@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Paleta base de Nura */
+:root {
+  --nura: #37B3B3;
+  --nura-soft: #7bd7d7;
+  --nura-bg: #f8fafa;
+  --nura-dark: #0a3a3a;
+}
+
+body {
+  background-color: var(--nura-bg);
+  font-family: 'Inter', sans-serif;
+  color: #333;
+}
+
+/* Utils globales responsive */
+.desktop-only { display: none !important; }
+.mobile-only  { display: inline-flex !important; }
+
+@media (min-width: 900px){
+  .desktop-only { display: inline-flex !important; }
+  .mobile-only  { display: none !important; }
+}
+
+/* Quita margen al body para que el header sticky quede arriba del todo */
+html, body { margin: 0; }
