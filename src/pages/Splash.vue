@@ -1,5 +1,7 @@
 <template>
   <section class="splash">
+  <h1 class="visually-hidden">S plash Screen </h1>
+
     <img src="/logos/OFICIALwhite.png" alt="Nura logo" class="logo" />
     <div class="loader"></div>
   </section>
@@ -14,21 +16,21 @@ const router = useRouter()
 
 onMounted(async () => {
   try {
-    // 1️⃣ Obtener sesión actual
+    // 1 Obtener sesión actual
     const { data } = await supabase.auth.getSession()
     const session = data.session
     const user = session?.user
 
-    // 2️⃣ Esperar breve animación
+    // 2️ Esperar breve animación
     await new Promise(resolve => setTimeout(resolve, 1500))
 
-    // 3️⃣ Redirigir según estado
+    // 3️ Redirigir según estado
     if (!user) {
       router.replace('/login')
       return
     }
 
-    // 4️⃣ Si está logueado, ver si ya completó onboarding
+    // 4️ Si está logueado, ver si ya completó onboarding
     const done =
       (user.user_metadata as any)?.onboarding_done === true ||
       false

@@ -10,7 +10,16 @@
 
     <!-- Formulario -->
     <form class="form" @submit.prevent="submit">
-      <p class="hint">Ingresá un:</p>
+      <p class="hint">Ingresá tus datos:</p>
+
+      <input
+        class="field"
+        v-model="name"
+        type="text"
+        placeholder="Nombre"
+        required
+        autocomplete="name"
+      />
 
       <input
         class="field"
@@ -25,7 +34,7 @@
         class="field"
         v-model="password"
         type="password"
-        placeholder="Contraseña"
+        placeholder="Contraseña (mínimo 6 caracteres)"
         required
         autocomplete="new-password"
         minlength="6"
@@ -81,6 +90,7 @@ import { supabase } from '@/composables/useSupabase'
 
 const router = useRouter()
 
+const name = ref('')
 const email = ref('')
 const password = ref('')
 const day = ref<number | null>(null)
@@ -96,46 +106,108 @@ const dob = computed(() => {
   return `${year.value}-${m}-${d}` // YYYY-MM-DD
 })
 
+function calcAge(dateStr: string): number {
+  const birth = new Date(dateStr)
+  if (Number.isNaN(birth.getTime())) return NaN
+
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  return age
+}
+
+function mapSupabaseError(err: any): string {
+  const raw = (err?.message || '').toLowerCase()
+
+  if (raw.includes('user already registered') || raw.includes('email')) {
+    return 'Ya existe una cuenta con ese correo. Probá iniciar sesión o usar otro email.'
+  }
+  if (raw.includes('password')) {
+    return 'La contraseña es demasiado débil. Usá al menos 6 caracteres.'
+  }
+  return 'No pudimos crear tu cuenta en este momento. Probá nuevamente en unos minutos.'
+}
+
 async function submit() {
+  if (!name.value.trim()) {
+    alert('Ingresá tu nombre.')
+    return
+  }
+
   if (!dob.value) {
     alert('Completá tu fecha de nacimiento.')
     return
   }
+
+  const age = calcAge(dob.value)
+  if (Number.isNaN(age)) {
+    alert('La fecha de nacimiento no es válida. Revisá día, mes y año.')
+    return
+  }
+  if (age < 15) {
+    alert('Por ahora Nura está disponible a partir de los 15 años.')
+    return
+  }
+
+  if (password.value.length < 6) {
+    alert('La contraseña debe tener al menos 6 caracteres.')
+    return
+  }
+
   loading.value = true
+
   try {
-    // 1) Crear cuenta directamente con Supabase
+    // 1) Crear el usuario en Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email: email.value.trim(),
       password: password.value,
       options: {
-        // Guardamos metadata útil
         data: {
-          dob: dob.value,
-          onboarding_done: false,
+          name: name.value.trim(),
+          dob: dob.value
         },
-        emailRedirectTo: window.location.origin + '/login', // si usás confirmación por mail
-      },
+        emailRedirectTo: window.location.origin + '/login'
+      }
     })
-    if (error) throw error
 
-    // 2) Si tu proyecto NO requiere confirmación por email, habrá session -> directo a onboarding
-    //    Si requiere confirmación, no habrá session -> lo mandamos a login con aviso
-    if (data.session) {
-      // Opcional: también dejar constancia en 'profiles' si la usás
+    if (error) {
+      throw error
+    }
+
+    // 2) Guardar/actualizar perfil en tabla profiles (solo columnas que existen)
+    if (data.user) {
       try {
         await supabase.from('profiles').upsert(
-          { id: data.user?.id, onboarding_done: false },
+          {
+            id: data.user.id,
+            full_name: name.value.trim()
+          },
           { onConflict: 'id' }
         )
-      } catch { /* opcional */ }
+      } catch (profileErr) {
+        console.error('Error guardando perfil en profiles:', profileErr)
+        // No cortamos el flujo, solo avisamos genérico
+        alert(
+          'Tu cuenta se creó, pero no pudimos guardar tu perfil completo. Podés actualizarlo después en la sección Perfil.'
+        )
+      }
+    }
 
+    // 3) Redirecciones según haya sesión o confirmación por email
+    if (data.session) {
       router.replace('/onboarding')
     } else {
-      alert('Te enviamos un correo para confirmar tu cuenta. Iniciá sesión cuando confirmes.')
+      alert(
+        'Te enviamos un correo para confirmar tu cuenta. Iniciá sesión cuando lo hayas confirmado.'
+      )
       router.replace('/login')
     }
   } catch (e: any) {
-    alert(e?.message ?? 'No pudimos crear tu cuenta.')
+    console.error('Error en registro:', e)
+    alert(mapSupabaseError(e))
   } finally {
     loading.value = false
   }
@@ -190,11 +262,11 @@ async function submit() {
   border: none;
   outline: none;
   background: #ffffffeb;
-  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
   font-size: 0.95rem;
 }
 .field:focus {
-  box-shadow: 0 0 0 3px rgba(133,182,224,.35);
+  box-shadow: 0 0 0 3px rgba(133, 182, 224, 0.35);
 }
 
 /* Fecha de nacimiento (chips) */
@@ -211,7 +283,7 @@ async function submit() {
   border-radius: 10px;
   border: none;
   background: #ffffffeb;
-  box-shadow: 0 4px 12px rgba(0,0,0,.10);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   font-size: 0.92rem;
 }
 
@@ -225,11 +297,13 @@ async function submit() {
   background: var(--nura-blue, #85b6e0);
   color: #fff;
   font-weight: 700;
-  box-shadow: 0 10px 22px rgba(0,0,0,.22);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  transition: .2s ease;
+  transition: 0.2s ease;
 }
-.cta:hover { background: var(--nura-green, #50bdbd); }
+.cta:hover {
+  background: var(--nura-green, #50bdbd);
+}
 
 /* Link a login */
 .link-btn {

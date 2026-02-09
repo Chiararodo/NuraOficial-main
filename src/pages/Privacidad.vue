@@ -11,8 +11,8 @@ function goBack() {
 <template>
   <main class="page">
     <header class="top">
-      <button class="back-btn" type="button" @click="goBack">
-        ←
+      <button class="back-link" type="button" @click="goBack">
+        <span class="arrow">←</span>
       </button>
       <h1 class="title">Privacidad y Términos</h1>
     </header>
@@ -79,6 +79,35 @@ function goBack() {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+
+/* Header */
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1100px;
+  margin: 0 auto 14px;
+}
+.sub-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #46bdbd;
+  font-weight: 700;
+}
+.back-link {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.arrow {
+  font-size: 1.5rem;
+  color: #46bdbd;
 }
 
 .top {

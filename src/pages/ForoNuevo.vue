@@ -7,7 +7,6 @@ import { useAuthStore } from '@/store/auth'
 const router = useRouter()
 const auth = useAuthStore()
 
-// Estado del formulario
 const title = ref('')
 const body = ref('')
 const categories = ['Alimentación', 'Ansiedad', 'Autoestima'] as const
@@ -17,7 +16,6 @@ const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
-// Validación simple
 const canSubmit = computed(() => {
   return (
     !loading.value &&
@@ -35,13 +33,13 @@ async function submit() {
 
   loading.value = true
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('forums')
       .insert({
         title: title.value.trim(),
         body: body.value.trim(),
         category: activeCat.value,
-        user_id: auth.user?.id ?? null,
+        user_id: auth.user?.id ?? null
       })
       .select('id')
       .single()
@@ -49,7 +47,6 @@ async function submit() {
     if (error) throw error
 
     successMsg.value = 'Tu foro se publicó correctamente.'
-    // Volvemos a la lista de foros
     router.push({ name: 'foro' })
   } catch (err: any) {
     console.error(err)
@@ -65,38 +62,39 @@ function goBack() {
 </script>
 
 <template>
+  <h1 class="visually-hidden">Crear nuevo foro en Nura</h1>
   <main class="foro-new">
-    <!-- Header tipo app -->
     <header class="head">
-      <button class="back-btn" type="button" @click="goBack">←</button>
-      <h2>Foro</h2>
+      <button class="back-link" type="button" @click="goBack">
+        <span class="arrow">←</span>
+      </button>
+      <h2>Nuevo foro</h2>
     </header>
 
     <section class="content">
-      <!-- Título -->
-      <label class="field">
-        <span class="label">Título</span>
+      <div class="field">
+        <label class="label" for="forum-title">Título</label>
         <input
+          id="forum-title"
           v-model="title"
           type="text"
           placeholder="Tips para manejar la ansiedad"
         />
-      </label>
+      </div>
 
-      <!-- Descripción -->
-      <label class="field">
-        <span class="label">Descripción</span>
+      <div class="field">
+        <label class="label" for="forum-body">Descripción</label>
         <textarea
+          id="forum-body"
           v-model="body"
           rows="4"
           placeholder="Estos días me costó mantener la calma antes de comer. ¿Qué estrategias les sirven a ustedes para bajar la ansiedad?"
         ></textarea>
-      </label>
+      </div>
 
-      <!-- Categoría -->
       <div class="field">
         <span class="label">Categoría</span>
-        <div class="pills">
+        <div class="pills" aria-label="Elegir categoría del foro">
           <button
             v-for="c in categories"
             :key="c"
@@ -110,28 +108,14 @@ function goBack() {
         </div>
       </div>
 
-      <!-- Adjuntar imagen (solo UI por ahora) -->
-      <div class="field">
-        <span class="label">Adjuntar imagen (opcional)</span>
-        <button type="button" class="attach-btn" disabled>
-          📎 Adjuntar imagen
-        </button>
-        <p class="hint">
-          (Funcionalidad opcional. Por ahora es solo ilustrativa para el diseño.)
-        </p>
-      </div>
-
-      <!-- Nota Nura -->
       <div class="note">
-        Nura es un espacio de apoyo.<br />
-        Compartí con respeto.
+        Nura es un espacio de apoyo. Cuidemos el tono y la forma de hablarle a
+        las demás personas.
       </div>
 
-      <!-- Mensajes -->
       <p v-if="errorMsg" class="msg error">{{ errorMsg }}</p>
       <p v-if="successMsg" class="msg success">{{ successMsg }}</p>
 
-      <!-- CTA -->
       <button
         class="btn-primary"
         type="button"
@@ -145,143 +129,159 @@ function goBack() {
 </template>
 
 <style scoped>
-.foro-new{
-  background:#fff;
-  max-width:900px;
-  margin:0 auto;
-  padding:0 18px 32px;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.foro-new {
+  background: #fff;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 18px 32px;
 }
 
 /* Header */
-.head{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:16px 0 10px;
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0 10px;
 }
-.head h2{
-  margin:0;
-  font-size:1.3rem;
-  color:#111;
+.head h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #111827;
 }
-.back-btn{
-  border:none;
-  background:#50bdbd;
-  color:#fff;
-  width:32px;
-  height:32px;
-  border-radius:999px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.back-link {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.arrow {
+  font-size: 1.5rem;
+  color: #46bdbd;
 }
 
 /* Contenido */
-.content{
-  display:grid;
-  gap:16px;
+.content {
+  display: grid;
+  gap: 16px;
 }
 
 /* Campos */
-.field{
-  display:grid;
-  gap:6px;
+.field {
+  display: grid;
+  gap: 6px;
 }
-.label{
-  font-size:.9rem;
-  font-weight:500;
+.label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
 }
 input,
-textarea{
-  border-radius:12px;
-  border:1px solid #e3edf2;
-  background:#f6fbff;
-  padding:10px 12px;
-  font-size:.95rem;
-  outline:none;
-  resize:vertical;
+textarea {
+  border-radius: 12px;
+  border: 1px solid #e3edf2;
+  background: #f6fbff;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  outline: none;
+  resize: vertical;
+}
+input:focus,
+textarea:focus {
+  border-color: #50bdbd;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.18);
 }
 
 /* Pills */
-.pills{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
+.pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.pill{
-  padding:8px 14px;
-  border-radius:999px;
-  border:1px solid #cfe7f3;
-  background:#eaf6ff;
-  cursor:pointer;
-  transition:all .15s ease;
-}
-.pill.active{
-  background:#50bdbd;
-  color:#fff;
-  border-color:transparent;
-  box-shadow:0 0 0 2px rgba(80,189,189,.15) inset;
+.pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 2px solid #bbe4f8;
+  background: #eaf6ff;
+  color: #50bdbd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.9rem;
 }
 
-/* Adjuntar imagen */
-.attach-btn{
-  padding:8px 14px;
-  border-radius:999px;
-  border:none;
-  background:#eaf6ff;
-  color:#4d5a6a;
-  cursor:not-allowed;
+.pill:hover {
+  background: #caf0f0;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
-.hint{
-  margin:4px 0 0;
-  font-size:.8rem;
-  opacity:.7;
+
+.pill.active {
+  background: #50bdbd;
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 
 /* Nota */
-.note{
-  margin-top:4px;
-  padding:10px 14px;
-  border-radius:12px;
-  background:#eaf6ff;
-  text-align:center;
-  font-size:.9rem;
+.note {
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #eaf6ff;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #475569;
 }
 
 /* Mensajes */
-.msg{
-  font-size:.85rem;
+.msg {
+  font-size: 0.85rem;
 }
-.msg.error{
-  color:#b3261e;
+.msg.error {
+  color: #b3261e;
 }
-.msg.success{
-  color:#087f23;
+.msg.success {
+  color: #087f23;
 }
 
 /* Botón publicar */
-.btn-primary{
-  margin-top:4px;
-  width:100%;
-  padding:12px 20px;
-  border-radius:999px;
-  border:none;
-  background:#85b6e0;
-  color:#fff;
-  font-weight:600;
-  cursor:pointer;
-  transition:background .15s ease, box-shadow .2s ease, transform .1s ease;
+.btn-primary {
+  margin-top: 4px;
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: none;
+  background: #50bdbd;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 10px 26px rgba(80, 189, 189, 0.45);
 }
-.btn-primary:disabled{
-  opacity:.5;
-  cursor:not-allowed;
-  box-shadow:none;
-  transform:none;
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
-.btn-primary:not(:disabled):hover{
-  background:#50bdbd;
-  box-shadow:0 10px 26px rgba(0,0,0,.12);
-  transform:translateY(-1px);
+.btn-primary:not(:disabled):hover {
+  background: #3ea9a9;
+  box-shadow: 0 12px 30px rgba(80, 189, 189, 0.55);
+  transform: translateY(-1px);
 }
 </style>

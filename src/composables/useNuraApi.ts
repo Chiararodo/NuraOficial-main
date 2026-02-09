@@ -29,7 +29,6 @@ export function useNuraApi() {
 
     const json = await res.json()
     loading.value = false
-    // tu API devuelve { ok: true, data: [...] }
     return json.data ?? json
   }
 

@@ -1,19 +1,41 @@
+<script setup lang="ts">
+import { watch } from 'vue'
+import Footer from '@/components/Footer.vue'
+import { useAuthStore } from '@/store/auth'
+import { useNotificationsStore } from '@/store/notifications'
+
+const auth = useAuthStore()
+const notif = useNotificationsStore()
+
+watch(
+  () => auth.user,
+  (u) => {
+    if (u) {
+      notif.initRealtime()
+      notif.refreshTodayCount()
+    } else {
+      // opcional: limpiar cuando se desloguea
+      notif.refreshTodayCount()
+    }
+  },
+  { immediate: true }
+)
+</script>
+
+
+
 <template>
+<h1 class="visually-hidden"> App
+</h1>
   <div id="app" class="app-wrapper min-h-screen bg-nura-bg text-nura-text">
-    
-    <!-- El contenido principal ocupa todo el alto -->
     <div class="app-content">
       <RouterView />
     </div>
-
     <!-- Footer para desktop -->
     <Footer />
   </div>
 </template>
 
-<script setup lang="ts">
-import Footer from '@/components/Footer.vue'
-</script>
 
 <style>
 :root {
@@ -24,14 +46,13 @@ import Footer from '@/components/Footer.vue'
   --nura-text: #000000;
 }
 
-/* 💚 Contenedor general que permite que el footer quede abajo */
+
 .app-wrapper {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* 💚 Esto hace que RouterView empuje al footer hacia abajo */
 .app-content {
   flex: 1;
 }

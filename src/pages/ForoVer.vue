@@ -26,75 +26,155 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const forumId = computed(() => route.params.id as string)
+const highlightId = computed(
+  () => (route.query.highlight as string | undefined) || null
+)
 
-// Estado
 const forum = ref<ForumRow | null>(null)
 const comments = ref<CommentRow[]>([])
-const loadingForum = ref(true)
-const loadingComments = ref(true)
 const errorMsg = ref('')
-
-// Nuevo comentario
 const newComment = ref('')
 const sending = ref(false)
 
-const canSend = computed(() => {
-  return !sending.value && newComment.value.trim().length > 1
-})
+const canSend = computed(
+  () => newComment.value.trim().length > 1 && !sending.value
+)
+
+/* =======================
+   Nombres + avatares
+   ======================= */
+
+const userNames = ref<Map<string, string>>(new Map())
+const userAvatars = ref<Map<string, string | null>>(new Map())
+
+// Solo sembramos el nombre del usuario logueado desde user_metadata.
+// El avatar siempre lo tomamos de profiles.avatar_url.
+function seedCurrentUserName() {
+  if (!auth.user) return
+  const metaName =
+    (auth.user.user_metadata as any)?.name?.trim() ||
+    auth.user.email?.split('@')[0] ||
+    ''
+
+  if (!metaName) return
+
+  const map = new Map(userNames.value)
+  map.set(auth.user.id, metaName)
+  userNames.value = map
+}
+
+function getDisplayName(userId: string | null | undefined) {
+  if (!userId) return 'Usuario'
+
+  const fromMap = userNames.value.get(userId)
+  if (fromMap) return fromMap
+
+  if (auth.user && userId === auth.user.id) {
+    const metaName =
+      (auth.user.user_metadata as any)?.name?.trim() ||
+      auth.user.email?.split('@')[0]
+    return metaName || 'Usuario'
+  }
+
+  return 'Usuario'
+}
+
+function displayAvatarFor(userId: string | null | undefined): string | null {
+  if (!userId) return null
+  const fromMap = userAvatars.value.get(userId)
+  return fromMap ?? null
+}
+
+async function loadUserNames() {
+  const ids = new Set<string>()
+  if (forum.value?.user_id) ids.add(forum.value.user_id)
+  comments.value.forEach((c) => c.user_id && ids.add(c.user_id))
+
+  if (ids.size === 0) return
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .in('id', Array.from(ids))
+
+  if (!data) return
+
+  const nameMap = new Map(userNames.value)
+  const avatarMap = new Map(userAvatars.value)
+
+  const avatarPromises: Promise<void>[] = []
+
+  ;(data as any[]).forEach((u) => {
+    // nombre
+    const existingName = nameMap.get(u.id)
+    const displayName = u.full_name?.trim() || existingName || 'Usuario'
+    nameMap.set(u.id, displayName)
+
+    // avatar: u.avatar_url es solo el path en el bucket "avatars"
+    if (u.avatar_url) {
+      const path = u.avatar_url as string
+      avatarPromises.push(
+        (async () => {
+          const { data: signed, error } = await supabase.storage
+            .from('avatars')
+            .createSignedUrl(path, 60 * 60 * 24 * 7) // 7 días
+
+          if (!error && signed?.signedUrl) {
+            avatarMap.set(u.id, signed.signedUrl)
+          }
+        })()
+      )
+    }
+  })
+
+  // esperamos a generar todas las signed URLs
+  await Promise.all(avatarPromises)
+
+  userNames.value = nameMap
+  userAvatars.value = avatarMap
+}
+
+const authorLabel = computed(() => getDisplayName(forum.value?.user_id ?? null))
+
+function displayNameForComment(c: CommentRow) {
+  return getDisplayName(c.user_id)
+}
+
+/* =======================
+   Navegación
+   ======================= */
 
 function goBack() {
   router.back()
 }
 
-/* ---------- Helpers de formato ---------- */
+function goToProfile(userId?: string | null) {
+  if (!userId) return
+  router.push({
+    name: 'perfil-publico',
+    params: { uid: userId }
+  })
+}
+
+/* =======================
+   Formato de fecha
+   ======================= */
+
 function formatDateTime(iso: string) {
   const d = new Date(iso)
   return d.toLocaleString('es-AR', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
-    minute: '2-digit',
+    minute: '2-digit'
   })
 }
 
-function formatTime(iso: string) {
-  const d = new Date(iso)
-  return d.toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+/* =======================
+   Cargar foro y comentarios
+   ======================= */
 
-/** Nombre a mostrar para el autor del foro */
-const authorLabel = computed(() => {
-  if (!forum.value) return 'Usuario'
-
-  // Si el post es del usuario logueado, mostramos su nombre real o mail
-  if (auth.user && forum.value.user_id === auth.user.id) {
-    const metaName = (auth.user.user_metadata as any)?.name
-    if (metaName) return metaName
-    if (auth.user.email) return auth.user.email.split('@')[0]
-  }
-
-  // Para otros usuarios (de momento) usamos un nombre genérico
-  return 'Usuario'
-})
-
-/** Nombre a mostrar para cada comentario */
-function displayNameForComment(c: CommentRow): string {
-  if (auth.user && c.user_id === auth.user.id) {
-    const metaName = (auth.user.user_metadata as any)?.name
-    if (metaName) return metaName
-    if (auth.user.email) return auth.user.email.split('@')[0]
-  }
-  return 'Usuario'
-}
-
-/* ---------- Carga post original ---------- */
 async function loadForum() {
-  loadingForum.value = true
-  errorMsg.value = ''
-
   const { data, error } = await supabase
     .from('forums')
     .select('id,title,body,category,created_at,user_id')
@@ -107,69 +187,164 @@ async function loadForum() {
   } else {
     forum.value = data as ForumRow
   }
-
-  loadingForum.value = false
 }
 
-/* ---------- Carga comentarios ---------- */
 async function loadComments() {
-  loadingComments.value = true
-
   const { data, error } = await supabase
     .from('forum_comments')
     .select('id,forum_id,user_id,body,created_at')
     .eq('forum_id', forumId.value)
     .order('created_at', { ascending: true })
 
-  if (error) {
-    console.error(error)
-  } else {
-    comments.value = (data ?? []) as CommentRow[]
+  if (!error && data) {
+    comments.value = data as CommentRow[]
   }
-
-  loadingComments.value = false
 }
 
-/* ---------- Enviar comentario ---------- */
+function scrollToHighlighted() {
+  if (!highlightId.value) return
+  requestAnimationFrame(() => {
+    const el = document.getElementById(highlightId.value as string)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  })
+}
+
+/* =======================
+   Enviar comentario
+   ======================= */
+
 async function sendComment() {
   if (!canSend.value) return
+
   sending.value = true
   errorMsg.value = ''
 
-  try {
-    const text = newComment.value.trim()
+  const text = newComment.value.trim()
 
-    const { data, error } = await supabase
-      .from('forum_comments')
-      .insert({
-        forum_id: forumId.value,
-        user_id: auth.user?.id ?? null,
-        body: text,
-      })
-      .select('id,forum_id,user_id,body,created_at')
-      .single()
+  const { data, error } = await supabase
+    .from('forum_comments')
+    .insert({
+      forum_id: forumId.value,
+      user_id: auth.user?.id ?? null,
+      body: text
+    })
+    .select('id,forum_id,user_id,body,created_at')
+    .single()
 
-    if (error) throw error
-
-    if (data) {
-      comments.value = [...comments.value, data as CommentRow]
-    }
-
-    newComment.value = ''
-  } catch (err: any) {
-    console.error(err)
+  if (error) {
+    console.error(error)
     errorMsg.value = 'No se pudo enviar el comentario.'
-  } finally {
-    sending.value = false
+  } else if (data) {
+    const c = data as CommentRow
+    comments.value.push(c)
+    newComment.value = ''
+
+    if (c.user_id && !userNames.value.get(c.user_id)) {
+      await loadUserNames()
+    }
   }
+
+  sending.value = false
 }
 
-/* ---------- Realtime ---------- */
-let channel: ReturnType<typeof supabase.channel> | null = null
+/* =======================
+   Borrar comentario
+   ======================= */
+
+const showConfirmDelete = ref(false)
+const commentToDelete = ref<CommentRow | null>(null)
+const deleting = ref(false)
+
+function askDelete(c: CommentRow) {
+  if (!auth.user || c.user_id !== auth.user.id) return
+  commentToDelete.value = c
+  showConfirmDelete.value = true
+}
+
+function cancelDelete() {
+  showConfirmDelete.value = false
+  commentToDelete.value = null
+}
+
+async function confirmDelete() {
+  if (!commentToDelete.value || !auth.user) return
+
+  deleting.value = true
+  errorMsg.value = ''
+
+  const { error } = await supabase
+    .from('forum_comments')
+    .delete()
+    .eq('id', commentToDelete.value.id)
+    .eq('user_id', auth.user.id)
+
+  if (error) {
+    console.error(error)
+    errorMsg.value = 'No se pudo borrar el comentario.'
+  } else {
+    comments.value = comments.value.filter(
+      (c) => c.id !== commentToDelete.value!.id
+    )
+  }
+
+  deleting.value = false
+  showConfirmDelete.value = false
+  commentToDelete.value = null
+}
+
+/* =======================
+   Borrar foro
+   ======================= */
+
+const canDeleteForum = computed(
+  () => auth.user && forum.value && forum.value.user_id === auth.user.id
+)
+
+const showConfirmDeleteForum = ref(false)
+const deletingForum = ref(false)
+
+function askDeleteForum() {
+  if (!canDeleteForum.value) return
+  showConfirmDeleteForum.value = true
+}
+
+function cancelDeleteForum() {
+  showConfirmDeleteForum.value = false
+}
+
+async function confirmDeleteForum() {
+  if (!auth.user || !forum.value) return
+
+  deletingForum.value = true
+  errorMsg.value = ''
+
+  const { error } = await supabase
+    .from('forums')
+    .delete()
+    .eq('id', forum.value.id)
+    .eq('user_id', auth.user.id)
+
+  if (error) {
+    console.error(error)
+    errorMsg.value = 'No se pudo borrar el foro.'
+    deletingForum.value = false
+    return
+  }
+
+  deletingForum.value = false
+  showConfirmDeleteForum.value = false
+  router.push({ name: 'foro' })
+}
+
+/* =======================
+   Realtime
+   ======================= */
+
+let channel: any = null
 
 function setupRealtime() {
-  if (!forumId.value) return
-
   channel = supabase
     .channel(`forum-comments-${forumId.value}`)
     .on(
@@ -178,12 +353,15 @@ function setupRealtime() {
         event: 'INSERT',
         schema: 'public',
         table: 'forum_comments',
-        filter: `forum_id=eq.${forumId.value}`,
+        filter: `forum_id=eq.${forumId.value}`
       },
-      (payload: any) => {
+      async (payload: any) => {
         const c = payload.new as CommentRow
         if (!comments.value.find((x) => x.id === c.id)) {
-          comments.value = [...comments.value, c]
+          comments.value.push(c)
+          if (c.user_id && !userNames.value.get(c.user_id)) {
+            await loadUserNames()
+          }
         }
       }
     )
@@ -191,256 +369,493 @@ function setupRealtime() {
 }
 
 onMounted(async () => {
-  if (!forumId.value) {
-    errorMsg.value = 'Foro no válido.'
-    return
-  }
+  seedCurrentUserName()
   await loadForum()
   if (!errorMsg.value) {
     await loadComments()
+    await loadUserNames()
     setupRealtime()
+    scrollToHighlighted()
   }
 })
 
 onBeforeUnmount(() => {
-  if (channel) {
-    supabase.removeChannel(channel)
-    channel = null
-  }
+  if (channel) supabase.removeChannel(channel)
 })
 </script>
 
 <template>
-  <main class="foro-view">
-    <!-- Header -->
-    <header class="head">
-      <button class="back-btn" type="button" @click="goBack">←</button>
-      <h2>Foro</h2>
-    </header>
+  <h1 class="visually-hidden">Foro Ver</h1>
 
-    <section v-if="loadingForum" class="state">Cargando foro…</section>
-    <section v-else-if="errorMsg" class="state error">{{ errorMsg }}</section>
+  <main class="contenido ver-foro">
+    <button class="back-link" type="button" @click="goBack">
+      <span class="arrow">←</span>
+    </button>
 
-    <section v-else-if="forum" class="content">
-      <!-- Post principal -->
-      <article class="post-card">
-        <p class="post-title">{{ forum.title }}</p>
-        <p class="post-meta">
-          por {{ authorLabel }} • {{ formatDateTime(forum.created_at) }}
-        </p>
-        <p class="post-body">
-          {{ forum.body }}
-        </p>
-      </article>
+    <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
 
-      <!-- Comentarios -->
-      <h3 class="comments-title">
-        Comentarios ({{ comments.length }})
-      </h3>
+    <div v-else-if="forum" class="post-box">
+      <div class="post-header">
+        <h2>{{ forum.title }}</h2>
 
-      <div v-if="loadingComments" class="state">Cargando comentarios…</div>
-      <p v-else-if="!comments.length" class="state empty">
-        Todavía no hay comentarios. ¡Sé la primera persona en comentar!
+        <button
+          v-if="canDeleteForum"
+          type="button"
+          class="delete-forum-btn"
+          @click="askDeleteForum"
+        >
+          Borrar foro
+        </button>
+      </div>
+
+      <p class="meta">
+        Publicado por
+        <button
+          v-if="forum.user_id"
+          class="author-link"
+          @click="goToProfile(forum.user_id)"
+        >
+          {{ authorLabel }}
+        </button>
+        <span v-else><strong>{{ authorLabel }}</strong></span>
+        · {{ formatDateTime(forum.created_at) }}
       </p>
 
-      <div v-else class="comments-list">
-        <article v-for="c in comments" :key="c.id" class="comment">
-          <div class="avatar">
-            <span>🙂</span>
+      <p class="body">{{ forum.body }}</p>
+
+      <span class="tag">{{ forum.category }}</span>
+    </div>
+
+    <section class="comments-box">
+      <h3>Comentarios ({{ comments.length }})</h3>
+
+      <div v-if="comments.length > 0">
+        <div
+          v-for="c in comments"
+          :key="c.id"
+          :id="c.id"
+          class="comment"
+          :class="{ highlighted: c.id === highlightId }"
+        >
+          <div
+            class="avatar"
+            :class="{ clickable: !!c.user_id }"
+            @click="goToProfile(c.user_id)"
+          >
+            <div class="avatar-inner">
+              <img
+                v-if="displayAvatarFor(c.user_id)"
+                :src="displayAvatarFor(c.user_id)!"
+                alt="Avatar"
+                class="avatar-img"
+              />
+              <span v-else class="avatar-initial">
+                {{ displayNameForComment(c).charAt(0).toUpperCase() }}
+              </span>
+            </div>
           </div>
+
           <div class="comment-body">
             <div class="comment-header">
-              <span class="name">{{ displayNameForComment(c) }}</span>
-              <span class="time">{{ formatTime(c.created_at) }}</span>
+              <button
+                v-if="c.user_id"
+                class="user-btn"
+                @click="goToProfile(c.user_id)"
+              >
+                {{ displayNameForComment(c) }}
+              </button>
+              <span v-else class="user">
+                {{ displayNameForComment(c) }}
+              </span>
+
+              <span class="date">
+                {{ formatDateTime(c.created_at) }}
+              </span>
+
+              <button
+                v-if="auth.user && c.user_id === auth.user.id"
+                class="delete-comment-btn"
+                @click="askDelete(c)"
+              >
+                Borrar
+              </button>
             </div>
-            <p class="text">{{ c.body }}</p>
+
+            <p>{{ c.body }}</p>
           </div>
-        </article>
+        </div>
       </div>
 
-      <!-- Mensaje de error envío -->
-      <p v-if="errorMsg && !loadingForum" class="state error">
-        {{ errorMsg }}
-      </p>
-
-      <!-- Composer -->
-      <div class="composer-wrap">
-        <form class="composer" @submit.prevent="sendComment">
-          <input
-            v-model="newComment"
-            type="text"
-            placeholder="Escribí tu comentario…"
-          />
-          <button type="submit" :disabled="!canSend">
-            {{ sending ? 'Enviando…' : 'Enviar' }}
-          </button>
-        </form>
+      <div v-else class="empty">
+        Todavía no hay comentarios. ¡Sé la primera en comentar!
       </div>
     </section>
+
+    <section v-if="auth.user" class="new-comment">
+      <textarea
+        v-model="newComment"
+        placeholder="Escribí un comentario..."
+      ></textarea>
+
+      <button class="btn" :disabled="!canSend" @click="sendComment">
+        Comentar
+      </button>
+    </section>
+
+    <p v-else class="login-msg">Tenés que iniciar sesión para comentar.</p>
+
+    <!-- Modal borrar comentario -->
+    <div v-if="showConfirmDelete" class="modal-backdrop">
+      <div class="modal">
+        <h4>¿Eliminar comentario?</h4>
+        <p>Esta acción no se puede deshacer.</p>
+
+        <div class="modal-actions">
+          <button class="modal-cancel" @click="cancelDelete">
+            Cancelar
+          </button>
+          <button
+            class="modal-delete"
+            :disabled="deleting"
+            @click="confirmDelete"
+          >
+            {{ deleting ? 'Borrando…' : 'Eliminar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal borrar foro -->
+    <div v-if="showConfirmDeleteForum" class="modal-backdrop">
+      <div class="modal">
+        <h4>¿Eliminar foro?</h4>
+        <p>Se borrará todo el contenido y los comentarios.</p>
+
+        <div class="modal-actions">
+          <button class="modal-cancel" @click="cancelDeleteForum">
+            Cancelar
+          </button>
+          <button
+            class="modal-delete"
+            :disabled="deletingForum"
+            @click="confirmDeleteForum"
+          >
+            {{ deletingForum ? 'Borrando…' : 'Eliminar foro' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
 <style scoped>
-.foro-view{
-  background:#fff;
-  max-width:900px;
-  margin:0 auto;
-  padding:0 18px 24px;
-  min-height: calc(100dvh - 64px);
+.contenido {
+  background: #fff;
+  padding: 24px 18px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
-/* Header */
-.head{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:16px 0 10px;
-}
-.head h2{
-  margin:0;
-  font-size:1.3rem;
-  color:#111;
-}
-.back-btn{
-  border:none;
-  background:#50bdbd;
-  color:#fff;
-  width:32px;
-  height:32px;
-  border-radius:999px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.ver-foro {
+  padding: 16px;
 }
 
-.content{
-  display:grid;
-  gap:16px;
+.back-link {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.arrow {
+  font-size: 1.5rem;
+  color: #46bdbd;
 }
 
-/* Post principal */
-.post-card{
-  background:#eaf6ff;
-  border-radius:16px;
-  padding:12px 14px;
+.error {
+  margin-top: 10px;
+  color: #b3261e;
 }
-.post-title{
-  margin:0 0 4px;
-  font-weight:600;
+
+/* Post */
+.post-box {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: 20px;
 }
-.post-meta{
-  margin:0 0 8px;
-  font-size:.8rem;
-  opacity:.75;
+
+.post-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.post-body{
-  margin:0;
-  font-size:.95rem;
+
+.meta {
+  color: #6b6f76;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.author-link {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font-weight: 600;
+  color: #1f2933;
+  cursor: pointer;
+}
+
+.tag {
+  background: #50bdbd;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
 }
 
 /* Comentarios */
-.comments-title{
-  margin:0;
-  font-size:1rem;
-  font-weight:600;
+.comments-box {
+  margin-top: 20px;
 }
 
-.comments-list{
-  display:grid;
-  gap:10px;
-}
-.comment{
-  display:flex;
-  gap:10px;
-  padding:10px 12px;
-  border-radius:16px;
-  background:#f3fbfb;
-  border:1px solid #e0edf5;
-}
-.avatar{
-  width:38px;
-  height:38px;
-  border-radius:50%;
-  background:#d8f0ec;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-shrink:0;
-}
-.comment-body{
-  flex:1;
-}
-.comment-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:2px;
-}
-.name{
-  font-weight:600;
-  font-size:.9rem;
-}
-.time{
-  font-size:.8rem;
-  opacity:.7;
-}
-.text{
-  margin:2px 0 0;
-  font-size:.92rem;
+.comment {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
 }
 
-/* Composer */
-.composer-wrap{
-  position:sticky;
-  bottom:0;
-  padding-top:8px;
-  background: linear-gradient(to top, #fff 70%, rgba(255,255,255,0));
+/* avatar estilo perfil público */
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6ad7d7, #2d9c9c);
+  padding: 3px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
-.composer{
-  display:flex;
-  gap:8px;
-  padding:8px 0 2px;
-}
-.composer input{
-  flex:1;
-  border-radius:999px;
-  border:1px solid #e3edf2;
-  background:#f6fbff;
-  padding:8px 12px;
-  font-size:.9rem;
-}
-.composer button{
-  border:none;
-  border-radius:999px;
-  padding:8px 14px;
-  background:#85b6e0;
-  color:#fff;
-  font-weight:600;
-  cursor:pointer;
-  transition:background .15s ease, transform .1s ease, box-shadow .2s ease;
-}
-.composer button:disabled{
-  opacity:.5;
-  cursor:not-allowed;
-  box-shadow:none;
-  transform:none;
-}
-.composer button:not(:disabled):hover{
-  background:#50bdbd;
-  box-shadow:0 8px 20px rgba(0,0,0,.12);
-  transform:translateY(-1px);
+.avatar.clickable {
+  cursor: pointer;
 }
 
-/* Estados */
-.state{
-  font-size:.9rem;
-  opacity:.8;
+.avatar-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
-.state.error{
-  color:#b3261e;
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
-.state.empty{
-  opacity:.7;
+
+.avatar-initial {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d9c9c;
+}
+
+/* cuerpo comentario */
+.comment-body {
+  flex: 1;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: black;
+}
+
+.user-btn {
+  color: black;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.user {
+  font-weight: bold;
+}
+
+.date {
+  font-size: 0.8rem;
+  color: #6b6f76;
+  margin-left: auto;
+}
+
+/* botones borrar foro / comentario */
+.delete-forum-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 14px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.delete-forum-btn:hover {
+  background: #dc2626;
+}
+
+.delete-comment-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 14px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.delete-comment-btn:hover {
+  background: #dc2626;
+}
+
+/* Nuevo comentario */
+.new-comment textarea {
+  width: 95%;
+  min-height: 80px;
+  border-radius: 12px;
+  border: 1px solid #dce5ec;
+  padding: 10px;
+  font-family: inherit;
+}
+
+.btn {
+  margin-top: 10px;
+  background: #50bdbd;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btn:hover {
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+
+.empty {
+  color: #6b6f76;
+  text-align: center;
+  padding: 20px;
+}
+
+.login-msg {
+  margin-top: 16px;
+  color: #6b6f76;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 40;
+}
+
+.modal {
+  background: white;
+  border-radius: 16px;
+  padding: 18px 20px;
+  width: 90%;
+  max-width: 360px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+}
+
+.modal h4 {
+  margin: 0 0 8px;
+}
+
+.modal p {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-cancel {
+  align-self: flex-start;
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: none;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(80, 189, 189, 0.4);
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.18s ease;
+}
+.modal-cancel:hover {
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.5);
+}
+
+.modal-delete {
+  background: #ef5350;
+  box-shadow: 0 3px 10px rgba(239, 83, 80, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+.modal-delete:hover {
+  background: #e53935;
+}
+
+.modal-delete:disabled {
+  opacity: 0.6;
+}
+
+/* highlight comentario desde perfil público */
+.highlighted {
+  background: #e0f7f7;
+  border-radius: 8px;
+}
+
+.comment {
+  padding: 8px;
+  margin-bottom: 8px;
 }
 </style>

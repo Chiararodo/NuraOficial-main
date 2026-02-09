@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const showModal = ref(true)
-// idioma “real” de la app (fijo por ahora)
 const lang = 'es-AR'
 
 function goBack() {
@@ -18,17 +17,19 @@ function closeModal() {
 </script>
 
 <template>
+<h1 class="visually-hidden">Idioma
+</h1>
   <main class="page">
     <header class="top">
-      <button class="back-btn" type="button" @click="goBack">
-        ←
+      <button class="back-link" type="button" @click="goBack">
+        <span class="arrow">←</span>
       </button>
       <h1 class="title">Idioma</h1>
     </header>
 
     <section class="card">
       <p class="intro">
-        Por el momento Nura está disponible únicamente en castellano. En futuras
+        Por el momento Nura está disponible únicamente en Español. En futuras
         versiones vamos a ir sumando otros idiomas.
       </p>
 
@@ -67,7 +68,7 @@ function closeModal() {
       <div class="modal-card">
         <h2 class="modal-title">Cambio de idioma no disponible</h2>
         <p class="modal-text">
-          Por el momento, Nura solo está habilitada en castellano. Estamos
+          Por el momento, Nura solo está habilitada en Español. Estamos
           trabajando para sumar más idiomas próximamente.
         </p>
 
@@ -87,6 +88,35 @@ function closeModal() {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+
+/* Header */
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1100px;
+  margin: 0 auto 14px;
+}
+.sub-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #46bdbd;
+  font-weight: 700;
+}
+.back-link {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.arrow {
+  font-size: 1.5rem;
+  color: #46bdbd;
 }
 
 .top {

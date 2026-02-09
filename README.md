@@ -1,5 +1,7 @@
 README – Proyecto Nura
 
+Albornos, Castro, Michanie y Rodo.
+
 Nura es una app de bienestar mental construida en Vue 3 + Vite y Supabase.
 Incluye:
 - Foro dinámico con realtime.
@@ -10,12 +12,10 @@ Incluye:
 - Turnos con profesionales.
 
 Instalación
-
-1. Clonar repo:
-git clone https://github.com/Chiararodo/NuraOficial.git
-2. Instalar dependencias:
+1. Instalar dependencias:
 npm install
-3. Ejecutar:
+npm install flatpickr
+2. Ejecutar:
 npm run dev
 
 Supabase Setup
@@ -27,11 +27,9 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 VITE_NURA_API_URL=https://nura-backend-vvuv.onrender.com/api
 
+CUENTA ADMIN
+Usuario: admin@nura.app
+Contraseña: 123456
 
 
-Deploy en GitHub
-
-1. git add .
-2. git commit -m "update"
-3. git push origin main
 

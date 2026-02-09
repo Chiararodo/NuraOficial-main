@@ -1,15 +1,20 @@
 {
-  "name": "nura-pwa",
+  "name": "Nura-pwa",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+     "server": "node server/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "flatpickr": "^4.6.13",
+    "mercadopago": "^2.11.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.22",
     "vue-router": "^4.6.3"

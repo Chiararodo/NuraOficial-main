@@ -22,17 +22,14 @@ type CommentRow = {
 
 const router = useRouter()
 
-/* -------- UI state -------- */
 const q = ref('')
 const categories = ['Alimentación', 'Ansiedad', 'Autoestima'] as const
 const activeCat = ref<string | 'Todas'>('Todas')
 
-/* -------- Data -------- */
 const forums = ref<ForumRow[]>([])
 const commentCount = ref<Map<string, number>>(new Map())
 const loading = ref(true)
 
-/* -------- Fetch -------- */
 async function loadForums() {
   loading.value = true
   const { data: f } = await supabase
@@ -41,7 +38,6 @@ async function loadForums() {
     .order('created_at', { ascending: false })
   forums.value = (f as ForumRow[]) ?? []
 
-  // Traigo comentarios recientes y armo conteo por foro (rápido y simple)
   const { data: c } = await supabase
     .from('forum_comments')
     .select('id,forum_id')
@@ -56,7 +52,6 @@ async function loadForums() {
   loading.value = false
 }
 
-/* -------- Realtime -------- */
 let channel: ReturnType<typeof supabase.channel> | null = null
 function setupRealtime() {
   channel = supabase
@@ -74,7 +69,6 @@ function setupRealtime() {
       (payload: any) => {
         const fid = (payload.new as CommentRow).forum_id
         commentCount.value.set(fid, (commentCount.value.get(fid) ?? 0) + 1)
-        // fuerza reactividad
         commentCount.value = new Map(commentCount.value)
       }
     )
@@ -90,43 +84,46 @@ onBeforeUnmount(() => {
   if (channel) supabase.removeChannel(channel)
 })
 
-/* -------- Filters -------- */
 const filtered = computed(() => {
   const term = q.value.trim().toLowerCase()
   return forums.value.filter((f) => {
     const catOk = activeCat.value === 'Todas' || f.category === activeCat.value
-    const txt =
-      `${f.title ?? ''} ${f.body ?? ''}`.toLowerCase()
+    const txt = `${f.title ?? ''} ${f.body ?? ''}`.toLowerCase()
     const textOk = !term || txt.includes(term)
     return catOk && textOk
   })
 })
 
-/* -------- Navigation -------- */
 function openForum(f: ForumRow) {
-  // Asegurate de tener luego una ruta /app/foro/:id
   router.push({ name: 'foro-view', params: { id: f.id } })
 }
 function goNewForum() {
-  // Asegurate de tener luego una ruta /app/foro/new
   router.push({ name: 'foro-new' })
 }
 
-/* -------- Helpers UI -------- */
 function countFor(id: string) {
   return commentCount.value.get(id) ?? 0
 }
 </script>
 
 <template>
-  <main class="foro">
-    <!-- Header simple -->
-    <h2>Foro</h2>
+  <h1 class="visually-hidden">Foro Nura</h1>
+  <main class="contenido foro">
+    <header class="page-head">
+      <h2>Foro</h2>
+      <p class="subtitle">
+        Compartí experiencias, dudas y recursos con la comunidad.
+      </p>
+    </header>
 
-    <!-- Search -->
+    <!-- Buscador -->
     <div class="search">
+      <label for="forum-search" class="visually-hidden">
+        Buscar en el foro
+      </label>
       <span class="loupe">🔍</span>
       <input
+        id="forum-search"
         v-model="q"
         type="search"
         placeholder="Buscar por tema o palabra clave"
@@ -134,10 +131,11 @@ function countFor(id: string) {
     </div>
 
     <!-- Filtros por categoría -->
-    <div class="filters">
+    <div class="filters" aria-label="Filtrar por categoría">
       <button
         class="pill"
         :class="{ active: activeCat === 'Todas' }"
+        type="button"
         @click="activeCat = 'Todas'"
       >
         Todas
@@ -146,6 +144,7 @@ function countFor(id: string) {
         v-for="c in categories"
         :key="c"
         class="pill"
+        type="button"
         :class="{ active: activeCat === c }"
         @click="activeCat = c"
       >
@@ -155,7 +154,9 @@ function countFor(id: string) {
 
     <!-- Lista de foros -->
     <div v-if="loading" class="loading">Cargando foros…</div>
-    <p v-else-if="!filtered.length" class="empty">No hay foros para mostrar.</p>
+    <p v-else-if="!filtered.length" class="empty">
+      No hay foros para mostrar con esos filtros.
+    </p>
 
     <ul v-else class="forum-list">
       <li
@@ -172,105 +173,176 @@ function countFor(id: string) {
 
     <!-- Acción principal -->
     <div class="cta">
-      <button class="btn-primary" @click="goNewForum">Nuevo foro</button>
+      <button class="btn-primary" type="button" @click="goNewForum">
+        Nuevo foro
+      </button>
     </div>
   </main>
 </template>
 
 <style scoped>
-.foro{
-  background:#fff;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.contenido {
+  background: #fff;
+  padding: 24px 18px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.foro {
+  background: #fff;
   max-width: 900px;
   margin: 0 auto;
   padding: 18px 18px 26px;
 }
-h2{
-  margin:0 0 10px;
-  color:#111;
-  font-size:1.4rem;
+
+h2 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 1.4rem;
+}
+
+.subtitle {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: #6b7280;
 }
 
 /* Search */
-.search{
+.search {
   position: relative;
   margin-bottom: 16px;
 }
-.search .loupe{
-  position:absolute; left:12px; top:50%; translate:0 -50%;
-  opacity:.6; pointer-events:none;
+.search .loupe {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  opacity: 0.6;
+  pointer-events: none;
 }
-.search input{
-  width:100%;
-  padding:12px 14px 12px 36px;
-  border-radius:12px;
-  border:1px solid #e3edf2;
-  background:#f6fbff;
-  outline:none;
+.search input {
+  width: 100%;
+  padding: 12px 14px 12px 36px;
+  border-radius: 999px;
+  border: 1px solid #e3edf2;
+  background: #f6fbff;
+  outline: none;
+  font-size: 0.95rem;
+}
+.search input:focus {
+  border-color: #50bdbd;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
 }
 
 /* Pills */
-.filters{
-  display:flex; gap:10px; flex-wrap:wrap;
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   margin: 8px 0 14px;
 }
-.pill{
-  padding:8px 14px;
-  border-radius:999px;
-  border:1px solid #cfe7f3;
-  background:#eaf6ff;
-  color:#2d2d2d;
-  cursor:pointer;
-  transition:all .15s ease;
+.pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cfe7f3;
+  background: #eaf6ff;
+  color: #2d2d2d;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.9rem;
 }
-.pill:hover{ transform: translateY(-1px); }
-.pill.active{
-  background:#50bdbd; color:#fff; border-color: transparent;
-  box-shadow: 0 0 0 2px rgba(80,189,189,.15) inset;
+.pill:hover {
+  transform: translateY(-1px);
+}
+.pill.active {
+  background: #50bdbd;
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 
 /* List */
-.forum-list{ list-style:none; padding:0; margin: 6px 0 18px; display:grid; gap:10px; }
-.forum-item{
-  display:flex; align-items:center; gap:10px;
-  padding:10px 12px;
-  background:#fff;
-  border-radius:14px;
-  border:1px solid #e8eef3;
-  box-shadow:0 6px 16px rgba(0,0,0,.04);
-  cursor:pointer;
-  transition: transform .1s ease, box-shadow .2s ease, background .2s ease;
+.forum-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 18px;
+  display: grid;
+  gap: 10px;
 }
-.forum-item:hover{
-  background:#f1fbfb;
+.forum-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e8eef3;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.forum-item:hover {
+  background: #f1fbfb;
   transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(0,0,0,.08);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
 }
-.dot{
-  width:8px; height:8px; border-radius:999px; background:#50bdbd; flex:0 0 8px;
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #50bdbd;
+  flex: 0 0 8px;
 }
-.title{ flex:1; color:#111; }
-.count{ opacity:.7; }
+.title {
+  flex: 1;
+  color: #111827;
+  font-size: 0.95rem;
+}
+.count {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
 
 /* CTA */
-.cta{
+.cta {
   margin-top: 16px;
-  display:flex; justify-content:center;
+  display: flex;
+  justify-content: center;
 }
-.btn-primary{
-  padding:12px 20px;
-  border-radius:999px;
-  border:none;
-  background:#85b6e0;
-  color:#fff; font-weight:600;
-  cursor:pointer;
-  transition: transform .1s ease, box-shadow .2s ease, background .2s ease;
+.btn-primary {
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: none;
+  background: #50bdbd;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 10px 26px rgba(80, 189, 189, 0.45);
 }
-.btn-primary:hover{
-  background:#50bdbd;
-  box-shadow:0 10px 26px rgba(0,0,0,.12);
+.btn-primary:hover {
+  background: #3ea9a9;
+  box-shadow: 0 12px 30px rgba(80, 189, 189, 0.55);
   transform: translateY(-1px);
 }
 
 /* Misc */
-.loading,.empty{ opacity:.75; }
+.loading,
+.empty {
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
 </style>

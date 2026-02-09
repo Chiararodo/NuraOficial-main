@@ -1,66 +1,3 @@
-<template>
-  <section class="login-page">
-    <!-- Botón Instalar (solo desktop) -->
-    <InstallButton class="install desktop-only" />
-
-    <!-- Logo fuera del card -->
-    <img
-      src="/logos/OFICIALwhite.png"
-      alt="Nura"
-      class="brand"
-      onerror="this.src='/icons/icon-192.png'"
-    />
-
-    <!-- Card -->
-    <div class="card">
-      <!-- OAuth -->
-      <button class="btn btn-oauth facebook with-icon w-field" @click="oauth('facebook')" :disabled="loading">
-        <img src="/logos/facebook.png" alt="" />
-        Entrar con Facebook
-      </button>
-
-      <button class="btn btn-oauth google with-icon w-field" @click="oauth('google')" :disabled="loading">
-        <img src="/logos/google.jpg" alt="" />
-        Entrar con Google
-      </button>
-
-      <div class="divider w-field">o ingresá con</div>
-
-      <!-- Email / Password -->
-      <form class="form" @submit.prevent="emailLogin">
-        <input
-          class="w-field"
-          v-model="email"
-          type="email"
-          placeholder="Usuario"
-          required
-          autocomplete="email"
-        />
-        <input
-          class="w-field"
-          v-model="password"
-          type="password"
-          placeholder="Contraseña"
-          required
-          autocomplete="current-password"
-        />
-
-        <a class="forgot" href="" @click.prevent="forgot">
-          ¿Olvidaste tu contraseña?
-        </a>
-
-        <!-- Acciones -->
-        <button type="submit" class="btn btn-primary w-actions" :disabled="loading">
-          {{ loading ? 'Ingresando…' : 'Entrar' }}
-        </button>
-        <button type="button" class="btn btn-primary w-actions" @click="goRegister" :disabled="loading">
-          Registrarse
-        </button>
-      </form>
-    </div>
-  </section>
-</template>
-
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -72,16 +9,54 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 
+async function ensureProfileForUser(user: any) {
+  // Por si el nombre se guardó en metadata en el onboarding
+  const metaName =
+    (user.user_metadata as any)?.name?.trim() ||
+    user.email?.split('@')[0] ||
+    null
+  const metaAvatar =
+    (user.user_metadata as any)?.avatar_url || null
+
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!existing) {
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      full_name: metaName,
+      name: metaName,
+      avatar_url: metaAvatar
+    })
+  } else if (!existing.full_name && metaName) {
+    await supabase
+      .from('profiles')
+      .update({
+        full_name: metaName,
+        name: metaName
+      })
+      .eq('id', user.id)
+  }
+}
+
 async function emailLogin() {
   try {
     loading.value = true
     const { error } = await supabase.auth.signInWithPassword({
       email: email.value.trim(),
-      password: password.value,
+      password: password.value
     })
     if (error) throw error
 
-    // Refrescar sesión y navegar (el guard te manda a onboarding si corresponde)
+    // Aseguramos perfil con nombre para foro/perfil público
+    const { data: userRes } = await supabase.auth.getUser()
+    if (userRes?.user) {
+      await ensureProfileForUser(userRes.user)
+    }
+
     await supabase.auth.refreshSession()
     window.location.replace('/app/home')
   } catch (e: any) {
@@ -96,10 +71,9 @@ async function oauth(provider: 'google' | 'facebook') {
     loading.value = true
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin + '/app/home' },
+      options: { redirectTo: window.location.origin + '/app/home' }
     })
     if (error) throw error
-    // Para OAuth Supabase redirige; no hacemos nada más aquí.
   } catch (e: any) {
     alert(e?.message ?? 'No pudimos iniciar con el proveedor seleccionado.')
   } finally {
@@ -113,9 +87,12 @@ async function forgot() {
     return
   }
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.value.trim(), {
-      redirectTo: window.location.origin + '/login',
-    })
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.value.trim(),
+      {
+        redirectTo: window.location.origin + '/login'
+      }
+    )
     if (error) throw error
     alert('Te enviamos un correo para recuperar tu contraseña.')
   } catch (e: any) {
@@ -128,8 +105,92 @@ function goRegister() {
 }
 </script>
 
+<template>
+  <h1 class="visually-hidden">Login</h1>
+  <section class="login-page">
+    <!-- Logo -->
+    <img
+      src="/logos/OFICIALwhite.png"
+      alt="Nura"
+      class="brand"
+      onerror="this.src='/icons/icon-192.png'"
+    />
+
+    <!-- Card -->
+    <div class="card">
+      <!-- OAuth -->
+      <button
+        class="btn btn-oauth facebook with-icon w-field"
+        @click="oauth('facebook')"
+        :disabled="loading"
+      >
+        <img src="/logos/facebook.png" alt="" />
+        Entrar con Facebook
+      </button>
+
+      <button
+        class="btn btn-oauth google with-icon w-field"
+        @click="oauth('google')"
+        :disabled="loading"
+      >
+        <img src="/logos/google.jpg" alt="" />
+        Entrar con Google
+      </button>
+
+      <div class="divider w-field">o ingresá con</div>
+
+      <!-- Email / Password -->
+      <form class="form" @submit.prevent="emailLogin">
+        <div class="field w-field">
+          <label for="login-email">Usuario</label>
+          <input
+            id="login-email"
+            v-model="email"
+            type="email"
+            required
+            autocomplete="email"
+            aria-label="Usuario (email)"
+          />
+        </div>
+
+        <div class="field w-field">
+          <label for="login-password">Contraseña</label>
+          <input
+            id="login-password"
+            v-model="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            aria-label="Contraseña"
+          />
+        </div>
+
+        <a class="forgot" href="" @click.prevent="forgot">
+          ¿Olvidaste tu contraseña?
+        </a>
+
+        <!-- Acciones -->
+        <button
+          type="submit"
+          class="btn btn-primary w-actions"
+          :disabled="loading"
+        >
+          {{ loading ? 'Ingresando…' : 'Entrar' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary w-actions"
+          @click="goRegister"
+          :disabled="loading"
+        >
+          Registrarse
+        </button>
+      </form>
+    </div>
+  </section>
+</template>
+
 <style scoped>
-/* ===== Fondo (igual al splash) ===== */
 .login-page {
   min-height: 100dvh;
   background: url('/bgs/splash.png') center/cover no-repeat;
@@ -140,7 +201,7 @@ function goRegister() {
   padding: 48px 16px 32px;
 }
 
-/* ===== Logo fuera del card ===== */
+/* ===== Logo ===== */
 .brand {
   width: 150px;
   height: auto;
@@ -150,68 +211,175 @@ function goRegister() {
 
 /* ===== Card ===== */
 .card {
-  width: 100%;
-  max-width: 500px;
-  background: #fff;
-  border-radius: 90px;
-  padding: 28px 16px 34px;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+ width: 100%;
+  max-width: 540px;
+  background: #ffffff;
+  border-radius: 60px;
+  padding: 28px 20px 34px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
 }
 
-/* Anchuras helper */
-:root, :host {
-  --field-w: 50%;
+.form {
+  padding: 0px 36px 4px;
+}
+
+/* Helpers de ancho */
+:root,
+:host {
+  --field-w: 60%;
   --actions-w: 40%;
 }
-.w-field, .w-actions { display: block; margin-left: auto; margin-right: auto; }
-.w-field   { width: var(--field-w); }
-.w-actions { width: var(--actions-w); }
+.w-field,
+.w-actions {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.w-field {
+  width: var(--field-w);
+}
+.w-actions {
+  width: var(--actions-w);
+}
+
+/* Campos con label */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0.45rem auto;
+}
+
+.field label {
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: #000000ff;
+   padding: 0.62rem 0.3rem;
+}
 
 /* Inputs */
-input {
+.field input {
   padding: 0.7rem 0.9rem;
-  margin: 0.45rem auto;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #ccd7e2;
   font-size: 0.92rem;
   outline: none;
+  width: 93%;
+  background: #f9fcff;
 }
-input:focus {
-  border-color: #85b6e0;
-  box-shadow: 0 0 0 3px rgba(133,182,224,.22);
+
+.field input:focus {
+  border-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.22);
 }
 
 /* Separador */
-.divider { text-align: center; opacity: .75; margin: 12px auto 8px; font-size: .92rem; }
+.divider {
+  text-align: center;
+  opacity: 0.75;
+  margin: 12px auto 8px;
+  font-size: 0.92rem;
+}
 
 /* Forgot */
 .forgot {
-  display: block; text-align: center; margin: 6px auto 14px;
-  color: #85b6e0; font-size: .9rem; text-decoration: none;
+  display: block;
+  text-align: center;
+  margin: 6px auto 14px;
+  color: #85b6e0;
+  font-size: 0.9rem;
+  text-decoration: none;
+   padding: 0.62rem 0.9rem;
 }
-.forgot:hover { text-decoration: underline; }
+.forgot:hover {
+  text-decoration: underline;
+}
 
 /* Botones */
 .btn {
-  border: none; border-radius: 16px; padding: .62rem .9rem; font-weight: 600;
-  cursor: pointer; transition: .2s ease; display: flex; align-items: center; justify-content: center;
-  gap: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.18); margin: .5rem auto;
+  border: none;
+  border-radius: 16px;
+  padding: 0.62rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  margin: 0.5rem auto;
 }
-.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-/* Primarios */
-.btn-primary { background: #85b6e0; color: #fff; }
-.btn-primary:hover { background: #50bdbd; }
+/* Primarios (Entrar / Registrarse) – VERDE NURA */
+
+.btn {
+  width: 74%;
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  background: #50bdbd;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
+  transition: background 0.15s ease, transform 0.08s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn:hover{
+  background: #a9873eff;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
+}
+.btn-primary {
+  background: #50bdbd;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #3ea9a9;
+}
+
+
 
 /* OAuth */
-.btn-oauth.with-icon img { width: 18px; height: 18px; object-fit: contain; }
-.btn-oauth.facebook { background: #1877f2; color: #fff; }
-.btn-oauth.facebook:hover { filter: brightness(.95); }
-.btn-oauth.google { background: #fff; color: #2b2b2b; border: 1px solid #d1d5db; box-shadow: none; }
-.btn-oauth.google:hover { background: #fafafa; }
 
-/* Instalar (desktop) */
-.install { position: fixed; top: 14px; right: 14px; z-index: 5; }
-.desktop-only { display: none; }
-@media (min-width: 900px) { .desktop-only { display: inline-flex; } }
+.btn-oauth.with-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.btn-oauth.facebook {
+  background: #1877f2;
+  color: #fff;
+}
+.btn-oauth.facebook:hover {
+  filter: brightness(0.95);
+}
+.btn-oauth.google {
+  background: #fff;
+  color: #2b2b2b;
+  border: 1px solid #d1d5db;
+  box-shadow: none;
+  
+}
+.btn-oauth.google:hover {
+  background: #fafafa;
+}
+
+/* Visually hidden */
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
 </style>

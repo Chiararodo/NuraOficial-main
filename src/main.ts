@@ -1,4 +1,3 @@
-// src/main.ts
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
@@ -10,7 +9,7 @@ const bootstrap = async () => {
   const app = createApp(App)
   app.use(createPinia())
 
-  // ⚠️ Importante: hidratar sesión ANTES de usar el router
+
   const auth = useAuthStore()
   await auth.initAuth()
 

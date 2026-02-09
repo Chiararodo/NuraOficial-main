@@ -1,18 +1,24 @@
 <template>
+  <h1 class="visually-hidden">Onboarding 2 · Recordatorios</h1>
+
   <main class="ob-page">
     <section class="ob-card">
-      <!-- Título + subtítulo -->
-      <h2>Mantenete al día</h2>
+      <h2>Elegí tus recordatorios</h2>
+
       <p class="subtitle">
-        Ayudanos a recordar lo importante<br />
-        ¿Qué te gustaría activar?
+        Podemos ayudarte a no olvidarte de lo importante.<br />
+        ¿Sobre qué te gustaría que Nura te avise?
       </p>
 
       <!-- Switch de notificaciones -->
       <div class="switch-row">
-        <span class="switch-label">Permitir notificaciones</span>
+        <div class="switch-text">
+          <span class="switch-label">Recibir notificaciones de Nura</span>
+          <p class="switch-caption">
+            Serán recordatorios suaves, sin spam. Podés cambiarlos cuando quieras.
+          </p>
+        </div>
 
-        <!-- accesible: input + label como interruptor -->
         <input
           id="notif"
           type="checkbox"
@@ -28,7 +34,7 @@
         <label class="option">
           <span class="opt-left">
             <span class="circle-icon">🕒</span>
-            <span>Turno y meditación</span>
+            <span>Turnos y meditaciones</span>
           </span>
           <input type="checkbox" v-model="opts.turno" class="check-input" />
           <span class="check"></span>
@@ -37,7 +43,7 @@
         <label class="option">
           <span class="opt-left">
             <span class="circle-icon">🧘‍♀️</span>
-            <span>Relajación y manejo del día</span>
+            <span>Pausas de respiración y bienestar diario</span>
           </span>
           <input type="checkbox" v-model="opts.relax" class="check-input" />
           <span class="check"></span>
@@ -46,7 +52,7 @@
         <label class="option">
           <span class="opt-left">
             <span class="circle-icon">📅</span>
-            <span>Agenda</span>
+            <span>Agenda y cosas importantes del día</span>
           </span>
           <input type="checkbox" v-model="opts.agenda" class="check-input" />
           <span class="check"></span>
@@ -55,8 +61,12 @@
 
       <!-- Acciones -->
       <div class="actions">
-        <button class="btn btn-secondary" @click="skip">Ahora no</button>
-        <button class="btn btn-primary" @click="goNext">Continuar</button>
+        <button class="btn btn-secondary" @click="skip">
+          Configurarlo más tarde
+        </button>
+        <button class="btn btn-primary" @click="goNext">
+          Continuar
+        </button>
       </div>
     </section>
   </main>
@@ -72,12 +82,12 @@ const router = useRouter()
 const notifEnabled = ref(false)
 
 async function onToggleNotif() {
-  // si lo activan, pedimos permiso del navegador
+  // si lo activa, pide permiso del navegador
   if (notifEnabled.value && 'Notification' in window) {
     try {
       const perm = await Notification.requestPermission()
       if (perm !== 'granted') {
-        // si no conceden, apagamos el switch
+        // si no concede, apaga el switch
         notifEnabled.value = false
       }
     } catch {
@@ -90,17 +100,14 @@ async function onToggleNotif() {
 const opts = ref({
   turno: true,
   relax: false,
-  agenda: false,
+  agenda: false
 })
 
 function skip() {
-  // omitir esta pantalla → ir a la 3
   router.push('/onboarding3')
 }
 
 function goNext() {
-  // acá guardarías en Supabase si querés (opcional)
-  // p.ej. user_metadata con preferencias
   router.push('/onboarding3')
 }
 </script>
@@ -148,16 +155,25 @@ h2 {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 12px;
-  background: #dbeff1; /* celeste muy claro como en mockup */
+  background: #dbeff1;
   border-radius: 16px;
   padding: 12px 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   margin-bottom: 18px;
 }
 
-.switch-label {
+.switch-text {
   text-align: left;
+}
+.switch-label {
+  display: block;
   font-weight: 700;
+  margin-bottom: 4px;
+}
+.switch-caption {
+  font-size: 0.85rem;
+  color: #425159;
+  margin: 0;
 }
 
 /* input escondido, label es el interruptor */
@@ -171,7 +187,7 @@ h2 {
   width: 82px;
   height: 40px;
   border-radius: 999px;
-  background: #85b6e0;
+  background: #50bdbd7a;
   display: inline-block;
   position: relative;
   transition: 0.25s ease;
@@ -208,17 +224,19 @@ h2 {
 }
 
 .option {
-  background: #66b8bc; /* tira hacia #50bdbd pero un poco más fría para contraste */
-  border-radius: 16px;
-  padding: 12px 14px;
+   background: #50bdbd;
+  font-size:1.1rem ;
+  font-weight: 530;
   color: #fff;
+  border-radius: 999px;
+  padding: 10px 14px;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
 
-/* izquierda: icono redondo + texto */
 .opt-left {
   display: inline-flex;
   align-items: center;
@@ -230,8 +248,7 @@ h2 {
   height: 36px;
   display: inline-grid;
   place-items: center;
-  background: #dff5f5;
-  color: #50bdbd;
+  background: #ffffffff;
   border-radius: 50%;
   font-size: 18px;
 }
@@ -257,35 +274,52 @@ h2 {
   box-shadow: inset 0 0 0 3px #50bdbd;
 }
 
+.check:hover{
+  background: #9be2e2ff;
+  box-shadow: inset 0 0 0 3px #50bdbd;
+}
+
 /* ===== Botones ===== */
 .actions {
   display: grid;
   gap: 12px;
   justify-items: center;
 }
+
 .btn {
-  width: 70%;
+  width: 74%;
   border: none;
-  border-radius: 16px;
-  padding: 0.9rem 1.2rem;
-  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  background: #50bdbd;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.98rem;
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
-  transition: 0.25s ease;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
+  transition: background 0.15s ease, transform 0.08s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn:hover{
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
 .btn-primary {
-  background: #85b6e0;
+  background: #50bdbd;
   color: #fff;
 }
 .btn-primary:hover {
-  background: #50bdbd;
+  background: #3ea9a9;
 }
 .btn-secondary {
-  background: #a7c1df;
+  background: #48b1b1ad;
   color: #fff;
 }
 .btn-secondary:hover {
   filter: brightness(0.96);
+  background: #50bdbd;
 }
 
 /* Responsive pequeño */

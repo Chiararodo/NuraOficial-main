@@ -23,7 +23,7 @@ export default defineConfig({
     })
   ],
 
-  // 🔥 AGREGADO: PROXY PARA EVITAR CORS Y PERMITIR LLAMAR A RENDER
+  
   server: {
     proxy: {
       '/api': {

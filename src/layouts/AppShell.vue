@@ -24,8 +24,8 @@
   /* Altura de header para calcular el espacio del contenido */
   :root, :host{ --hdr: 64px; --tabbar: 82px; }
   
-  /* En mobile dejamos espacio para el TabBar.
-     El header es sticky, por eso no restamos su altura aquí. */
+  /* En mobile deja espacio para el TabBar.
+     El header es sticky */
   main{
     min-height: calc(100dvh - var(--hdr));
     padding-bottom: var(--tabbar);

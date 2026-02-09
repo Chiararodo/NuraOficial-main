@@ -1,4 +1,3 @@
-// src/router/index.ts
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 // Públicas
@@ -8,11 +7,14 @@ import Register from '@/pages/Register.vue'
 import Onboarding from '@/pages/Onboarding.vue'
 import Onboarding2 from '@/pages/Onboarding2.vue'
 import Onboarding3 from '@/pages/Onboarding3.vue'
+import NotificacionesFeed from '@/pages/NotificacionesFeed.vue'
 
 // App (autenticadas)
 import Home from '@/pages/Home.vue'
 import Cartilla from '@/pages/Cartilla.vue'
 import Agendar from '@/pages/Agendar.vue'
+import AgendarEventos from '@/pages/AgendarEventos.vue'
+import AgendarSesiones from '@/pages/AgendarSesiones.vue'
 import Contenido from '@/pages/Contenido.vue'
 import Perfil from '@/pages/Perfil.vue'
 import Foro from '@/pages/Foro.vue'
@@ -36,54 +38,73 @@ const routes: RouteRecordRaw[] = [
   { path: '/onboarding2', name: 'onboarding2', component: Onboarding2 },
   { path: '/onboarding3', name: 'onboarding3', component: Onboarding3 },
 
-  // Área privada
+  // Área privada /app
   {
     path: '/app',
     component: () => import('@/layouts/AppShell.vue'),
     meta: { requiresAuth: true },
     children: [
       { path: 'home', name: 'home', component: Home },
+
+      // Cartilla / turnos
       { path: 'cartilla', name: 'cartilla', component: Cartilla },
       { path: 'agendar', name: 'agendar', component: Agendar },
-      { path: 'contenido', name: 'contenido', component: Contenido },
-      { path: 'perfil', name: 'perfil', component: Perfil },
+      { path: 'agendar/eventos', name: 'agendar-eventos', component: AgendarEventos },
+      { path: 'agendar/sesiones', name: 'agendar-sesiones', component: AgendarSesiones },
 
-      // EDITAR PERFIL
+      // Contenido
+      { path: 'contenido', name: 'contenido', component: Contenido },
+
+      // Perfil
+      { path: 'perfil', name: 'perfil', component: Perfil },
       {
         path: 'perfil/editar',
         name: 'perfil-editar',
         component: () => import('@/pages/PerfilEditar.vue')
       },
+      {
+        path: 'perfil-publico/:uid',
+        name: 'perfil-publico',
+        component: () => import('@/pages/PerfilPublico.vue')
+      },
 
-      // FORO
+      // Medicaciones
+      {
+        path: 'medicaciones',
+        name: 'Medicaciones',
+        component: () => import('@/pages/Medicamentos.vue')
+      },
+
+      // Foro
       { path: 'foro', name: 'foro', component: Foro },
       { path: 'foro/new', name: 'foro-new', component: ForoNuevo },
       { path: 'foro/:id', name: 'foro-view', component: ForoVer },
 
-      // CHATBOT
+      // Chatbot
       { path: 'chatbot', name: 'chatbot', component: Chatbot },
 
-      // DIARIO
+      // Diario /
       { path: 'diario', name: 'diario', component: Diary },
-      { path: "mood-success", name: "mood-success", component: () => import('@/pages/MoodSuccess.vue') },
-      { path: 'diario/entradas', name: 'diario-entradas', component: () => import('@/pages/DiarioEntradas.vue') },
-      
+      {
+        path: 'diario/entradas',
+        name: 'diario-entradas',
+        component: () => import('@/pages/DiarioEntradas.vue')
+      },
 
-
-{
-  path: 'mood-success',
-  name: 'mood-success',
-  component: () => import('@/pages/MoodSuccess.vue')
-},
-
-      // NOTIFICACIONES
+      // Notificaciones
       {
         path: 'notificaciones',
         name: 'notificaciones',
         component: Notificaciones
       },
+      {
+        path: 'notis',
+        name: 'notificaciones-feed',
+        component: NotificacionesFeed
+      },
 
-      // PREMIUM (todos dentro de /app)
+      // Premium
+
       {
         path: 'premium',
         name: 'premium',
@@ -99,8 +120,23 @@ const routes: RouteRecordRaw[] = [
         name: 'premium-confirm',
         component: () => import('@/pages/PremiumConfirm.vue')
       },
+      {
+        path: 'premium/area',
+        name: 'premium-area',
+        component: () => import('@/pages/PremiumPage.vue')
+      },
 
-      // PRIVACIDAD / IDIOMA
+
+
+
+      //  Acá va TÉRMINOS como ruta hija (sin /app delante)
+      {
+        path: 'terminos',
+        name: 'terminos',
+        component: () => import('@/pages/Terminos.vue')
+      },
+
+      // Privacidad / idioma
       {
         path: 'privacidad',
         name: 'privacidad',
@@ -112,9 +148,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/Idioma.vue')
       },
 
-      // Redirect por defecto
+      // Redirect por defecto dentro de /app
       { path: '', redirect: '/app/home' }
     ]
+  },
+
+  // Reset password (fuera de /app, sin auth)
+  {
+    path: '/auth/reset-password',
+    name: 'reset-password',
+    component: () => import('@/pages/ResetPassword.vue')
   },
 
   // Fallback
@@ -129,23 +172,59 @@ export const router = createRouter({
   }
 })
 
-/* =========== Guard de autenticación =========== */
-
 const ONBOARDING_PATHS = new Set(['/onboarding', '/onboarding2', '/onboarding3'])
+
+// cache simple del perfil para no pedirlo en cada navegación
+let profileCache: { id: string; terms_accepted?: boolean } | null = null
 
 router.beforeEach(async (to) => {
   if (to.name === 'splash') return
 
+  // 1) Sesión actual
   const { data } = await supabase.auth.getSession()
   const session = data.session
   const user = session?.user
   const isAuthed = !!user
 
+  // 2) Rutas que requieren auth
   if (to.meta.requiresAuth && !isAuthed) return '/login'
   if (!isAuthed && ONBOARDING_PATHS.has(to.path)) return '/login'
 
-  if (isAuthed && (to.path === '/login' || to.path === '/register'))
+  // 3) Usuario logueado y yendo a login/register -> mandarlo al home
+  if (isAuthed && (to.path === '/login' || to.path === '/register')) {
     return '/app/home'
+  }
+
+  // 4) Chequeo de TÉRMINOS solo si está logueado
+  if (isAuthed) {
+    // Cargar perfil una sola vez
+    if (!profileCache) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, terms_accepted')
+        .eq('id', user!.id)
+        .maybeSingle()
+
+      profileCache = prof ?? null
+    }
+
+    const termsAccepted = profileCache?.terms_accepted === true
+
+    // Si NO aceptó y está tratando de entrar a /app (cualquier sección) que no sea terminos ni onboarding
+    if (
+      !termsAccepted &&
+      to.name !== 'terminos' &&
+      to.path.startsWith('/app') &&
+      !ONBOARDING_PATHS.has(to.path)
+    ) {
+      return '/app/terminos'
+    }
+
+    // Si YA aceptó y viene a terminos, lo mandamos al home
+    if (termsAccepted && to.name === 'terminos') {
+      return '/app/home'
+    }
+  }
 
   return true
 })

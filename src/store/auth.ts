@@ -1,4 +1,3 @@
-// src/store/auth.ts
 import { defineStore } from 'pinia'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/composables/useSupabase'
@@ -28,7 +27,6 @@ export const useAuthStore = defineStore('auth', {
       })
     },
 
-    /** Refresca por si lo necesitás manualmente */
     async reload() {
       const { data } = await supabase.auth.getSession()
       this.user = data.session?.user ?? null
@@ -41,7 +39,6 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
     },
 
-    /** Por si querés limpiar todo */
     $reset() {
       this.user = null
       this.ready = false

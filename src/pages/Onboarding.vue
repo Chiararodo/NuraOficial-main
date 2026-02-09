@@ -1,20 +1,25 @@
 <template>
+  <h1 class="visually-hidden">Onboarding</h1>
+
   <main class="onboarding">
     <section class="ob">
       <h2>¡Bienvenida/o a Nura!</h2>
 
       <p class="intro">
-        Soy Nuri y estoy acá para acompañarte un día a la vez, a tu ritmo.
+        Soy <strong>Nuri</strong>, tu compañero de bienestar.  
+        Estoy acá para ayudarte a hacer una pausa, escuchar cómo estás
+        y acompañarte un día a la vez, sin presión y a tu ritmo.
       </p>
 
       <!-- Imagen -->
-      <img src="/icons/NuriBienvenida.png" alt="Nuri" class="nuri" />
+      <img src="/icons/NuriBienvenida.png" alt="Nuri dando la bienvenida" class="nuri" />
 
       <p class="text">
-        Registrá cómo te sentís y accedé a recursos confiables.
+        En Nura vas a poder registrar tus emociones, acceder a recursos confiables
+        y crear hábitos que te hagan sentir mejor.
       </p>
 
-      <button class="btn" @click="goNext">Continuar</button>
+      <button class="btn" @click="goNext">Comenzar</button>
     </section>
   </main>
 </template>
@@ -22,6 +27,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 const router = useRouter()
+
 function goNext() {
   router.push('/onboarding2')
 }
@@ -33,62 +39,77 @@ function goNext() {
   background: url('/bgs/onboarding.png') center/cover no-repeat;
   display: flex;
   justify-content: center;
-  padding: 24px;
+  padding: 28px 20px;
   animation: fadeIn 0.6s ease-in forwards;
 }
 
 .ob {
-  max-width: 500px;
-  padding: 32px 28px;
+  max-width: 520px;
+  padding: 36px 30px;
   text-align: center;
+  backdrop-filter: blur(3px);
 }
 
 h2 {
   color: #50bdbd;
-  font-size: 1.6rem;
-  margin-bottom: 12px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 14px;
 }
 
 .intro {
-  font-size: 0.95rem;
-  line-height: 1.5;
-  margin-bottom: 22px;
-  color: #333;
+  font-size: 1rem;
+  line-height: 1.55;
+  margin-bottom: 24px;
+  color: #2b3a41;
 }
 
 .text {
-  margin: 12px 0 20px;
-  font-size: 0.95rem;
-  color: #333;
+  margin: 14px 0 26px;
+  font-size: 1rem;
+  color: #2b3a41;
+  line-height: 1.5;
 }
 
 .nuri {
-  width: 240px;
+  width: 260px;
   height: auto;
-  margin: 0 auto 40px;
+  margin: 0 auto 34px;
   display: block;
+  animation: float 2.4s ease-in-out infinite;
 }
 
 .btn {
-  background: #85b6e0;
-  color: #fff;
+  width:  74%;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 1rem;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-  transition: all 0.25s ease;
-}
-.btn:hover {
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
   background: #50bdbd;
-  transform: translateY(-2px);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.98rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
+  transition: background 0.15s ease, transform 0.08s ease,
+    box-shadow 0.15s ease;
 }
+
+.btn:hover{
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
+}
+
 
 /* Animación entrada */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(15px); }
+  from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Efecto flotando del personaje */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 </style>

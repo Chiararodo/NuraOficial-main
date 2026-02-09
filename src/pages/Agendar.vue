@@ -1,243 +1,257 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-type OpcionId = 'sesiones' | 'turno' | 'eventos' | 'diario'
+type OpcionId = 'sesiones' | 'turno' | 'eventos' | 'foro'
 
 const opciones = [
   {
     id: 'sesiones' as OpcionId,
     titulo: 'Sesiones Grupales',
-    descripcion: `
-Espacios virtuales guiados por profesionales,
-donde las usuarias pueden compartir experiencias
-y trabajar juntas temas como ansiedad, relación con la comida y autocuidado.
-Cada sesión tiene un cupo limitado y se desarrolla en un entorno de confianza.
-    `,
-    img: '/icons/nuri-bien.png',
-    boton: 'Entrar',
+    descripcion:
+      'Espacios virtuales guiados por profesionales, donde podés compartir experiencias y trabajar temas como ansiedad, relación con la comida y autocuidado.',
+    img: '/covers/sesiongrupal.png',
+    boton: 'Ver sesiones',
   },
   {
     id: 'turno' as OpcionId,
     titulo: 'Turno con profesional',
-    descripcion: `
-Podés reservar consultas individuales con profesionales del equipo de Nura,
-eligiendo día, horario y modalidad. Por ahora, los turnos se gestionan
-a través de la cartilla de profesionales.
-    `,
-    img: '/icons/nuri-normal.png',
-    boton: 'Agendar',
+    descripcion:
+      'Reservá consultas individuales con profesionales del equipo de Nura, eligiendo día, horario y modalidad. Por ahora, los turnos se gestionan desde la cartilla.',
+    img: '/covers/turnos.jpg',
+    boton: 'Ir a la cartilla',
   },
   {
     id: 'eventos' as OpcionId,
     titulo: 'Eventos Grupales',
-    descripcion: `
-Charlas y talleres especiales donde se abordan diferentes temáticas
-vinculadas al bienestar emocional y la salud integral, con especialistas invitados.
-Los eventos se realizan en fechas puntuales y son una oportunidad
-para aprender, compartir y conectar con otras personas.
-    `,
-    img: '/icons/nuri-muybien.png',
-    boton: 'Entrar',
+    descripcion:
+      'Charlas y talleres especiales sobre bienestar emocional y salud integral, con especialistas invitados. Encuentros puntuales para aprender, compartir y conectar.',
+    img: '/covers/eventosgrupales.jpg',
+    boton: 'Ver eventos',
   },
   {
-    id: 'diario' as OpcionId,
-    titulo: 'Escribir en mi Diario',
-    descripcion: `
-Registrá cómo te sentís, qué pensaste durante el día y
-qué cosas te ayudaron. Tu diario es un espacio privado
-para hacer seguimiento de tu bienestar emocional.
-    `,
-    img: '/icons/nuri-triste.png',
-    boton: 'Escribir',
+    id: 'foro' as OpcionId,
+    titulo: 'Ir al Foro',
+    descripcion:
+      'Un espacio para hacer preguntas, compartir experiencias y acompañarte con la comunidad. Ideal para sentirte contenida y no estar sola.',
+    img: '/covers/foro.jpg',
+    boton: 'Entrar al foro',
   },
 ]
 
-/* ===== Modal “no disponible por el momento” ===== */
-const showModal = ref(false)
-const modalTitle = ref('')
-const modalText = ref('')
-
-function abrirModal(tipo: 'sesiones' | 'eventos') {
-  modalTitle.value = tipo === 'sesiones'
-    ? 'Sesiones grupales'
-    : 'Eventos grupales'
-
-  modalText.value =
-    'Esta funcionalidad todavía no está habilitada en la versión actual de Nura. ' +
-    'Próximamente vas a poder reservar tus ' +
-    (tipo === 'sesiones' ? 'sesiones grupales' : 'eventos especiales') +
-    ' directamente desde la app. Por ahora, podés coordinar con tu profesional o con el equipo de Nura.'
-
-  showModal.value = true
-}
-
 function handleClick(id: OpcionId) {
-  if (id === 'sesiones' || id === 'eventos') {
-    abrirModal(id)
-  } else if (id === 'turno') {
-    // Llevar a la cartilla para elegir profesional
-    router.push('/app/cartilla')
-  } else if (id === 'diario') {
-    router.push('/app/diario')
-  }
+  if (id === 'sesiones') router.push('/app/agendar/sesiones')
+  else if (id === 'eventos') router.push('/app/agendar/eventos')
+  else if (id === 'turno') router.push('/app/cartilla')
+  else if (id === 'foro') router.push('/app/foro')
 }
 </script>
 
 <template>
-  <main class="agendar">
-    <h1 class="titulo">Agendar</h1>
+  <h1 class="visually-hidden">Agendar</h1>
 
-    <div class="grid">
-      <div v-for="item in opciones" :key="item.id" class="card">
-        <div class="card-img">
-          <img :src="item.img" alt="" />
-        </div>
-
-        <h2 class="card-title">{{ item.titulo }}</h2>
-        <p class="card-desc">
-          {{ item.descripcion }}
+  <main class="page">
+    <section class="wrap">
+      <header class="head">
+        <p class="kicker">Agenda</p>
+        <h2 class="title">Agendar</h2>
+        <p class="sub">
+          Elegí qué querés hacer hoy: sesiones, eventos, turnos o comunidad.
         </p>
+      </header>
 
-        <button class="btn" @click="handleClick(item.id)">
-          {{ item.boton }}
-        </button>
-      </div>
-    </div>
+      <section class="grid">
+        <article v-for="item in opciones" :key="item.id" class="card">
+          <div class="card-row">
+            <div class="card-img">
+              <img :src="item.img" :alt="item.titulo" loading="lazy" />
+            </div>
 
-    <!-- MODAL “Próximamente” -->
-    <div v-if="showModal" class="modal">
-      <div class="modal-box">
-        <h3 class="modal-title">{{ modalTitle }}</h3>
-        <p class="modal-text">
-          {{ modalText }}
-        </p>
-        <button class="btn-close" @click="showModal = false">
-          Entendido
-        </button>
-      </div>
-    </div>
+            <div class="card-body">
+              <h3 class="card-title">{{ item.titulo }}</h3>
+              <p class="card-desc">{{ item.descripcion }}</p>
+
+              <button class="btn btn-primary" type="button" @click="handleClick(item.id)">
+                {{ item.boton }}
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
   </main>
 </template>
 
 <style scoped>
-.agendar {
-  padding: 24px 18px;
-  padding-bottom: 60px;
+/* Accesibilidad */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
 }
 
-.titulo {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--nura-green);
-  margin-bottom: 20px;
+/* Page */
+.page {
+  background: #f5fbfd;
+  min-height: calc(100dvh - 64px);
+  padding: 28px 16px 44px;
 }
 
-/* Grid de cards */
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+
+/* Head */
+.head {
+  display: grid;
+  gap: 6px;
+  padding: 2px 2px 6px;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 850;
+  color: #0f172a;
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: #475569;
+  font-size: 1rem;
+  max-width: 80ch;
+}
+
+/* Grid */
 .grid {
   display: grid;
-  gap: 22px;
+  gap: 18px;
 }
 
 @media (min-width: 900px) {
   .grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+/* Cards */
 .card {
   background: #ffffff;
   border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9eef4;
-  display: grid;
-  gap: 12px;
+  padding: 16px 16px;
+  border: 1px solid #e2edf7;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  border-color: #b6ebe5;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
+}
+
+.card-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+/* Imagen */
+.card-img {
+  flex: 0 0 110px;
 }
 
 .card-img img {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
+  width: 110px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+
+/* Texto */
+.card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .card-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #333333;
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 850;
+  color: #0f172a;
 }
 
 .card-desc {
-  font-size: 0.9rem;
-  color: #5c5c5c;
-  line-height: 1.35rem;
-  white-space: pre-line;
-}
-
-.btn {
-  margin-top: 6px;
-  background: #85b6e0;
-  color: white;
-  border-radius: 12px;
-  padding: 8px 16px;
-  text-align: center;
-  font-weight: 600;
-  display: inline-block;
-  width: fit-content;
-  box-shadow: 0 6px 14px rgba(133, 182, 224, 0.3);
-  transition: 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.btn:hover {
-  background: var(--nura-green);
-}
-
-/* ===== Modal ===== */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-box {
-  background: #ffffff;
-  padding: 22px 20px;
-  border-radius: 18px;
-  max-width: 420px;
-  width: 90%;
-  text-align: center;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
-}
-
-.modal-title {
-  margin: 0 0 10px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #222;
-}
-
-.modal-text {
   margin: 0;
   font-size: 0.95rem;
-  color: #4b5563;
+  color: #475569;
+  line-height: 1.4rem;
 }
 
-.btn-close {
-  margin-top: 16px;
-  border: none;
-  background: #50bdbd;
-  color: #fff;
-  padding: 0.5rem 1.2rem;
+/* Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
+  border: none;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 850;
   cursor: pointer;
-  font-weight: 600;
+  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+  width: fit-content;
+  margin-top: 6px;
+}
+
+.btn-primary {
+  background: #50bdbd;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(80, 189, 189, 0.28);
+}
+
+.btn-primary:hover {
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(80, 189, 189, 0.35);
+}
+
+@media (max-width: 520px) {
+  .card-row {
+    flex-direction: column;
+  }
+
+  .card-img {
+    flex: none;
+  }
+
+  .card-img img {
+    width: 100%;
+    height: 160px;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
 </style>

@@ -1,6 +1,8 @@
 <template>
   <main class="contenido">
     <header class="page-head">
+    <h1 class="visually-hidden">Contenido educativo</h1>
+
       <h2>Contenido educativo</h2>
       <nav class="tabs">
         <button
@@ -17,309 +19,425 @@
 
     <!-- VIDEOS -->
     <section v-if="tab === 'videos'" class="section">
-      <!-- ABM VIDEOS (solo admin) -->
-      <section v-if="isAdmin" class="abm card">
-        <h3 class="abm-title">
-          {{ editingVideoId != null ? 'Editar video' : 'Nuevo video' }}
-        </h3>
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA VIDEOS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.videos" class="loading">Cargando videos…</div>
+          <p v-else-if="!videos.length" class="empty">Aún no hay videos.</p>
 
-        <div class="abm-grid">
-          <div class="field">
-            <label>Título</label>
-            <input v-model="videoForm.title" type="text" />
-          </div>
+          <div v-else class="grid">
+            <article
+              v-for="v in videos"
+              :key="v.id"
+              class="card video-card"
+              @click="openVideo(v)"
+            >
+              <div class="thumb">
+                <img :src="publicUrl(v.cover_path)" :alt="v.title" />
+                <span class="duration" v-if="v.duration_seconds">
+                  {{ mmss(v.duration_seconds) }}
+                </span>
+              </div>
+              <h3 class="title">{{ v.title }}</h3>
 
-          <div class="field">
-            <label>Portada (cover_path)</label>
-            <input v-model="videoForm.cover_path" type="text" />
-          </div>
-
-          <div class="field">
-            <label>Archivo de video (file_path)</label>
-            <input v-model="videoForm.file_path" type="text" />
-          </div>
-
-          <div class="field">
-            <label>Duración (segundos)</label>
-            <input
-              v-model.number="videoForm.duration_seconds"
-              type="number"
-              min="0"
-            />
-          </div>
-
-          <div class="field field--full">
-            <label>Descripción</label>
-            <textarea rows="2" v-model="videoForm.description"></textarea>
+              <div v-if="isAdmin" class="small-actions" @click.stop>
+                <button class="abm-btn abm-btn--edit" @click="startEditVideo(v)">
+                  🖊 Editar
+                </button>
+                <button
+                  class="abm-btn abm-btn--delete"
+                  @click="askDelete('video', v.id, v.title)"
+                >
+                  🗑 Borrar
+                </button>
+              </div>
+            </article>
           </div>
         </div>
 
-        <div class="abm-actions">
-          <button type="button" class="pill pill--primary" @click="saveVideo">
-            {{ editingVideoId != null ? 'Guardar cambios' : 'Crear video' }}
-          </button>
-          <button
-            v-if="editingVideoId != null"
-            type="button"
-            class="pill pill--ghost"
-            @click="resetVideoForm"
+        <!-- ABM VIDEO DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">Nuevo video</h3>
+
+          <div class="abm-grid abm-2col">
+            <div class="field">
+              <label>Título</label>
+              <input v-model="videoCreateForm.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Portada (cover_path)</label>
+              <input v-model="videoCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Archivo de video (file_path)</label>
+              <input v-model="videoCreateForm.file_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Duración (segundos)</label>
+              <input
+                v-model.number="videoCreateForm.duration_seconds"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div class="field field--full">
+              <label>Descripción</label>
+              <textarea rows="2" v-model="videoCreateForm.description" />
+            </div>
+          </div>
+
+          <div class="abm-actions">
+            <button type="button" class="pill pill--primary" @click="createVideo">
+              Crear video
+            </button>
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetVideoCreateForm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- VISTA SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.videos" class="loading">Cargando videos…</div>
+        <p v-else-if="!videos.length" class="empty">Aún no hay videos.</p>
+
+        <div v-else class="grid">
+          <article
+            v-for="v in videos"
+            :key="v.id"
+            class="card video-card"
+            @click="openVideo(v)"
           >
-            Cancelar
-          </button>
+            <div class="thumb">
+              <img :src="publicUrl(v.cover_path)" :alt="v.title" />
+              <span class="duration" v-if="v.duration_seconds">
+                {{ mmss(v.duration_seconds) }}
+              </span>
+            </div>
+            <h3 class="title">{{ v.title }}</h3>
+          </article>
         </div>
-      </section>
-
-      <div v-if="loading.videos" class="loading">Cargando videos…</div>
-      <p v-else-if="!videos.length" class="empty">Aún no hay videos.</p>
-
-      <div class="grid">
-        <article
-          v-for="v in videos"
-          :key="v.id"
-          class="card video-card"
-          @click="openVideo(v)"
-        >
-          <div class="thumb">
-            <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-            <span class="duration" v-if="v.duration_seconds">
-              {{ mmss(v.duration_seconds) }}
-            </span>
-          </div>
-          <h3 class="title">{{ v.title }}</h3>
-
-          <!-- acciones admin -->
-          <div v-if="isAdmin" class="small-actions" @click.stop>
-            <button class="btn-edit" @click="startEditVideo(v)">
-              🖊 Editar
-            </button>
-            <button class="btn-delete" @click="askDelete('video', v.id)">
-              🗑 Borrar
-            </button>
-          </div>
-        </article>
       </div>
     </section>
 
     <!-- BIBLIOTECA -->
     <section v-else-if="tab === 'biblioteca'" class="section">
-      <!-- ABM LIBROS (solo admin) -->
-      <section v-if="isAdmin" class="abm card">
-        <h3 class="abm-title">
-          {{ editingBookId != null ? 'Editar libro' : 'Nuevo libro' }}
-        </h3>
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA LIBROS + ARTÍCULOS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.books" class="loading">Cargando biblioteca…</div>
+          <p v-else-if="!books.length" class="empty">
+            Aún no hay libros recomendados.
+          </p>
 
-        <div class="abm-grid">
-          <div class="field">
-            <label>Título</label>
-            <input v-model="bookForm.title" type="text" />
+          <div v-else class="grid">
+            <article
+              v-for="b in books"
+              :key="b.id"
+              class="card book-card"
+              @click="openBook(b)"
+            >
+              <div class="book-thumb">
+                <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+              </div>
+              <h3 class="title">{{ b.title }}</h3>
+
+              <div v-if="isAdmin" class="small-actions" @click.stop>
+                <button class="abm-btn abm-btn--edit" @click="startEditBook(b)">
+                  🖊 Editar
+                </button>
+                <button
+                  class="abm-btn abm-btn--delete"
+                  @click="askDelete('book', b.id, b.title)"
+                >
+                  🗑 Borrar
+                </button>
+              </div>
+            </article>
           </div>
 
-          <div class="field">
-            <label>Portada (cover_path)</label>
-            <input v-model="bookForm.cover_path" type="text" />
+          <h3 class="subhead" v-if="articles.length">Artículos destacados</h3>
+          <div class="articles" v-if="articles.length">
+            <article v-for="a in articles" :key="a.id" class="article-card">
+              <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+              <div class="art-body">
+                <h4 class="art-title">{{ a.title }}</h4>
+                <p class="art-summary">{{ a.summary }}</p>
+                <small v-if="a.read_minutes">Lectura {{ a.read_minutes }}m</small>
+              </div>
+            </article>
           </div>
+        </div>
 
-          <div class="field">
-            <label>Archivo PDF (file_path)</label>
-            <input
-              v-model="bookForm.file_path"
-              type="text"
-              placeholder="Ruta en Supabase (opcional si subís un PDF)"
-            />
-          </div>
+        <!-- ABM LIBROS DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">Nuevo libro</h3>
 
-          <div class="field field--full">
-            <label>O subí un archivo PDF:</label>
-            <div class="upload-row">
+          <div class="abm-2col">
+            <div class="field">
+              <label>Título</label>
+              <input v-model="bookCreateForm.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Portada (cover_path)</label>
+              <input v-model="bookCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Archivo PDF (file_path)</label>
               <input
-                ref="bookPdfInput"
-                type="file"
-                accept="application/pdf"
-                class="file-input"
-                @change="onBookPdfSelected"
+                v-model="bookCreateForm.file_path"
+                type="text"
+                placeholder="Ruta en Supabase (opcional si subís un PDF)"
               />
-              <button type="button" class="upload-btn" @click="bookPdfInput?.click()">
-                Seleccionar PDF
-              </button>
-              <span v-if="bookPdfName" class="file-name">
-                {{ bookPdfName }}
-              </span>
+            </div>
+
+            <div class="field">
+              <label>O subí un PDF</label>
+              <div class="upload-row">
+                <input
+                  ref="bookPdfInput"
+                  type="file"
+                  accept="application/pdf"
+                  class="file-input"
+                  @change="onBookPdfSelected"
+                />
+                <button
+                  type="button"
+                  class="upload-btn"
+                  @click="bookPdfInput?.click()"
+                >
+                  Seleccionar PDF
+                </button>
+                <span v-if="bookPdfName" class="file-name">
+                  {{ bookPdfName }}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="abm-actions">
-          <button type="button" class="pill pill--primary" @click="saveBook">
-            {{ editingBookId != null ? 'Guardar cambios' : 'Crear libro' }}
-          </button>
-          <button
-            v-if="editingBookId != null"
-            type="button"
-            class="pill pill--ghost"
-            @click="resetBookForm"
-          >
-            Cancelar
-          </button>
-        </div>
-      </section>
-
-      <div v-if="loading.books" class="loading">Cargando biblioteca…</div>
-      <p v-else-if="!books.length" class="empty">Aún no hay libros recomendados.</p>
-
-      <div class="grid">
-        <article
-          v-for="b in books"
-          :key="b.id"
-          class="card book-card"
-          @click="openBook(b)"
-        >
-          <div class="book-thumb">
-            <img :src="publicUrl(b.cover_path)" :alt="b.title" />
-          </div>
-          <h3 class="title">{{ b.title }}</h3>
-
-          <div v-if="isAdmin" class="small-actions" @click.stop>
-            <button class="btn-edit" @click="startEditBook(b)">
-              🖊 Editar
+          <div class="abm-actions">
+            <button type="button" class="pill pill--primary" @click="createBook">
+              Crear libro
             </button>
-            <button class="btn-delete" @click="askDelete('book', b.id)">
-              🗑 Borrar
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetBookCreateForm"
+            >
+              Limpiar
             </button>
           </div>
-        </article>
+        </section>
       </div>
 
-      <!-- Artículos (solo lectura por ahora) -->
-      <h3 class="subhead" v-if="articles.length">Artículos destacados</h3>
-      <div class="articles" v-if="articles.length">
-        <article v-for="a in articles" :key="a.id" class="article-card">
-          <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
-          <div class="art-body">
-            <h4 class="art-title">{{ a.title }}</h4>
-            <p class="art-summary">{{ a.summary }}</p>
-            <small v-if="a.read_minutes">Lectura {{ a.read_minutes }}m</small>
-          </div>
-        </article>
+      <!-- SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.books" class="loading">Cargando biblioteca…</div>
+        <p v-else-if="!books.length" class="empty">
+          Aún no hay libros recomendados.
+        </p>
+
+        <div v-else class="grid">
+          <article
+            v-for="b in books"
+            :key="b.id"
+            class="card book-card"
+            @click="openBook(b)"
+          >
+            <div class="book-thumb">
+              <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+            </div>
+            <h3 class="title">{{ b.title }}</h3>
+          </article>
+        </div>
+
+        <h3 class="subhead" v-if="articles.length">Artículos destacados</h3>
+        <div class="articles" v-if="articles.length">
+          <article v-for="a in articles" :key="a.id" class="article-card">
+            <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+            <div class="art-body">
+              <h4 class="art-title">{{ a.title }}</h4>
+              <p class="art-summary">{{ a.summary }}</p>
+              <small v-if="a.read_minutes">Lectura {{ a.read_minutes }}m</small>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
     <!-- GUÍAS -->
     <section v-else-if="tab === 'guias'" class="section">
-      <!-- ABM GUÍAS (solo admin) -->
-      <section v-if="isAdmin" class="abm card">
-        <h3 class="abm-title">
-          {{ editingGuideId != null ? 'Editar guía' : 'Nueva guía' }}
-        </h3>
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA GUÍAS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.guides" class="loading">Cargando guías…</div>
+          <p v-else-if="!guides.length" class="empty">Aún no hay guías.</p>
 
-        <div class="abm-grid">
-          <div class="field">
-            <label>Título</label>
-            <input v-model="guideForm.title" type="text" />
-          </div>
-
-          <div class="field">
-            <label>Portada (cover_path)</label>
-            <input v-model="guideForm.cover_path" type="text" />
-          </div>
-
-          <div class="field">
-            <label>Archivo PDF (file_path)</label>
-            <input
-              v-model="guideForm.file_path"
-              type="text"
-              placeholder="Ruta en Supabase (opcional si subís un PDF)"
-            />
-          </div>
-
-          <div class="field field--full">
-            <label>O subí un archivo PDF:</label>
-            <div class="upload-row">
-              <input
-                ref="guidePdfInput"
-                type="file"
-                accept="application/pdf"
-                class="file-input"
-                @change="onGuidePdfSelected"
-              />
-              <button type="button" class="upload-btn" @click="guidePdfInput?.click()">
-                Seleccionar PDF
-              </button>
-              <span v-if="guidePdfName" class="file-name">
-                {{ guidePdfName }}
-              </span>
-            </div>
-          </div>
-
-          <div class="field field--full">
-            <label>Descripción</label>
-            <textarea rows="2" v-model="guideForm.description"></textarea>
-          </div>
-        </div>
-
-        <div class="abm-actions">
-          <button type="button" class="pill pill--primary" @click="saveGuide">
-            {{ editingGuideId != null ? 'Guardar cambios' : 'Crear guía' }}
-          </button>
-          <button
-            v-if="editingGuideId != null"
-            type="button"
-            class="pill pill--ghost"
-            @click="resetGuideForm"
-          >
-            Cancelar
-          </button>
-        </div>
-      </section>
-
-      <div v-if="loading.guides" class="loading">Cargando guías…</div>
-      <p v-else-if="!guides.length" class="empty">Aún no hay guías.</p>
-
-      <div class="grid">
-        <article
-          v-for="g in guides"
-          :key="g.id"
-          class="card guide-card"
-          @click="openGuide(g)"
-        >
-          <div class="guide-thumb">
-            <img :src="publicUrl(g.cover_path)" :alt="g.title" />
-          </div>
-          <div class="guide-body">
-            <h3 class="guide-title">{{ g.title }}</h3>
-            <p class="guide-summary">{{ g.description }}</p>
-
-            <div class="guide-actions">
-              <button class="btn" @click.stop="openGuide(g)">Continuar</button>
-              <div class="progress" v-if="progressMap.get(g.id) !== undefined">
-                <div
-                  class="bar"
-                  :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
-                ></div>
+          <div v-else class="grid">
+            <article
+              v-for="g in guides"
+              :key="g.id"
+              class="card guide-card"
+              @click="openGuide(g)"
+            >
+              <div class="guide-thumb">
+                <img :src="publicUrl(g.cover_path)" :alt="g.title" />
               </div>
-              <small class="pct" v-if="progressMap.get(g.id) !== undefined">
-                {{ progressMap.get(g.id) }}%
-              </small>
+              <div class="guide-body">
+                <h3 class="guide-title">{{ g.title }}</h3>
+                <p class="guide-summary">{{ g.description }}</p>
+
+                <div class="guide-actions">
+                  <button class="btn" @click.stop="openGuide(g)">Continuar</button>
+                  <div class="progress" v-if="progressMap.get(g.id) !== undefined">
+                    <div
+                      class="bar"
+                      :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
+                    />
+                  </div>
+                  <small class="pct" v-if="progressMap.get(g.id) !== undefined">
+                    {{ progressMap.get(g.id) }}%
+                  </small>
+                </div>
+
+                <div v-if="isAdmin" class="small-actions" @click.stop>
+                  <button class="abm-btn abm-btn--edit" @click="startEditGuide(g)">
+                    🖊 Editar
+                  </button>
+                  <button
+                    class="abm-btn abm-btn--delete"
+                    @click="askDelete('guide', g.id, g.title)"
+                  >
+                    🗑 Borrar
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- ABM GUÍAS DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">Nueva guía</h3>
+
+          <div class="abm-2col">
+            <div class="field">
+              <label>Título</label>
+              <input v-model="guideCreateForm.title" type="text" />
             </div>
 
-            <div v-if="isAdmin" class="small-actions" @click.stop>
-              <button class="btn-edit" @click="startEditGuide(g)">
-                🖊 Editar
-              </button>
-              <button class="btn-delete" @click="askDelete('guide', g.id)">
-                🗑 Borrar
-              </button>
+            <div class="field">
+              <label>Portada (cover_path)</label>
+              <input v-model="guideCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Archivo PDF (file_path)</label>
+              <input
+                v-model="guideCreateForm.file_path"
+                type="text"
+                placeholder="Ruta en Supabase (opcional si subís un PDF)"
+              />
+            </div>
+
+            <div class="field">
+              <label>O subí un PDF</label>
+              <div class="upload-row">
+                <input
+                  ref="guidePdfInput"
+                  type="file"
+                  accept="application/pdf"
+                  class="file-input"
+                  @change="onGuidePdfSelected"
+                />
+                <button
+                  type="button"
+                  class="upload-btn"
+                  @click="guidePdfInput?.click()"
+                >
+                  Seleccionar PDF
+                </button>
+                <span v-if="guidePdfName" class="file-name">
+                  {{ guidePdfName }}
+                </span>
+              </div>
+            </div>
+
+            <div class="field field--full">
+              <label>Descripción</label>
+              <textarea rows="2" v-model="guideCreateForm.description" />
             </div>
           </div>
-        </article>
+
+          <div class="abm-actions">
+            <button type="button" class="pill pill--primary" @click="createGuide">
+              Crear guía
+            </button>
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetGuideCreateForm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.guides" class="loading">Cargando guías…</div>
+        <p v-else-if="!guides.length" class="empty">Aún no hay guías.</p>
+
+        <div v-else class="grid">
+          <article
+            v-for="g in guides"
+            :key="g.id"
+            class="card guide-card"
+            @click="openGuide(g)"
+          >
+            <div class="guide-thumb">
+              <img :src="publicUrl(g.cover_path)" :alt="g.title" />
+            </div>
+            <div class="guide-body">
+              <h3 class="guide-title">{{ g.title }}</h3>
+              <p class="guide-summary">{{ g.description }}</p>
+
+              <div class="guide-actions">
+                <button class="btn" @click.stop="openGuide(g)">Continuar</button>
+                <div class="progress" v-if="progressMap.get(g.id) !== undefined">
+                  <div
+                    class="bar"
+                    :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
+                  />
+                </div>
+                <small class="pct" v-if="progressMap.get(g.id) !== undefined">
+                  {{ progressMap.get(g.id) }}%
+                </small>
+              </div>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
-    <!-- OVERLAY VIDEO -->
+    <!-- OVERLAYS Y MODALES -->
     <div v-if="currentVideo" class="overlay">
       <div class="modal-card">
         <button type="button" class="close" @click="closeVideo">×</button>
         <div class="player">
-          <video v-if="videoSrc" :src="videoSrc" controls playsinline></video>
+          <video v-if="videoSrc" :src="videoSrc" controls playsinline />
         </div>
         <h3 class="modal-title">{{ currentVideo?.title }}</h3>
         <p class="modal-desc" v-if="currentVideo?.description">
@@ -328,7 +446,6 @@
       </div>
     </div>
 
-    <!-- OVERLAY PDF (Libros / Guías) -->
     <div v-if="currentPdf" class="overlay" @click.self="closePdf">
       <div class="modal-card">
         <button type="button" class="close" @click="closePdf">×</button>
@@ -337,28 +454,99 @@
           {{ currentPdf?.description }}
         </p>
         <div class="pdf">
-          <iframe v-if="pdfSrc" :src="pdfSrc" title="Documento"></iframe>
+          <iframe v-if="pdfSrc" :src="pdfSrc" title="Documento" />
         </div>
       </div>
     </div>
 
-    <!-- MODAL CONFIRMACIÓN BORRADO -->
-    <div v-if="confirmDelete" class="overlay">
-      <div class="confirm-card">
-        <h3>Eliminar {{ deleteLabel }}</h3>
-        <p>¿Estás segura de que querés borrar este {{ deleteLabel }}?</p>
-        <div class="confirm-actions">
-          <button class="pill pill--ghost" type="button" @click="confirmDelete = null">
+    <div v-if="editModal" class="overlay" @click.self="closeEditModal">
+      <div class="edit-card">
+        <header class="edit-header">
+          <h3 class="edit-title">
+            <span v-if="editModal.type === 'video'">Editar video</span>
+            <span v-else-if="editModal.type === 'book'">Editar libro</span>
+            <span v-else>Editar guía</span>
+          </h3>
+          <button class="edit-close" type="button" @click="closeEditModal">
+            ×
+          </button>
+        </header>
+
+        <section class="edit-body">
+          <div class="abm-grid">
+            <div class="field">
+              <label>Título</label>
+              <input v-model="editModal.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>Portada (cover_path)</label>
+              <input v-model="editModal.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>
+                Archivo
+                <span v-if="editModal.type === 'video'">de video</span>
+                <span v-else>PDF</span>
+                (file_path)
+              </label>
+              <input v-model="editModal.file_path" type="text" />
+            </div>
+
+            <div v-if="editModal.type === 'video'" class="field">
+              <label>Duración (segundos)</label>
+              <input
+                v-model.number="editModal.duration_seconds"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div v-if="editModal.type !== 'book'" class="field field--full">
+              <label>Descripción</label>
+              <textarea rows="3" v-model="editModal.description" />
+            </div>
+          </div>
+        </section>
+
+        <footer class="edit-footer">
+          <button class="pill pill--ghost" type="button" @click="closeEditModal">
             Cancelar
           </button>
-          <button class="pill pill--danger" type="button" @click="performDelete">
-            Borrar
+          <button class="pill pill--primary" type="button" @click="saveEdit">
+            Guardar cambios
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
+      <div class="confirm-card">
+        <h3>Eliminar {{ deleteLabel }}</h3>
+        <p>
+          ¿Seguro que querés borrar
+          <strong>«{{ confirmDelete.title }}»</strong>?
+        </p>
+        <div class="confirm-actions">
+          <button
+            class="pill pill--primary"
+            type="button"
+            @click="cancelDelete"
+          >
+            Cancelar
+          </button>
+          <button
+            class="pill pill--danger"
+            type="button"
+            @click="performDelete"
+          >
+            🗑 Borrar
           </button>
         </div>
       </div>
     </div>
 
-    <!-- TOAST / MENSAJITO -->
     <div v-if="toast" class="toast" :class="toast.kind">
       {{ toast.message }}
     </div>
@@ -375,6 +563,7 @@ const TABS = [
   { key: 'biblioteca', label: 'Bibliotecas' },
   { key: 'guias', label: 'Guías' },
 ] as const
+
 type TabKey = (typeof TABS)[number]['key']
 const tab = ref<TabKey>('videos')
 
@@ -418,7 +607,6 @@ const loading = ref({ videos: false, books: false, guides: false })
 const auth = useAuthStore()
 const progressMap = ref<Map<IdType, number>>(new Map())
 
-// 🔐 admin
 const isAdmin = computed(
   () => (auth.user as any)?.email === 'admin@nura.app',
 )
@@ -430,20 +618,16 @@ function publicUrl(path?: string | null) {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }
 
-/* ---------- TOAST ---------- */
 const toast = ref<{ message: string; kind: 'success' | 'error' } | null>(null)
 
 function showToast(message: string, kind: 'success' | 'error' = 'success') {
   toast.value = { message, kind }
   setTimeout(() => {
-    // sólo lo cierro si sigue siendo el mismo mensaje
-    if (toast.value?.message === message) {
-      toast.value = null
-    }
+    if (toast.value?.message === message) toast.value = null
   }, 2500)
 }
 
-/* ---------- UPLOAD PDF ---------- */
+/* Upload PDF */
 const bookPdfInput = ref<HTMLInputElement | null>(null)
 const guidePdfInput = ref<HTMLInputElement | null>(null)
 const bookPdfFile = ref<File | null>(null)
@@ -479,25 +663,27 @@ async function uploadPdf(file: File, folder: 'books' | 'guides') {
 
   if (error) {
     console.error('Error al subir PDF:', error)
-    showToast('Error al subir el PDF. Revisá la consola.', 'error')
+    showToast('Error al subir el PDF.', 'error')
     return null
   }
 
   return data?.path ?? null
 }
 
-/* ---------- LOADERS ---------- */
+/* Loaders */
 async function loadVideos() {
   loading.value.videos = true
   const { data, error } = await supabase
     .from('videos')
     .select('id,title,description,cover_path,file_path,duration_seconds')
     .order('created_at', { ascending: false })
+
   if (error) {
     console.error(error)
     showToast('Error al cargar videos.', 'error')
   }
-  if (!error && data) videos.value = data as VideoRow[]
+
+  videos.value = (data as VideoRow[]) || []
   loading.value.videos = false
 }
 
@@ -531,6 +717,7 @@ async function loadGuides() {
     .from('guides')
     .select('id,title,description,cover_path,file_path')
     .order('created_at', { ascending: false })
+
   if (error) {
     console.error('Error loading guides:', error)
     showToast('Error al cargar las guías.', 'error')
@@ -542,33 +729,29 @@ async function loadGuides() {
       .from('guide_progress')
       .select('guide_id, percent')
       .eq('user_id', auth.user.id)
+
     if (errP) console.error(errP)
     progressMap.value = new Map(
-      ((p as any[] | null) ?? []).map((r) => [r.guide_id as IdType, r.percent]),
+      ((p as any[] | null) ?? []).map((r) => [
+        r.guide_id as IdType,
+        r.percent,
+      ]),
     )
   }
   loading.value.guides = false
 }
 
-/* ---------- ABM VIDEOS ---------- */
-const editingVideoId = ref<IdType | null>(null)
-const videoForm = ref<{
-  title: string
-  description: string
-  cover_path: string
-  file_path: string
-  duration_seconds: number | null
-}>({
+/* ABM NUEVOS (create) */
+const videoCreateForm = ref({
   title: '',
   description: '',
   cover_path: '',
   file_path: '',
-  duration_seconds: null,
+  duration_seconds: null as number | null,
 })
 
-function resetVideoForm() {
-  editingVideoId.value = null
-  videoForm.value = {
+function resetVideoCreateForm() {
+  videoCreateForm.value = {
     title: '',
     description: '',
     cover_path: '',
@@ -577,150 +760,89 @@ function resetVideoForm() {
   }
 }
 
-function startEditVideo(v: VideoRow) {
-  editingVideoId.value = v.id
-  videoForm.value = {
-    title: v.title,
-    description: v.description ?? '',
-    cover_path: v.cover_path ?? '',
-    file_path: v.file_path,
-    duration_seconds: v.duration_seconds ?? null,
-  }
-}
-
-async function saveVideo() {
-  if (!videoForm.value.title || !videoForm.value.file_path) {
+async function createVideo() {
+  if (!videoCreateForm.value.title || !videoCreateForm.value.file_path) {
     showToast('Título y archivo de video son obligatorios.', 'error')
     return
   }
 
   const payload = {
-    title: videoForm.value.title,
-    description: videoForm.value.description || null,
-    cover_path: videoForm.value.cover_path || null,
-    file_path: videoForm.value.file_path,
-    duration_seconds: videoForm.value.duration_seconds,
+    title: videoCreateForm.value.title,
+    description: videoCreateForm.value.description || null,
+    cover_path: videoCreateForm.value.cover_path || null,
+    file_path: videoCreateForm.value.file_path,
+    duration_seconds: videoCreateForm.value.duration_seconds,
   }
 
-  if (editingVideoId.value != null) {
-    const { error } = await supabase
-      .from('videos')
-      .update(payload)
-      .eq('id', editingVideoId.value)
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al actualizar el video.', 'error')
-      return
-    }
-    showToast('Video editado correctamente.')
-  } else {
-    const { error } = await supabase.from('videos').insert([payload])
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al crear el video.', 'error')
-      return
-    }
-    showToast('Video creado correctamente.')
+  const { error } = await supabase.from('videos').insert([payload])
+  if (error) {
+    console.error(error)
+    showToast('Hubo un problema al crear el video.', 'error')
+    return
   }
 
+  showToast('Video creado correctamente.')
   await loadVideos()
-  resetVideoForm()
+  resetVideoCreateForm()
 }
 
-/* ---------- ABM LIBROS ---------- */
-const editingBookId = ref<IdType | null>(null)
-const bookForm = ref<{
-  title: string
-  cover_path: string
-  file_path: string
-}>({
+const bookCreateForm = ref({
   title: '',
   cover_path: '',
   file_path: '',
 })
 
-function resetBookForm() {
-  editingBookId.value = null
-  bookForm.value = { title: '', cover_path: '', file_path: '' }
+function resetBookCreateForm() {
+  bookCreateForm.value = { title: '', cover_path: '', file_path: '' }
   bookPdfFile.value = null
   bookPdfName.value = ''
 }
 
-function startEditBook(b: BookRow) {
-  editingBookId.value = b.id
-  bookForm.value = {
-    title: b.title,
-    cover_path: b.cover_path ?? '',
-    file_path: b.file_path,
-  }
-  bookPdfFile.value = null
-  bookPdfName.value = ''
-}
-
-async function saveBook() {
+async function createBook() {
   if (
-    !bookForm.value.title ||
-    (!bookForm.value.file_path && !bookPdfFile.value)
+    !bookCreateForm.value.title ||
+    (!bookCreateForm.value.file_path && !bookPdfFile.value)
   ) {
-    showToast('Título y archivo del libro (ruta o PDF) son obligatorios.', 'error')
+    showToast(
+      'Título y archivo del libro (ruta o PDF) son obligatorios.',
+      'error',
+    )
     return
   }
 
-  // si subió PDF, lo subimos y usamos ese path
-  if (!bookForm.value.file_path && bookPdfFile.value) {
+  if (!bookCreateForm.value.file_path && bookPdfFile.value) {
     const uploadedPath = await uploadPdf(bookPdfFile.value, 'books')
     if (!uploadedPath) return
-    bookForm.value.file_path = uploadedPath
+    bookCreateForm.value.file_path = uploadedPath
   }
 
   const payload = {
-    title: bookForm.value.title,
-    cover_path: bookForm.value.cover_path || null,
-    file_path: bookForm.value.file_path,
+    title: bookCreateForm.value.title,
+    cover_path: bookCreateForm.value.cover_path || null,
+    file_path: bookCreateForm.value.file_path,
   }
 
-  if (editingBookId.value != null) {
-    const { error } = await supabase
-      .from('books')
-      .update(payload)
-      .eq('id', editingBookId.value)
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al actualizar el libro.', 'error')
-      return
-    }
-    showToast('Libro editado correctamente.')
-  } else {
-    const { error } = await supabase.from('books').insert([payload])
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al crear el libro.', 'error')
-      return
-    }
-    showToast('Libro creado correctamente.')
+  const { error } = await supabase.from('books').insert([payload])
+  if (error) {
+    console.error(error)
+    showToast('Hubo un problema al crear el libro.', 'error')
+    return
   }
 
+  showToast('Libro creado correctamente.')
   await loadBooksAndArticles()
-  resetBookForm()
+  resetBookCreateForm()
 }
 
-/* ---------- ABM GUÍAS ---------- */
-const editingGuideId = ref<IdType | null>(null)
-const guideForm = ref<{
-  title: string
-  description: string
-  cover_path: string
-  file_path: string
-}>({
+const guideCreateForm = ref({
   title: '',
   description: '',
   cover_path: '',
   file_path: '',
 })
 
-function resetGuideForm() {
-  editingGuideId.value = null
-  guideForm.value = {
+function resetGuideCreateForm() {
+  guideCreateForm.value = {
     title: '',
     description: '',
     cover_path: '',
@@ -730,69 +852,160 @@ function resetGuideForm() {
   guidePdfName.value = ''
 }
 
+async function createGuide() {
+  if (
+    !guideCreateForm.value.title ||
+    (!guideCreateForm.value.file_path && !guidePdfFile.value)
+  ) {
+    showToast(
+      'Título y archivo de la guía (ruta o PDF) son obligatorios.',
+      'error',
+    )
+    return
+  }
+
+  if (!guideCreateForm.value.file_path && guidePdfFile.value) {
+    const uploadedPath = await uploadPdf(guidePdfFile.value, 'guides')
+    if (!uploadedPath) return
+    guideCreateForm.value.file_path = uploadedPath
+  }
+
+  const payload = {
+    title: guideCreateForm.value.title,
+    description: guideCreateForm.value.description || null,
+    cover_path: guideCreateForm.value.cover_path || null,
+    file_path: guideCreateForm.value.file_path,
+  }
+
+  const { error } = await supabase.from('guides').insert([payload])
+  if (error) {
+    console.error(error)
+    showToast('Hubo un problema al crear la guía.', 'error')
+    return
+  }
+
+  showToast('Guía creada correctamente.')
+  await loadGuides()
+  resetGuideCreateForm()
+}
+
+/* EDIT MODAL */
+const editModal = ref<{
+  type: 'video' | 'book' | 'guide'
+  id: IdType
+  title: string
+  description?: string
+  cover_path?: string
+  file_path?: string
+  duration_seconds?: number | null
+} | null>(null)
+
+function startEditVideo(v: VideoRow) {
+  editModal.value = {
+    type: 'video',
+    id: v.id,
+    title: v.title,
+    description: v.description ?? '',
+    cover_path: v.cover_path ?? '',
+    file_path: v.file_path,
+    duration_seconds: v.duration_seconds ?? null,
+  }
+}
+
+function startEditBook(b: BookRow) {
+  editModal.value = {
+    type: 'book',
+    id: b.id,
+    title: b.title,
+    cover_path: b.cover_path ?? '',
+    file_path: b.file_path,
+  }
+}
+
 function startEditGuide(g: GuideRow) {
-  editingGuideId.value = g.id
-  guideForm.value = {
+  editModal.value = {
+    type: 'guide',
+    id: g.id,
     title: g.title,
     description: g.description ?? '',
     cover_path: g.cover_path ?? '',
     file_path: g.file_path,
   }
-  guidePdfFile.value = null
-  guidePdfName.value = ''
 }
 
-async function saveGuide() {
-  if (
-    !guideForm.value.title ||
-    (!guideForm.value.file_path && !guidePdfFile.value)
-  ) {
-    showToast('Título y archivo de la guía (ruta o PDF) son obligatorios.', 'error')
+function closeEditModal() {
+  editModal.value = null
+}
+
+async function saveEdit() {
+  if (!editModal.value) return
+
+  const m = editModal.value
+
+  if (!m.title || !m.file_path) {
+    showToast('Título y archivo son obligatorios.', 'error')
     return
   }
 
-  if (!guideForm.value.file_path && guidePdfFile.value) {
-    const uploadedPath = await uploadPdf(guidePdfFile.value, 'guides')
-    if (!uploadedPath) return
-    guideForm.value.file_path = uploadedPath
-  }
-
-  const payload = {
-    title: guideForm.value.title,
-    description: guideForm.value.description || null,
-    cover_path: guideForm.value.cover_path || null,
-    file_path: guideForm.value.file_path,
-  }
-
-  if (editingGuideId.value != null) {
-    const { error } = await supabase
-      .from('guides')
-      .update(payload)
-      .eq('id', editingGuideId.value)
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al actualizar la guía.', 'error')
-      return
+  try {
+    if (m.type === 'video') {
+      const payload = {
+        title: m.title,
+        description: m.description || null,
+        cover_path: m.cover_path || null,
+        file_path: m.file_path,
+        duration_seconds: m.duration_seconds ?? null,
+      }
+      const { error } = await supabase
+        .from('videos')
+        .update(payload)
+        .eq('id', m.id)
+      if (error) throw error
+      showToast('Video editado correctamente.')
+      await loadVideos()
+    } else if (m.type === 'book') {
+      const payload = {
+        title: m.title,
+        cover_path: m.cover_path || null,
+        file_path: m.file_path,
+      }
+      const { error } = await supabase
+        .from('books')
+        .update(payload)
+        .eq('id', m.id)
+      if (error) throw error
+      showToast('Libro editado correctamente.')
+      await loadBooksAndArticles()
+    } else if (m.type === 'guide') {
+      const payload = {
+        title: m.title,
+        description: m.description || null,
+        cover_path: m.cover_path || null,
+        file_path: m.file_path,
+      }
+      const { error } = await supabase
+        .from('guides')
+        .update(payload)
+        .eq('id', m.id)
+      if (error) throw error
+      showToast('Guía editada correctamente.')
+      await loadGuides()
     }
-    showToast('Guía editada correctamente.')
-  } else {
-    const { error } = await supabase.from('guides').insert([payload])
-    if (error) {
-      console.error(error)
-      showToast('Hubo un problema al crear la guía.', 'error')
-      return
-    }
-    showToast('Guía creada correctamente.')
+  } catch (err) {
+    console.error(err)
+    showToast('Error al guardar los cambios.', 'error')
+    return
   }
 
-  await loadGuides()
-  resetGuideForm()
+  closeEditModal()
 }
 
-/* ---------- CONFIRMAR BORRADO ---------- */
-const confirmDelete = ref<{ type: 'video' | 'book' | 'guide'; id: IdType } | null>(
-  null,
-)
+/* Confirm delete */
+const confirmDelete = ref<{
+  type: 'video' | 'book' | 'guide'
+  id: IdType
+  title: string
+} | null>(null)
 
 const deleteLabel = computed(() => {
   if (!confirmDelete.value) return ''
@@ -801,8 +1014,16 @@ const deleteLabel = computed(() => {
   return 'guía'
 })
 
-function askDelete(type: 'video' | 'book' | 'guide', id: IdType) {
-  confirmDelete.value = { type, id }
+function askDelete(
+  type: 'video' | 'book' | 'guide',
+  id: IdType,
+  title: string,
+) {
+  confirmDelete.value = { type, id, title }
+}
+
+function cancelDelete() {
+  confirmDelete.value = null
 }
 
 async function performDelete() {
@@ -812,28 +1033,23 @@ async function performDelete() {
   if (type === 'video') {
     await supabase.from('videos').delete().eq('id', id)
     await loadVideos()
-    if (editingVideoId.value === id) resetVideoForm()
-    showToast('Video borrado correctamente.')
   } else if (type === 'book') {
     await supabase.from('books').delete().eq('id', id)
     await loadBooksAndArticles()
-    if (editingBookId.value === id) resetBookForm()
-    showToast('Libro borrado correctamente.')
-  } else if (type === 'guide') {
+  } else {
     await supabase.from('guides').delete().eq('id', id)
     await loadGuides()
-    if (editingGuideId.value === id) resetGuideForm()
-    showToast('Guía borrada correctamente.')
   }
 
+  showToast('Contenido borrado correctamente.')
   confirmDelete.value = null
 }
 
-/* ---------- VIDEO OVERLAY ---------- */
+/* Video overlay */
 const currentVideo = ref<VideoRow | null>(null)
 const videoSrc = ref('')
 
-async function openVideo(v: VideoRow) {
+function openVideo(v: VideoRow) {
   currentVideo.value = v
   videoSrc.value = publicUrl(v.file_path)
 }
@@ -843,16 +1059,18 @@ function closeVideo() {
   videoSrc.value = ''
 }
 
-/* ---------- PDF OVERLAY (Libros / Guías) ---------- */
-const currentPdf = ref<{ title: string; description?: string | null } | null>(null)
+/* PDF overlay */
+const currentPdf = ref<{ title: string; description?: string | null } | null>(
+  null,
+)
 const pdfSrc = ref('')
 
-async function openBook(b: BookRow) {
+function openBook(b: BookRow) {
   currentPdf.value = { title: b.title }
   pdfSrc.value = publicUrl(b.file_path)
 }
 
-async function openGuide(g: GuideRow) {
+function openGuide(g: GuideRow) {
   currentPdf.value = { title: g.title, description: g.description }
   pdfSrc.value = publicUrl(g.file_path)
 }
@@ -873,14 +1091,6 @@ function mmss(total: number) {
   const s = total % 60
   return `${m}:${s.toString().padStart(2, '0')}`
 }
-
-/* ---- Ejemplo de datos para crear un video nuevo ----
-  Título: "Introducción a Nura"
-  Descripción: "Video de bienvenida a la plataforma Nura."
-  cover_path: "videos/covers/intro-nura.jpg"
-  file_path:  "videos/files/intro-nura.mp4"
-  duración:  180 (3 minutos)
-*/
 </script>
 
 <style scoped>
@@ -889,6 +1099,7 @@ function mmss(total: number) {
   padding: 24px 18px 48px;
   max-width: 1100px;
   margin: 0 auto;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Head + Tabs */
@@ -930,6 +1141,40 @@ h2 {
   box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 
+/* LAYOUT ABM + LISTA */
+.section {
+  display: grid;
+  gap: 14px;
+}
+
+.content-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.content-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.abm-box {
+  flex: 0 0 260px;
+  max-width: 280px;
+}
+
+/* En pantallas chicas: ABM arriba y centrado */
+@media (max-width: 900px) {
+  .content-row {
+    flex-direction: column-reverse; 
+  }
+  .abm-box {
+    flex: 1 1 auto;
+    width: 90%;
+    margin: 0 auto 12px auto;
+  }
+}
+
 /* ABM panel */
 .abm {
   margin-bottom: 18px;
@@ -940,24 +1185,85 @@ h2 {
 }
 .abm-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
+
+/* ABM una sola columna, compacto */
+.abm-2col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+/* Inputs y labels ABM */
+.abm-2col .field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.abm-2col .field--full {
+  grid-column: 1 / -1;
+}
+
+.abm-2col .field label {
+  font-size: 0.85rem;
+  color: #50bdbd;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.abm-2col input,
+.abm-2col textarea {
+  border-radius: 12px;
+  border: 1.6px solid #50bdbd;
+  background: #e6fbfb;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.abm-2col input:focus,
+.abm-2col textarea:focus {
+  background: #ffffff;
+  border-color: #37a8a8;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
+}
+
 .field--full {
   grid-column: 1 / -1;
 }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field label {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.field input,
+.field textarea {
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 7px 10px;
+  font-size: 0.86rem;
+  background: #f9fafb;
+}
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: #50bdbd;
+  background: #ffffff;
+}
+
 .abm-actions {
   margin-top: 10px;
   display: flex;
   gap: 8px;
-}
-
-.field input,
-.field textarea {
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  background: #f9fafb;
+  justify-content: flex-end;
 }
 
 /* Upload PDF */
@@ -970,15 +1276,6 @@ h2 {
 .file-input {
   display: none;
 }
-
-input[type='file'] {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-}
-
 .upload-btn {
   padding: 7px 14px;
   border-radius: 999px;
@@ -1005,7 +1302,8 @@ input[type='file'] {
 
 /* Card */
 .card {
-  background: #e4f3f3;
+  background: #d9f5f5;
+  width: 90%;
   border-radius: 18px;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
   padding: 12px;
@@ -1016,51 +1314,40 @@ input[type='file'] {
     background 0.2s ease;
 }
 .card:hover {
-  background: #f1fbfb;
-  transform: translateY(-3px);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12);
+  background: #d9f5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-/* ================= EDITAR / BORRAR EN CARDS ================= */
+/* Edit / delete buttons estilo pill */
 .small-actions {
   display: flex;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 12px;
   margin-top: 10px;
 }
 
-.btn-edit,
-.btn-delete {
-  background: transparent;
+.abm-btn {
+  border-radius: 999px;
+  padding: 6px 18px;
   border: 2px solid #50bdbd;
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 14px;
+  background: #ffffff;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  transition: 0.15s ease;
 }
-
-.btn-edit {
-  color: #000;
+.abm-btn--edit {
+  color: #50bdbd;
 }
-
-.btn-edit:hover {
-  background: #85b5e046;
-  border-color: #85b6e0;
-  transform: translateY(-2px);
+.abm-btn--edit:hover {
+  background: rgba(80, 189, 189, 0.06);
 }
-
-.btn-delete {
-  color: #f10909;
+.abm-btn--delete {
+  color: #e53935;
+  border-color: #e53935;
 }
-
-.btn-delete:hover {
-  background: #ff1c1c20;
-  border-color: #c20808;
-  transform: translateY(-2px);
+.abm-btn--delete:hover {
+  background: rgba(229, 57, 53, 0.06);
 }
 
 /* Videos */
@@ -1142,11 +1429,23 @@ input[type='file'] {
   padding: 0 6px 6px;
 }
 .btn {
-  padding: 8px 12px;
+  align-self: flex-start;
+  padding: 7px 18px;
   border-radius: 999px;
-  background: #50bdbd;
-  color: #fff;
   border: none;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.9rem;
+  width: 100%;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(80, 189, 189, 0.4);
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.18s ease;
+}
+.btn:hover {
+  background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.5);
 }
 .progress {
   height: 10px;
@@ -1160,11 +1459,6 @@ input[type='file'] {
 }
 .pct {
   opacity: 0.8;
-}
-
-.section {
-  display: grid;
-  gap: 14px;
 }
 
 .articles {
@@ -1199,11 +1493,12 @@ input[type='file'] {
   opacity: 0.75;
 }
 
-/* Overlay genérico para video y PDF */
+/* Overlay genérico con blur (video, pdf, editar, borrar) */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1211,7 +1506,7 @@ input[type='file'] {
   padding: 16px;
 }
 
-/* Contenido del modal */
+/* Modal principal (video/pdf) */
 .modal-card {
   position: relative;
   background: #ffffff;
@@ -1219,8 +1514,6 @@ input[type='file'] {
   overflow: hidden;
   width: min(900px, 96vw);
 }
-
-/* Botón de cierre */
 .close {
   z-index: 20;
   position: absolute;
@@ -1240,8 +1533,6 @@ input[type='file'] {
   font-weight: 600;
   line-height: 1;
 }
-
-/* Barra de título del modal */
 .modal-title {
   margin: 0;
   padding: 10px 48px 10px 18px;
@@ -1250,15 +1541,12 @@ input[type='file'] {
   color: #ffffff;
   font-size: 1.2rem;
 }
-
-/* Texto debajo del título */
 .modal-desc {
   margin: 0;
   padding: 10px 18px 14px;
   background: #50bdbd;
   color: #ffffff;
 }
-
 .player {
   background: #000;
 }
@@ -1267,7 +1555,6 @@ input[type='file'] {
   height: auto;
   display: block;
 }
-
 .pdf {
   height: 70vh;
 }
@@ -1277,7 +1564,101 @@ input[type='file'] {
   border: 0;
 }
 
-/* Confirm delete modal */
+/* Card del modal de edición */
+.edit-card {
+  background: #ffffff;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+.edit-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+}
+
+.edit-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #50bdbd;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f0f4f8;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-close:hover {
+  background: #e2e8f0;
+  transform: scale(1.05);
+}
+
+.edit-body {
+  padding: 20px 22px 10px;
+}
+
+.edit-body .field label {
+  font-size: 0.8rem;
+  font-weight: 750;
+  color: #50bdbd;
+  letter-spacing: 0.05em;
+}
+
+.edit-body input,
+.edit-body textarea {
+  border-radius: 14px;
+  border: 1.5px solid #50bdbd;
+  background: #d9f5f5;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-family: 'Inter', sans-serif;
+  color: #111827;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.edit-body input:focus,
+.edit-body textarea:focus {
+  border-color: #3ea9a9;
+  background: #e6fbfb;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
+}
+
+.edit-footer {
+  padding: 16px 22px 18px;
+  border-top: 1px solid #eef2f7;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Confirm delete */
 .confirm-card {
   background: #ffffff;
   border-radius: 18px;
@@ -1298,7 +1679,7 @@ input[type='file'] {
   gap: 8px;
 }
 
-/* Pills / botones genéricos */
+/* Pills */
 .pill {
   border-radius: 999px;
   padding: 7px 16px;
@@ -1316,15 +1697,22 @@ input[type='file'] {
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
 }
 .pill--primary {
-  padding: 10px 22px;
+  padding: 9px 22px;
   font-size: 0.9rem;
 }
+
 .pill--ghost {
-  background: #ffffff;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
-  box-shadow: none;
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.4);
 }
+
+.pill--ghost:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
 .pill--danger {
   background: #e53935;
   box-shadow: 0 8px 18px rgba(229, 57, 53, 0.4);
@@ -1346,7 +1734,7 @@ input[type='file'] {
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
 }
 .toast.success {
-  background: #22c55e;
+  background: #50bdbd;
 }
 .toast.error {
   background: #ef4444;
