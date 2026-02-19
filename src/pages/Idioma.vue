@@ -1,82 +1,103 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+
+type NuraLocale = 'es-AR' | 'en'
 
 const router = useRouter()
+const { locale, t } = useI18n()
 
-const showModal = ref(true)
-const lang = 'es-AR'
+const currentLocale = computed(() => locale.value as NuraLocale)
 
 function goBack() {
   router.back()
 }
 
-function closeModal() {
-  showModal.value = false
+function applyLanguage(next: NuraLocale) {
+  locale.value = next
+  localStorage.setItem('nura_locale', next)
+  document.documentElement.lang = next
 }
+
+function setLanguage(next: NuraLocale) {
+  if (currentLocale.value === next) return
+  applyLanguage(next)
+}
+
+/**
+ * Blindaje:
+ * si el locale cambia por cualquier otra razón (otra pantalla, init async, etc),
+ * igual mantenemos localStorage + lang sincronizados.
+ */
+watch(
+  () => locale.value,
+  (next) => {
+    const safe = (next === 'es-AR' || next === 'en') ? next : 'es-AR'
+    localStorage.setItem('nura_locale', safe)
+    document.documentElement.lang = safe
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
-<h1 class="visually-hidden">Idioma
-</h1>
+  <h1 class="visually-hidden">{{ t('language.title') }}</h1>
+
   <main class="page">
     <header class="top">
-      <button class="back-link" type="button" @click="goBack">
+      <button class="back-link" type="button" @click="goBack" aria-label="Volver">
         <span class="arrow">←</span>
       </button>
-      <h1 class="title">Idioma</h1>
+      <h1 class="title">{{ t('language.title') }}</h1>
     </header>
 
     <section class="card">
       <p class="intro">
-        Por el momento Nura está disponible únicamente en Español. En futuras
-        versiones vamos a ir sumando otros idiomas.
+        {{ t('language.intro') }}
       </p>
 
       <p class="current">
-        Idioma actual: <strong>Español (Argentina)</strong>
+        {{ t('language.current') }}
+        <strong>
+          {{ currentLocale === 'en' ? 'English' : 'Español (Argentina)' }}
+        </strong>
       </p>
 
       <div class="options">
-        <div class="option disabled">
-          <div class="dot active" />
-          <div class="option-body">
+        <!-- Español -->
+        <button
+          class="option"
+          type="button"
+          :class="{ active: currentLocale === 'es-AR' }"
+          @click="setLanguage('es-AR')"
+        >
+          <span class="dot" :class="{ active: currentLocale === 'es-AR' }" />
+          <span class="option-body">
             <span class="option-title">Español (Argentina)</span>
-            <span class="option-sub">Idioma actual de la aplicación.</span>
-          </div>
-        </div>
+            <span class="option-sub">{{ t('language.esSub') }}</span>
+          </span>
+        </button>
 
-        <div class="option disabled">
-          <div class="dot" />
-          <div class="option-body">
-            <span class="option-title">Otros idiomas</span>
-            <span class="option-sub">
-              Próximamente vamos a habilitar más opciones.
-            </span>
-          </div>
-        </div>
+        <!-- English -->
+        <button
+          class="option"
+          type="button"
+          :class="{ active: currentLocale === 'en' }"
+          @click="setLanguage('en')"
+        >
+          <span class="dot" :class="{ active: currentLocale === 'en' }" />
+          <span class="option-body">
+            <span class="option-title">English</span>
+            <span class="option-sub">{{ t('language.enSub') }}</span>
+          </span>
+        </button>
       </div>
 
       <p class="hint">
-        Cuando la app esté disponible en otros idiomas, vas a poder elegirlos
-        desde esta misma sección.
+        {{ t('language.hint') }}
       </p>
     </section>
-
-    <!-- MODAL: cambio de idioma no disponible -->
-    <div v-if="showModal" class="modal-backdrop">
-      <div class="modal-card">
-        <h2 class="modal-title">Cambio de idioma no disponible</h2>
-        <p class="modal-text">
-          Por el momento, Nura solo está habilitada en Español. Estamos
-          trabajando para sumar más idiomas próximamente.
-        </p>
-
-        <button class="modal-btn" type="button" @click="closeModal">
-          Entendido
-        </button>
-      </div>
-    </div>
   </main>
 </template>
 
@@ -88,35 +109,6 @@ function closeModal() {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-
-/* Header */
-.sub-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 1100px;
-  margin: 0 auto 14px;
-}
-.sub-header h1 {
-  margin: 0;
-  font-size: 1.4rem;
-  color: #46bdbd;
-  font-weight: 700;
-}
-.back-link {
-  border: none;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 0;
-}
-.arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
 }
 
 .top {
@@ -135,18 +127,19 @@ function closeModal() {
   color: #0f172a;
 }
 
-.back-btn {
+.back-link {
   border: none;
-  background: #50bdbd;
-  color: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  cursor: pointer;
-  display: flex;
+  background: transparent;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.arrow {
+  font-size: 1.5rem;
+  color: #46bdbd;
 }
 
 .card {
@@ -173,21 +166,32 @@ function closeModal() {
 
 .options {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
 .option {
+  width: 100%;
+  border: none;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 12px 12px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 10px;
-  border-radius: 14px;
-  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
 }
 
-.option.disabled {
-  opacity: 0.8;
+.option:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.option.active {
+  background: #eefcfc;
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.18);
 }
 
 .dot {
@@ -196,6 +200,7 @@ function closeModal() {
   border-radius: 999px;
   border: 2px solid #cbd5e1;
   margin-top: 4px;
+  flex: 0 0 auto;
 }
 
 .dot.active {
@@ -210,7 +215,7 @@ function closeModal() {
 
 .option-title {
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #0f172a;
 }
 
@@ -225,52 +230,13 @@ function closeModal() {
   color: #94a3b8;
 }
 
-/* Modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 40;
-}
-
-.modal-card {
-  max-width: 420px;
-  width: 100%;
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 20px 18px 16px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
-  border: 1px solid #e2edf7;
-  text-align: center;
-}
-
-.modal-title {
-  margin: 0 0 8px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.modal-text {
-  margin: 0 0 16px;
-  font-size: 0.95rem;
-  color: #475569;
-}
-
-.modal-btn {
-  border: none;
-  border-radius: 14px;
-  padding: 0.6rem 1.4rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  color: #ffffff;
-  background: #50bdbd;
-  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.45);
-  width: 100%;
+/* Accesibilidad */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
 }
 </style>

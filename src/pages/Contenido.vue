@@ -1,15 +1,17 @@
 <template>
   <main class="contenido">
     <header class="page-head">
-    <h1 class="visually-hidden">Contenido educativo</h1>
+      <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
 
-      <h2>Contenido educativo</h2>
-      <nav class="tabs">
+      <h2>{{ $t('content.pageTitle') }}</h2>
+
+      <nav class="tabs" :aria-label="$t('content.tabsAria')">
         <button
-          v-for="t in TABS"
+          v-for="t in tabs"
           :key="t.key"
           class="tab"
           :class="{ active: tab === t.key }"
+          type="button"
           @click="tab = t.key"
         >
           {{ t.label }}
@@ -22,8 +24,12 @@
       <div v-if="isAdmin" class="content-row">
         <!-- LISTA VIDEOS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.videos" class="loading">Cargando videos…</div>
-          <p v-else-if="!videos.length" class="empty">Aún no hay videos.</p>
+          <div v-if="loading.videos" class="loading">
+            {{ $t('content.loadingVideos') }}
+          </div>
+          <p v-else-if="!videos.length" class="empty">
+            {{ $t('content.emptyVideos') }}
+          </p>
 
           <div v-else class="grid">
             <article
@@ -38,17 +44,23 @@
                   {{ mmss(v.duration_seconds) }}
                 </span>
               </div>
+
               <h3 class="title">{{ v.title }}</h3>
 
               <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button class="abm-btn abm-btn--edit" @click="startEditVideo(v)">
-                  🖊 Editar
+                <button
+                  class="abm-btn abm-btn--edit"
+                  type="button"
+                  @click="startEditVideo(v)"
+                >
+                  🖊 {{ $t('content.actions.edit') }}
                 </button>
                 <button
                   class="abm-btn abm-btn--delete"
+                  type="button"
                   @click="askDelete('video', v.id, v.title)"
                 >
-                  🗑 Borrar
+                  🗑 {{ $t('content.actions.delete') }}
                 </button>
               </div>
             </article>
@@ -57,26 +69,26 @@
 
         <!-- ABM VIDEO DERECHA -->
         <section class="abm card abm-box">
-          <h3 class="abm-title">Nuevo video</h3>
+          <h3 class="abm-title">{{ $t('content.video.newTitle') }}</h3>
 
           <div class="abm-grid abm-2col">
             <div class="field">
-              <label>Título</label>
+              <label>{{ $t('content.fields.title') }}</label>
               <input v-model="videoCreateForm.title" type="text" />
             </div>
 
             <div class="field">
-              <label>Portada (cover_path)</label>
+              <label>{{ $t('content.fields.coverPath') }}</label>
               <input v-model="videoCreateForm.cover_path" type="text" />
             </div>
 
             <div class="field">
-              <label>Archivo de video (file_path)</label>
+              <label>{{ $t('content.video.filePath') }}</label>
               <input v-model="videoCreateForm.file_path" type="text" />
             </div>
 
             <div class="field">
-              <label>Duración (segundos)</label>
+              <label>{{ $t('content.video.duration') }}</label>
               <input
                 v-model.number="videoCreateForm.duration_seconds"
                 type="number"
@@ -85,21 +97,25 @@
             </div>
 
             <div class="field field--full">
-              <label>Descripción</label>
+              <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="2" v-model="videoCreateForm.description" />
             </div>
           </div>
 
           <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createVideo">
-              Crear video
+            <button
+              type="button"
+              class="pill pill--primary"
+              @click="createVideo"
+            >
+              {{ $t('content.video.create') }}
             </button>
             <button
               type="button"
               class="pill pill--ghost"
               @click="resetVideoCreateForm"
             >
-              Limpiar
+              {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
@@ -107,8 +123,12 @@
 
       <!-- VISTA SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.videos" class="loading">Cargando videos…</div>
-        <p v-else-if="!videos.length" class="empty">Aún no hay videos.</p>
+        <div v-if="loading.videos" class="loading">
+          {{ $t('content.loadingVideos') }}
+        </div>
+        <p v-else-if="!videos.length" class="empty">
+          {{ $t('content.emptyVideos') }}
+        </p>
 
         <div v-else class="grid">
           <article
@@ -134,9 +154,11 @@
       <div v-if="isAdmin" class="content-row">
         <!-- LISTA LIBROS + ARTÍCULOS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.books" class="loading">Cargando biblioteca…</div>
+          <div v-if="loading.books" class="loading">
+            {{ $t('content.loadingLibrary') }}
+          </div>
           <p v-else-if="!books.length" class="empty">
-            Aún no hay libros recomendados.
+            {{ $t('content.emptyBooks') }}
           </p>
 
           <div v-else class="grid">
@@ -152,27 +174,41 @@
               <h3 class="title">{{ b.title }}</h3>
 
               <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button class="abm-btn abm-btn--edit" @click="startEditBook(b)">
-                  🖊 Editar
+                <button
+                  class="abm-btn abm-btn--edit"
+                  type="button"
+                  @click="startEditBook(b)"
+                >
+                  🖊 {{ $t('content.actions.edit') }}
                 </button>
                 <button
                   class="abm-btn abm-btn--delete"
+                  type="button"
                   @click="askDelete('book', b.id, b.title)"
                 >
-                  🗑 Borrar
+                  🗑 {{ $t('content.actions.delete') }}
                 </button>
               </div>
             </article>
           </div>
 
-          <h3 class="subhead" v-if="articles.length">Artículos destacados</h3>
+          <h3 class="subhead" v-if="articles.length">
+            {{ $t('content.articles.title') }}
+          </h3>
+
           <div class="articles" v-if="articles.length">
             <article v-for="a in articles" :key="a.id" class="article-card">
-              <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+              <img
+                class="art-cover"
+                :src="publicUrl(a.cover_path)"
+                :alt="a.title"
+              />
               <div class="art-body">
                 <h4 class="art-title">{{ a.title }}</h4>
                 <p class="art-summary">{{ a.summary }}</p>
-                <small v-if="a.read_minutes">Lectura {{ a.read_minutes }}m</small>
+                <small v-if="a.read_minutes">
+                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                </small>
               </div>
             </article>
           </div>
@@ -180,30 +216,30 @@
 
         <!-- ABM LIBROS DERECHA -->
         <section class="abm card abm-box">
-          <h3 class="abm-title">Nuevo libro</h3>
+          <h3 class="abm-title">{{ $t('content.book.newTitle') }}</h3>
 
           <div class="abm-2col">
             <div class="field">
-              <label>Título</label>
+              <label>{{ $t('content.fields.title') }}</label>
               <input v-model="bookCreateForm.title" type="text" />
             </div>
 
             <div class="field">
-              <label>Portada (cover_path)</label>
+              <label>{{ $t('content.fields.coverPath') }}</label>
               <input v-model="bookCreateForm.cover_path" type="text" />
             </div>
 
             <div class="field">
-              <label>Archivo PDF (file_path)</label>
+              <label>{{ $t('content.book.filePath') }}</label>
               <input
                 v-model="bookCreateForm.file_path"
                 type="text"
-                placeholder="Ruta en Supabase (opcional si subís un PDF)"
+                :placeholder="$t('content.book.filePlaceholder')"
               />
             </div>
 
             <div class="field">
-              <label>O subí un PDF</label>
+              <label>{{ $t('content.pdf.orUpload') }}</label>
               <div class="upload-row">
                 <input
                   ref="bookPdfInput"
@@ -217,7 +253,7 @@
                   class="upload-btn"
                   @click="bookPdfInput?.click()"
                 >
-                  Seleccionar PDF
+                  {{ $t('content.pdf.select') }}
                 </button>
                 <span v-if="bookPdfName" class="file-name">
                   {{ bookPdfName }}
@@ -228,14 +264,14 @@
 
           <div class="abm-actions">
             <button type="button" class="pill pill--primary" @click="createBook">
-              Crear libro
+              {{ $t('content.book.create') }}
             </button>
             <button
               type="button"
               class="pill pill--ghost"
               @click="resetBookCreateForm"
             >
-              Limpiar
+              {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
@@ -243,9 +279,11 @@
 
       <!-- SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.books" class="loading">Cargando biblioteca…</div>
+        <div v-if="loading.books" class="loading">
+          {{ $t('content.loadingLibrary') }}
+        </div>
         <p v-else-if="!books.length" class="empty">
-          Aún no hay libros recomendados.
+          {{ $t('content.emptyBooks') }}
         </p>
 
         <div v-else class="grid">
@@ -262,14 +300,18 @@
           </article>
         </div>
 
-        <h3 class="subhead" v-if="articles.length">Artículos destacados</h3>
+        <h3 class="subhead" v-if="articles.length">
+          {{ $t('content.articles.title') }}
+        </h3>
         <div class="articles" v-if="articles.length">
           <article v-for="a in articles" :key="a.id" class="article-card">
             <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
             <div class="art-body">
               <h4 class="art-title">{{ a.title }}</h4>
               <p class="art-summary">{{ a.summary }}</p>
-              <small v-if="a.read_minutes">Lectura {{ a.read_minutes }}m</small>
+              <small v-if="a.read_minutes">
+                {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+              </small>
             </div>
           </article>
         </div>
@@ -281,8 +323,12 @@
       <div v-if="isAdmin" class="content-row">
         <!-- LISTA GUÍAS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.guides" class="loading">Cargando guías…</div>
-          <p v-else-if="!guides.length" class="empty">Aún no hay guías.</p>
+          <div v-if="loading.guides" class="loading">
+            {{ $t('content.loadingGuides') }}
+          </div>
+          <p v-else-if="!guides.length" class="empty">
+            {{ $t('content.emptyGuides') }}
+          </p>
 
           <div v-else class="grid">
             <article
@@ -299,27 +345,36 @@
                 <p class="guide-summary">{{ g.description }}</p>
 
                 <div class="guide-actions">
-                  <button class="btn" @click.stop="openGuide(g)">Continuar</button>
+                  <button class="btn" type="button" @click.stop="openGuide(g)">
+                    {{ $t('content.actions.continue') }}
+                  </button>
+
                   <div class="progress" v-if="progressMap.get(g.id) !== undefined">
                     <div
                       class="bar"
                       :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
                     />
                   </div>
+
                   <small class="pct" v-if="progressMap.get(g.id) !== undefined">
                     {{ progressMap.get(g.id) }}%
                   </small>
                 </div>
 
                 <div v-if="isAdmin" class="small-actions" @click.stop>
-                  <button class="abm-btn abm-btn--edit" @click="startEditGuide(g)">
-                    🖊 Editar
+                  <button
+                    class="abm-btn abm-btn--edit"
+                    type="button"
+                    @click="startEditGuide(g)"
+                  >
+                    🖊 {{ $t('content.actions.edit') }}
                   </button>
                   <button
                     class="abm-btn abm-btn--delete"
+                    type="button"
                     @click="askDelete('guide', g.id, g.title)"
                   >
-                    🗑 Borrar
+                    🗑 {{ $t('content.actions.delete') }}
                   </button>
                 </div>
               </div>
@@ -329,30 +384,30 @@
 
         <!-- ABM GUÍAS DERECHA -->
         <section class="abm card abm-box">
-          <h3 class="abm-title">Nueva guía</h3>
+          <h3 class="abm-title">{{ $t('content.guide.newTitle') }}</h3>
 
           <div class="abm-2col">
             <div class="field">
-              <label>Título</label>
+              <label>{{ $t('content.fields.title') }}</label>
               <input v-model="guideCreateForm.title" type="text" />
             </div>
 
             <div class="field">
-              <label>Portada (cover_path)</label>
+              <label>{{ $t('content.fields.coverPath') }}</label>
               <input v-model="guideCreateForm.cover_path" type="text" />
             </div>
 
             <div class="field">
-              <label>Archivo PDF (file_path)</label>
+              <label>{{ $t('content.guide.filePath') }}</label>
               <input
                 v-model="guideCreateForm.file_path"
                 type="text"
-                placeholder="Ruta en Supabase (opcional si subís un PDF)"
+                :placeholder="$t('content.guide.filePlaceholder')"
               />
             </div>
 
             <div class="field">
-              <label>O subí un PDF</label>
+              <label>{{ $t('content.pdf.orUpload') }}</label>
               <div class="upload-row">
                 <input
                   ref="guidePdfInput"
@@ -366,7 +421,7 @@
                   class="upload-btn"
                   @click="guidePdfInput?.click()"
                 >
-                  Seleccionar PDF
+                  {{ $t('content.pdf.select') }}
                 </button>
                 <span v-if="guidePdfName" class="file-name">
                   {{ guidePdfName }}
@@ -375,21 +430,21 @@
             </div>
 
             <div class="field field--full">
-              <label>Descripción</label>
+              <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="2" v-model="guideCreateForm.description" />
             </div>
           </div>
 
           <div class="abm-actions">
             <button type="button" class="pill pill--primary" @click="createGuide">
-              Crear guía
+              {{ $t('content.guide.create') }}
             </button>
             <button
               type="button"
               class="pill pill--ghost"
               @click="resetGuideCreateForm"
             >
-              Limpiar
+              {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
@@ -397,8 +452,12 @@
 
       <!-- SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.guides" class="loading">Cargando guías…</div>
-        <p v-else-if="!guides.length" class="empty">Aún no hay guías.</p>
+        <div v-if="loading.guides" class="loading">
+          {{ $t('content.loadingGuides') }}
+        </div>
+        <p v-else-if="!guides.length" class="empty">
+          {{ $t('content.emptyGuides') }}
+        </p>
 
         <div v-else class="grid">
           <article
@@ -415,13 +474,17 @@
               <p class="guide-summary">{{ g.description }}</p>
 
               <div class="guide-actions">
-                <button class="btn" @click.stop="openGuide(g)">Continuar</button>
+                <button class="btn" type="button" @click.stop="openGuide(g)">
+                  {{ $t('content.actions.continue') }}
+                </button>
+
                 <div class="progress" v-if="progressMap.get(g.id) !== undefined">
                   <div
                     class="bar"
                     :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
                   />
                 </div>
+
                 <small class="pct" v-if="progressMap.get(g.id) !== undefined">
                   {{ progressMap.get(g.id) }}%
                 </small>
@@ -454,7 +517,7 @@
           {{ currentPdf?.description }}
         </p>
         <div class="pdf">
-          <iframe v-if="pdfSrc" :src="pdfSrc" title="Documento" />
+          <iframe v-if="pdfSrc" :src="pdfSrc" :title="$t('content.pdf.iframeTitle')" />
         </div>
       </div>
     </div>
@@ -463,9 +526,9 @@
       <div class="edit-card">
         <header class="edit-header">
           <h3 class="edit-title">
-            <span v-if="editModal.type === 'video'">Editar video</span>
-            <span v-else-if="editModal.type === 'book'">Editar libro</span>
-            <span v-else>Editar guía</span>
+            <span v-if="editModal.type === 'video'">{{ $t('content.edit.video') }}</span>
+            <span v-else-if="editModal.type === 'book'">{{ $t('content.edit.book') }}</span>
+            <span v-else>{{ $t('content.edit.guide') }}</span>
           </h3>
           <button class="edit-close" type="button" @click="closeEditModal">
             ×
@@ -475,27 +538,27 @@
         <section class="edit-body">
           <div class="abm-grid">
             <div class="field">
-              <label>Título</label>
+              <label>{{ $t('content.fields.title') }}</label>
               <input v-model="editModal.title" type="text" />
             </div>
 
             <div class="field">
-              <label>Portada (cover_path)</label>
+              <label>{{ $t('content.fields.coverPath') }}</label>
               <input v-model="editModal.cover_path" type="text" />
             </div>
 
             <div class="field">
               <label>
-                Archivo
-                <span v-if="editModal.type === 'video'">de video</span>
-                <span v-else>PDF</span>
+                {{ $t('content.fields.file') }}
+                <span v-if="editModal.type === 'video'">{{ $t('content.video.fileLabelSuffix') }}</span>
+                <span v-else>{{ $t('content.pdf.fileLabelSuffix') }}</span>
                 (file_path)
               </label>
               <input v-model="editModal.file_path" type="text" />
             </div>
 
             <div v-if="editModal.type === 'video'" class="field">
-              <label>Duración (segundos)</label>
+              <label>{{ $t('content.video.duration') }}</label>
               <input
                 v-model.number="editModal.duration_seconds"
                 type="number"
@@ -504,7 +567,7 @@
             </div>
 
             <div v-if="editModal.type !== 'book'" class="field field--full">
-              <label>Descripción</label>
+              <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="3" v-model="editModal.description" />
             </div>
           </div>
@@ -512,10 +575,10 @@
 
         <footer class="edit-footer">
           <button class="pill pill--ghost" type="button" @click="closeEditModal">
-            Cancelar
+            {{ $t('content.actions.cancel') }}
           </button>
           <button class="pill pill--primary" type="button" @click="saveEdit">
-            Guardar cambios
+            {{ $t('content.actions.save') }}
           </button>
         </footer>
       </div>
@@ -523,25 +586,19 @@
 
     <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
       <div class="confirm-card">
-        <h3>Eliminar {{ deleteLabel }}</h3>
+        <h3>
+          {{ $t('content.delete.title', { item: $t(`content.delete.labels.${confirmDelete.type}`) }) }}
+        </h3>
         <p>
-          ¿Seguro que querés borrar
+          {{ $t('content.delete.text') }}
           <strong>«{{ confirmDelete.title }}»</strong>?
         </p>
         <div class="confirm-actions">
-          <button
-            class="pill pill--primary"
-            type="button"
-            @click="cancelDelete"
-          >
-            Cancelar
+          <button class="pill pill--primary" type="button" @click="cancelDelete">
+            {{ $t('content.actions.cancel') }}
           </button>
-          <button
-            class="pill pill--danger"
-            type="button"
-            @click="performDelete"
-          >
-            🗑 Borrar
+          <button class="pill pill--danger" type="button" @click="performDelete">
+            🗑 {{ $t('content.actions.delete') }}
           </button>
         </div>
       </div>
@@ -557,14 +614,17 @@
 import { onMounted, ref, computed } from 'vue'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
+import { useI18n } from 'vue-i18n'
 
-const TABS = [
-  { key: 'videos', label: 'Videos' },
-  { key: 'biblioteca', label: 'Bibliotecas' },
-  { key: 'guias', label: 'Guías' },
-] as const
+const { t, locale } = useI18n()
 
-type TabKey = (typeof TABS)[number]['key']
+const tabs = computed(() => [
+  { key: 'videos', label: t('content.tabs.videos') },
+  { key: 'biblioteca', label: t('content.tabs.library') },
+  { key: 'guias', label: t('content.tabs.guides') },
+] as const)
+
+type TabKey = 'videos' | 'biblioteca' | 'guias'
 const tab = ref<TabKey>('videos')
 
 type IdType = string | number
@@ -607,9 +667,7 @@ const loading = ref({ videos: false, books: false, guides: false })
 const auth = useAuthStore()
 const progressMap = ref<Map<IdType, number>>(new Map())
 
-const isAdmin = computed(
-  () => (auth.user as any)?.email === 'admin@nura.app',
-)
+const isAdmin = computed(() => (auth.user as any)?.email === 'admin@nura.app')
 
 const BUCKET = 'nura-content'
 
@@ -653,17 +711,15 @@ async function uploadPdf(file: File, folder: 'books' | 'guides') {
   const safeName = file.name.replace(/\s+/g, '-')
   const path = `${folder}/${Date.now()}-${safeName}`
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, {
-      upsert: true,
-      cacheControl: '3600',
-      contentType: file.type,
-    })
+  const { data, error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    upsert: true,
+    cacheControl: '3600',
+    contentType: file.type,
+  })
 
   if (error) {
     console.error('Error al subir PDF:', error)
-    showToast('Error al subir el PDF.', 'error')
+    showToast(t('content.toasts.uploadPdfError'), 'error')
     return null
   }
 
@@ -680,7 +736,7 @@ async function loadVideos() {
 
   if (error) {
     console.error(error)
-    showToast('Error al cargar videos.', 'error')
+    showToast(t('content.toasts.loadVideosError'), 'error')
   }
 
   videos.value = (data as VideoRow[]) || []
@@ -696,7 +752,7 @@ async function loadBooksAndArticles() {
 
   if (errB) {
     console.error(errB)
-    showToast('Error al cargar la biblioteca.', 'error')
+    showToast(t('content.toasts.loadLibraryError'), 'error')
   }
   books.value = (b as BookRow[]) || []
 
@@ -720,7 +776,7 @@ async function loadGuides() {
 
   if (error) {
     console.error('Error loading guides:', error)
-    showToast('Error al cargar las guías.', 'error')
+    showToast(t('content.toasts.loadGuidesError'), 'error')
   }
   guides.value = (g as GuideRow[]) || []
 
@@ -732,12 +788,10 @@ async function loadGuides() {
 
     if (errP) console.error(errP)
     progressMap.value = new Map(
-      ((p as any[] | null) ?? []).map((r) => [
-        r.guide_id as IdType,
-        r.percent,
-      ]),
+      ((p as any[] | null) ?? []).map((r) => [r.guide_id as IdType, r.percent]),
     )
   }
+
   loading.value.guides = false
 }
 
@@ -762,7 +816,7 @@ function resetVideoCreateForm() {
 
 async function createVideo() {
   if (!videoCreateForm.value.title || !videoCreateForm.value.file_path) {
-    showToast('Título y archivo de video son obligatorios.', 'error')
+    showToast(t('content.toasts.videoRequired'), 'error')
     return
   }
 
@@ -777,11 +831,11 @@ async function createVideo() {
   const { error } = await supabase.from('videos').insert([payload])
   if (error) {
     console.error(error)
-    showToast('Hubo un problema al crear el video.', 'error')
+    showToast(t('content.toasts.videoCreateError'), 'error')
     return
   }
 
-  showToast('Video creado correctamente.')
+  showToast(t('content.toasts.videoCreated'), 'success')
   await loadVideos()
   resetVideoCreateForm()
 }
@@ -799,14 +853,8 @@ function resetBookCreateForm() {
 }
 
 async function createBook() {
-  if (
-    !bookCreateForm.value.title ||
-    (!bookCreateForm.value.file_path && !bookPdfFile.value)
-  ) {
-    showToast(
-      'Título y archivo del libro (ruta o PDF) son obligatorios.',
-      'error',
-    )
+  if (!bookCreateForm.value.title || (!bookCreateForm.value.file_path && !bookPdfFile.value)) {
+    showToast(t('content.toasts.bookRequired'), 'error')
     return
   }
 
@@ -825,11 +873,11 @@ async function createBook() {
   const { error } = await supabase.from('books').insert([payload])
   if (error) {
     console.error(error)
-    showToast('Hubo un problema al crear el libro.', 'error')
+    showToast(t('content.toasts.bookCreateError'), 'error')
     return
   }
 
-  showToast('Libro creado correctamente.')
+  showToast(t('content.toasts.bookCreated'), 'success')
   await loadBooksAndArticles()
   resetBookCreateForm()
 }
@@ -853,14 +901,8 @@ function resetGuideCreateForm() {
 }
 
 async function createGuide() {
-  if (
-    !guideCreateForm.value.title ||
-    (!guideCreateForm.value.file_path && !guidePdfFile.value)
-  ) {
-    showToast(
-      'Título y archivo de la guía (ruta o PDF) son obligatorios.',
-      'error',
-    )
+  if (!guideCreateForm.value.title || (!guideCreateForm.value.file_path && !guidePdfFile.value)) {
+    showToast(t('content.toasts.guideRequired'), 'error')
     return
   }
 
@@ -880,11 +922,11 @@ async function createGuide() {
   const { error } = await supabase.from('guides').insert([payload])
   if (error) {
     console.error(error)
-    showToast('Hubo un problema al crear la guía.', 'error')
+    showToast(t('content.toasts.guideCreateError'), 'error')
     return
   }
 
-  showToast('Guía creada correctamente.')
+  showToast(t('content.toasts.guideCreated'), 'success')
   await loadGuides()
   resetGuideCreateForm()
 }
@@ -943,7 +985,7 @@ async function saveEdit() {
   const m = editModal.value
 
   if (!m.title || !m.file_path) {
-    showToast('Título y archivo son obligatorios.', 'error')
+    showToast(t('content.toasts.editRequired'), 'error')
     return
   }
 
@@ -956,12 +998,9 @@ async function saveEdit() {
         file_path: m.file_path,
         duration_seconds: m.duration_seconds ?? null,
       }
-      const { error } = await supabase
-        .from('videos')
-        .update(payload)
-        .eq('id', m.id)
+      const { error } = await supabase.from('videos').update(payload).eq('id', m.id)
       if (error) throw error
-      showToast('Video editado correctamente.')
+      showToast(t('content.toasts.videoEdited'), 'success')
       await loadVideos()
     } else if (m.type === 'book') {
       const payload = {
@@ -969,12 +1008,9 @@ async function saveEdit() {
         cover_path: m.cover_path || null,
         file_path: m.file_path,
       }
-      const { error } = await supabase
-        .from('books')
-        .update(payload)
-        .eq('id', m.id)
+      const { error } = await supabase.from('books').update(payload).eq('id', m.id)
       if (error) throw error
-      showToast('Libro editado correctamente.')
+      showToast(t('content.toasts.bookEdited'), 'success')
       await loadBooksAndArticles()
     } else if (m.type === 'guide') {
       const payload = {
@@ -983,17 +1019,14 @@ async function saveEdit() {
         cover_path: m.cover_path || null,
         file_path: m.file_path,
       }
-      const { error } = await supabase
-        .from('guides')
-        .update(payload)
-        .eq('id', m.id)
+      const { error } = await supabase.from('guides').update(payload).eq('id', m.id)
       if (error) throw error
-      showToast('Guía editada correctamente.')
+      showToast(t('content.toasts.guideEdited'), 'success')
       await loadGuides()
     }
   } catch (err) {
     console.error(err)
-    showToast('Error al guardar los cambios.', 'error')
+    showToast(t('content.toasts.saveError'), 'error')
     return
   }
 
@@ -1001,24 +1034,9 @@ async function saveEdit() {
 }
 
 /* Confirm delete */
-const confirmDelete = ref<{
-  type: 'video' | 'book' | 'guide'
-  id: IdType
-  title: string
-} | null>(null)
+const confirmDelete = ref<{ type: 'video' | 'book' | 'guide'; id: IdType; title: string } | null>(null)
 
-const deleteLabel = computed(() => {
-  if (!confirmDelete.value) return ''
-  if (confirmDelete.value.type === 'video') return 'video'
-  if (confirmDelete.value.type === 'book') return 'libro'
-  return 'guía'
-})
-
-function askDelete(
-  type: 'video' | 'book' | 'guide',
-  id: IdType,
-  title: string,
-) {
+function askDelete(type: 'video' | 'book' | 'guide', id: IdType, title: string) {
   confirmDelete.value = { type, id, title }
 }
 
@@ -1041,7 +1059,7 @@ async function performDelete() {
     await loadGuides()
   }
 
-  showToast('Contenido borrado correctamente.')
+  showToast(t('content.toasts.deleted'), 'success')
   confirmDelete.value = null
 }
 
@@ -1060,9 +1078,7 @@ function closeVideo() {
 }
 
 /* PDF overlay */
-const currentPdf = ref<{ title: string; description?: string | null } | null>(
-  null,
-)
+const currentPdf = ref<{ title: string; description?: string | null } | null>(null)
 const pdfSrc = ref('')
 
 function openBook(b: BookRow) {
@@ -1094,6 +1110,7 @@ function mmss(total: number) {
 </script>
 
 <style scoped>
+/* TU CSS EXACTO, NO LO TOQUÉ */
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;
@@ -1166,7 +1183,7 @@ h2 {
 /* En pantallas chicas: ABM arriba y centrado */
 @media (max-width: 900px) {
   .content-row {
-    flex-direction: column-reverse; 
+    flex-direction: column-reverse;
   }
   .abm-box {
     flex: 1 1 auto;

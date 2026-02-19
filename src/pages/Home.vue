@@ -4,7 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 import MoodSuccessModal from '@/components/MoodSuccessModal.vue'
-
+import { useI18n } from 'vue-i18n'
 
 type ForoResumen = {
   id: string
@@ -27,6 +27,7 @@ type Appt = {
 
 const router = useRouter()
 const auth = useAuthStore()
+const { locale, t, tm } = useI18n()
 
 /* ========= Navegación ========= */
 function goDiaryList() {
@@ -121,26 +122,22 @@ function irAlForo(id: string) {
   router.push({ path: `/app/foro/${id}` })
 }
 
-/* ========= Frase del día ========= */
-const frases = [
-  'Sé amable con vos.',
-  'Un paso a la vez.',
-  'Respirá profundo y seguí.',
-  'Tu proceso importa.',
-  'Cuidarte también es avanzar.',
-  'El descanso también es productivo.',
-  'Soltar no es rendirse.',
-  'Hoy merecés calma.',
-  'Celebrá los pequeños logros.',
-  'Pedí ayuda cuando lo necesites.'
-]
-
+/* ========= Frase del día (i18n) ========= */
 const hoyYYYYMMDD = new Date().toISOString().slice(0, 10)
 
-const fraseDelDia = frases[
-  [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) %
-    frases.length
-]
+const frases = computed(() => {
+  // tm devuelve "unknown" si no existe; lo casteamos a string[]
+  const arr = tm('home.quotes') as unknown as string[]
+  return Array.isArray(arr) && arr.length ? arr : []
+})
+
+const fraseDelDia = computed(() => {
+  if (!frases.value.length) return ''
+  const idx =
+    [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) %
+    frases.value.length
+  return frases.value[idx]
+})
 
 /* ========= Moods ========= */
 const showMoodModal = ref(false)
@@ -170,12 +167,18 @@ function handleWriteDiaryFromModal() {
   escribirDiario()
 }
 
-
-
 /* ========= Calendario simple (mes actual) ========= */
 const today = new Date()
-const monthName = today.toLocaleString('es-AR', { month: 'long' })
-const weekdays = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+
+const monthName = computed(() => {
+  const loc = (locale.value || 'es-AR') as string
+  return today.toLocaleString(loc, { month: 'long' })
+})
+
+const weekdays = computed(() => {
+  // Para calendario Lunes->Domingo
+  return tm('home.weekdays') as unknown as string[]
+})
 
 const first = new Date(today.getFullYear(), today.getMonth(), 1)
 const last = new Date(today.getFullYear(), today.getMonth() + 1, 0)
@@ -188,8 +191,8 @@ const daysInMonth = last.getDate()
 /* ========= Actividades (turnos de hoy) ========= */
 const activities = ref<Appt[]>([])
 
-function formatTime(t: string) {
-  return t?.slice(0, 5) ?? ''
+function formatTime(ti: string) {
+  return ti?.slice(0, 5) ?? ''
 }
 
 /* Google Calendar para turno */
@@ -205,9 +208,9 @@ function exportApptToGoogle(a: Appt) {
 
   const url = new URL('https://calendar.google.com/calendar/render')
   url.searchParams.set('action', 'TEMPLATE')
-  url.searchParams.set('text', a.title || 'Turno Nura')
+  url.searchParams.set('text', a.title || t('home.calendar.defaultEventTitle'))
   url.searchParams.set('dates', `${start}/${end}`)
-  url.searchParams.set('details', a.details || 'Turno agendado desde Nura')
+  url.searchParams.set('details', a.details || t('home.calendar.defaultEventDetails'))
   url.searchParams.set('ctz', 'America/Argentina/Buenos_Aires')
 
   window.open(url.toString(), '_blank')
@@ -221,9 +224,7 @@ onMounted(async () => {
 
   const { data, error } = await supabase
     .from('appointments')
-    .select(
-      'id,user_id,on_date,at_time,title,details,professional,modality'
-    )
+    .select('id,user_id,on_date,at_time,title,details,professional,modality')
     .eq('user_id', auth.user.id)
     .eq('on_date', hoyYYYYMMDD)
     .order('on_date', { ascending: true })
@@ -242,40 +243,55 @@ onMounted(async () => {
       <section class="col">
         <!-- Saludo + Moods -->
         <div class="card">
-          <h2>¡Hola, {{ displayName }}!</h2>
-          <p class="sub">¿Cómo te sentís hoy?</p>
+          <h2>{{ $t('home.greeting', { name: displayName }) }}</h2>
+          <p class="sub">{{ $t('home.howFeeling') }}</p>
 
           <div class="moods">
-            <button class="mood" @click="setMood('triste')">
-              <img src="/icons/nuri-triste.png" alt="Triste" />
-              <span>Triste</span>
+            <button class="mood" @click="setMood('triste')" type="button">
+              <img
+                src="/icons/nuri-triste.png"
+                :alt="$t('home.moods.sad')"
+              />
+              <span>{{ $t('home.moods.sad') }}</span>
             </button>
-            <button class="mood" @click="setMood('normal')">
-              <img src="/icons/nuri-normal.png" alt="Normal" />
-              <span>Normal</span>
+
+            <button class="mood" @click="setMood('normal')" type="button">
+              <img
+                src="/icons/nuri-normal.png"
+                :alt="$t('home.moods.ok')"
+              />
+              <span>{{ $t('home.moods.ok') }}</span>
             </button>
-            <button class="mood" @click="setMood('bien')">
-              <img src="/icons/nuri-bien.png" alt="Bien" />
-              <span>Bien</span>
+
+            <button class="mood" @click="setMood('bien')" type="button">
+              <img
+                src="/icons/nuri-bien.png"
+                :alt="$t('home.moods.good')"
+              />
+              <span>{{ $t('home.moods.good') }}</span>
             </button>
-            <button class="mood" @click="setMood('muybien')">
-              <img src="/icons/nuri-muybien.png" alt="Muy bien" />
-              <span>Muy bien</span>
+
+            <button class="mood" @click="setMood('muybien')" type="button">
+              <img
+                src="/icons/nuri-muybien.png"
+                :alt="$t('home.moods.great')"
+              />
+              <span>{{ $t('home.moods.great') }}</span>
             </button>
           </div>
         </div>
 
         <!-- Frase del día -->
         <div class="card frase-dia-card">
-          <h3>Frase del día</h3>
+          <h3>{{ $t('home.quoteTitle') }}</h3>
 
           <div class="quote">"{{ fraseDelDia }}"</div>
-          <p class="frase">Nura te acompaña todos los días</p>
+          <p class="frase">{{ $t('home.quoteSubtitle') }}</p>
 
           <div class="progreso-box">
             <div class="progreso-top">
               <span class="progreso-text">
-                Llevás <strong>{{ diasCuidado }}</strong> días cuidando de vos
+                {{ $t('home.progressText', { days: diasCuidado }) }}
                 <span class="star-icon">
                   <svg
                     width="20"
@@ -291,7 +307,9 @@ onMounted(async () => {
                 </span>
               </span>
 
-              <span class="meta-text"> Meta: {{ meta }} días </span>
+              <span class="meta-text">
+                {{ $t('home.goal', { goal: meta }) }}
+              </span>
             </div>
 
             <div class="progreso-bar">
@@ -306,7 +324,7 @@ onMounted(async () => {
         <!-- Foro activo -->
         <div class="card">
           <div class="foro-card-header">
-            <h3>Foro activo</h3>
+            <h3>{{ $t('home.activeForum') }}</h3>
           </div>
 
           <ul class="foro-list">
@@ -321,12 +339,12 @@ onMounted(async () => {
             </li>
 
             <li v-if="forosActivos.length === 0" class="foro-item vacío">
-              <span class="foro-title">Todavía no hay foros activos.</span>
+              <span class="foro-title">{{ $t('home.noActiveForums') }}</span>
             </li>
           </ul>
 
           <RouterLink class="foro-btn" to="/app/foro">
-            Ver más del foro
+            {{ $t('home.seeMoreForum') }}
           </RouterLink>
         </div>
       </section>
@@ -335,7 +353,7 @@ onMounted(async () => {
       <section class="col">
         <!-- ACTIVIDADES + CALENDARIO -->
         <div class="card">
-          <h3>Actividades de hoy</h3>
+          <h3>{{ $t('home.todayActivities') }}</h3>
 
           <div v-if="activities.length" class="activities-wrap">
             <ul class="activities-list">
@@ -362,14 +380,14 @@ onMounted(async () => {
                   class="google-btn"
                   @click.stop="exportApptToGoogle(a)"
                 >
-                  + Google Calendar
+                  {{ $t('home.addToGoogleCalendar') }}
                 </button>
               </li>
             </ul>
           </div>
 
           <p v-else class="no-activities">
-            Hoy no tenés actividades agendadas.
+            {{ $t('home.noActivities') }}
           </p>
 
           <!-- CALENDARIO SIMPLE -->
@@ -384,25 +402,18 @@ onMounted(async () => {
             </div>
 
             <div class="cal-grid">
-              <span
-                v-for="d in weekdays"
-                :key="'w' + d"
-                class="wd"
-              >
+              <span v-for="d in weekdays" :key="'w' + d" class="wd">
                 {{ d }}
               </span>
 
-              <span
-                v-for="i in leadingBlanks"
-                :key="'b' + i"
-                class="blank"
-              />
+              <span v-for="i in leadingBlanks" :key="'b' + i" class="blank" />
 
               <button
                 v-for="d in daysInMonth"
                 :key="'d' + d"
                 class="cal-day"
                 :class="{ today: d === today.getDate() }"
+                type="button"
               >
                 {{ d }}
               </button>
@@ -412,40 +423,39 @@ onMounted(async () => {
           <!-- BOTONES BAJO CALENDARIO -->
           <div class="cal-actions">
             <button type="button" class="foro-btn" @click="goDiaryList">
-              Ver todas mis entradas
+              {{ $t('home.viewAllEntries') }}
             </button>
             <button type="button" class="foro-btn" @click="escribirDiario">
-              Escribir hoy
+              {{ $t('home.writeToday') }}
             </button>
           </div>
         </div>
 
         <!-- NuriChat -->
         <div class="card">
-          <h3>NuriChat</h3>
+          <h3>{{ $t('home.nurichatTitle') }}</h3>
           <RouterLink to="/app/chatbot" class="chatbot-card">
             <img
               src="/banners/chatbot-home.png"
-              alt="Tu guía de bienestar, ahora en un chat. Habla con Nuri siempre que lo necesites"
+              :alt="$t('home.nurichatAlt')"
             />
           </RouterLink>
         </div>
       </section>
     </div>
   </main>
-  
- <MoodSuccessModal
-  :open="showMoodModal"
-  :mood="moodSeleccionado"
-  :date="moodDate"
-  @close="showMoodModal = false"
-  @writeDiary="handleWriteDiaryFromModal"
-/>
 
-
+  <MoodSuccessModal
+    :open="showMoodModal"
+    :mood="moodSeleccionado"
+    :date="moodDate"
+    @close="showMoodModal = false"
+    @writeDiary="handleWriteDiaryFromModal"
+  />
 </template>
 
 <style scoped>
+/* (DEJO TU CSS TAL CUAL) */
 .home-page {
   background: #fff;
   padding: 24px 18px 48px;
@@ -472,7 +482,6 @@ onMounted(async () => {
   flex-direction: column;
   gap: 20px;
 }
-
 
 /* Cards */
 .card {
@@ -838,14 +847,13 @@ h3 {
   width: 100%;
   height: auto;
   border-radius: inherit;
-  /* asegura que no se deforme en iPhone */
   object-fit: cover;
 }
 
 /* ===== MOBILE (iPhone / <= 768px) ===== */
 @media (max-width: 768px) {
   .home-page {
-    padding: 16px 12px 96px; /* más espacio para la barra inferior */
+    padding: 16px 12px 96px;
   }
 
   h2 {
@@ -935,7 +943,6 @@ h3 {
     width: 100%;
   }
 
-  /* NuriChat más contenido y separado de la barra inferior */
   .chatbot-card {
     border-radius: 18px;
     margin-top: 4px;

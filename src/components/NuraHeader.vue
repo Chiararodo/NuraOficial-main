@@ -64,6 +64,7 @@ onMounted(async () => {
 
 <template>
   <h1 class="visually-hidden">Header</h1>
+
   <header class="nura-header">
     <!-- Logo -->
     <RouterLink to="/app/home" class="logo-link">
@@ -72,11 +73,25 @@ onMounted(async () => {
 
     <!-- Nav (solo desktop) -->
     <nav class="topnav desktop-only">
-      <RouterLink to="/app/home">Inicio</RouterLink>
-      <RouterLink to="/app/cartilla">Cartilla</RouterLink>
-      <RouterLink to="/app/agendar">Agendar</RouterLink>
-      <RouterLink to="/app/contenido">Contenido</RouterLink>
-      <RouterLink to="/app/perfil">Perfil</RouterLink>
+      <RouterLink to="/app/home">
+        {{ $t('header.home') }}
+      </RouterLink>
+
+      <RouterLink to="/app/cartilla">
+        {{ $t('header.directory') }}
+      </RouterLink>
+
+      <RouterLink to="/app/agendar">
+        {{ $t('header.schedule') }}
+      </RouterLink>
+
+      <RouterLink to="/app/contenido">
+        {{ $t('header.content') }}
+      </RouterLink>
+
+      <RouterLink to="/app/perfil">
+        {{ $t('header.profile') }}
+      </RouterLink>
     </nav>
 
     <!-- Acciones derecha -->
@@ -86,10 +101,10 @@ onMounted(async () => {
         class="icon-btn bell-wrapper"
         :class="{ 'icon-active': isNotisActive, 'has-new': notifCount > 0 }"
         type="button"
-        title="Notificaciones"
+        :title="$t('header.notifications')"
         @click="goToNotifications"
       >
-        <img src="/icons/notif.png" alt="Notificaciones" />
+        <img src="/icons/notif.png" :alt="$t('header.notifications')" />
         <span v-if="notifCount > 0" class="notif-badge">
           {{ notifCount }}
         </span>
@@ -100,19 +115,19 @@ onMounted(async () => {
         class="icon-btn"
         :class="{ 'icon-active': isChatActive }"
         type="button"
-        title="Chatbot"
+        :title="$t('header.chatbot')"
         @click="goToChatbot"
       >
-        <img src="/icons/chat.png" alt="Chatbot" />
+        <img src="/icons/chat.png" :alt="$t('header.chatbot')" />
       </button>
 
-      <!-- Premium (solo si es premium) -->
+      <!-- Premium -->
       <button
         v-if="isPremium"
         class="icon-btn premium-btn"
         :class="{ 'icon-active': isPremiumActive }"
         type="button"
-        title="Premium"
+        :title="$t('header.premium')"
         @click="goToPremium"
       >
         <span class="premium-star">
@@ -129,8 +144,8 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- Botón instalar solo en desktop -->
-    <div class="install-wrapper desktop-only">
+    <!-- Install Button (AHORA visible en cualquier dispositivo) -->
+    <div class="install-wrapper">
       <InstallButton />
     </div>
   </header>
@@ -239,29 +254,10 @@ onMounted(async () => {
   filter: brightness(0) invert(28%) sepia(14%) saturate(2476%)
     hue-rotate(276deg) brightness(94%) contrast(87%);
 }
+
 .icon-active {
   transform: scale(1.12);
   transition: transform 0.2s ease;
-}
-
-/* Animación cuando hay nuevas notificaciones */
-.icon-btn.has-new {
-  animation: nuraPulse 0.8s ease-out;
-}
-
-@keyframes nuraPulse {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.22);
-  }
-  70% {
-    transform: scale(0.94);
-  }
-  100% {
-    transform: scale(1);
-  }
 }
 
 /* Install button */

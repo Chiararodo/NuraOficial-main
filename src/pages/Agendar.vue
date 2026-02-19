@@ -1,64 +1,65 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 
 type OpcionId = 'sesiones' | 'turno' | 'eventos' | 'foro'
 
-const opciones = [
+const routeById: Record<OpcionId, string> = {
+  sesiones: '/app/agendar/sesiones',
+  eventos: '/app/agendar/eventos',
+  turno: '/app/cartilla',
+  foro: '/app/foro'
+}
+
+const opciones = computed(() => [
   {
     id: 'sesiones' as OpcionId,
-    titulo: 'Sesiones Grupales',
-    descripcion:
-      'Espacios virtuales guiados por profesionales, donde podés compartir experiencias y trabajar temas como ansiedad, relación con la comida y autocuidado.',
+    titulo: t('agendar.options.sessions.title'),
+    descripcion: t('agendar.options.sessions.description'),
     img: '/covers/sesiongrupal.png',
-    boton: 'Ver sesiones',
+    boton: t('agendar.options.sessions.button')
   },
   {
     id: 'turno' as OpcionId,
-    titulo: 'Turno con profesional',
-    descripcion:
-      'Reservá consultas individuales con profesionales del equipo de Nura, eligiendo día, horario y modalidad. Por ahora, los turnos se gestionan desde la cartilla.',
+    titulo: t('agendar.options.appointment.title'),
+    descripcion: t('agendar.options.appointment.description'),
     img: '/covers/turnos.jpg',
-    boton: 'Ir a la cartilla',
+    boton: t('agendar.options.appointment.button')
   },
   {
     id: 'eventos' as OpcionId,
-    titulo: 'Eventos Grupales',
-    descripcion:
-      'Charlas y talleres especiales sobre bienestar emocional y salud integral, con especialistas invitados. Encuentros puntuales para aprender, compartir y conectar.',
+    titulo: t('agendar.options.events.title'),
+    descripcion: t('agendar.options.events.description'),
     img: '/covers/eventosgrupales.jpg',
-    boton: 'Ver eventos',
+    boton: t('agendar.options.events.button')
   },
   {
     id: 'foro' as OpcionId,
-    titulo: 'Ir al Foro',
-    descripcion:
-      'Un espacio para hacer preguntas, compartir experiencias y acompañarte con la comunidad. Ideal para sentirte contenida y no estar sola.',
+    titulo: t('agendar.options.forum.title'),
+    descripcion: t('agendar.options.forum.description'),
     img: '/covers/foro.jpg',
-    boton: 'Entrar al foro',
-  },
-]
+    boton: t('agendar.options.forum.button')
+  }
+])
 
 function handleClick(id: OpcionId) {
-  if (id === 'sesiones') router.push('/app/agendar/sesiones')
-  else if (id === 'eventos') router.push('/app/agendar/eventos')
-  else if (id === 'turno') router.push('/app/cartilla')
-  else if (id === 'foro') router.push('/app/foro')
+  router.push(routeById[id])
 }
 </script>
 
 <template>
-  <h1 class="visually-hidden">Agendar</h1>
+  <h1 class="visually-hidden">{{ t('agendar.a11y.pageTitle') }}</h1>
 
   <main class="page">
     <section class="wrap">
       <header class="head">
-        <p class="kicker">Agenda</p>
-        <h2 class="title">Agendar</h2>
-        <p class="sub">
-          Elegí qué querés hacer hoy: sesiones, eventos, turnos o comunidad.
-        </p>
+        <p class="kicker">{{ t('agendar.header.kicker') }}</p>
+        <h2 class="title">{{ t('agendar.header.title') }}</h2>
+        <p class="sub">{{ t('agendar.header.subtitle') }}</p>
       </header>
 
       <section class="grid">
@@ -239,10 +240,6 @@ function handleClick(id: OpcionId) {
 @media (max-width: 520px) {
   .card-row {
     flex-direction: column;
-  }
-
-  .card-img {
-    flex: none;
   }
 
   .card-img img {

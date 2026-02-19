@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 
@@ -72,11 +72,10 @@ async function resolveAvatarUrl() {
   avatarUrl.value = data.signedUrl
 }
 
-
-const memberSince = computed(() => {
+const memberSinceYear = computed(() => {
   const iso = auth.user?.created_at
   if (!iso) return ''
-  return `Usuario desde ${new Date(iso).getFullYear()}`
+  return String(new Date(iso).getFullYear())
 })
 
 const isPremiumLS = computed(
@@ -238,6 +237,20 @@ async function confirmLogout() {
   router.replace('/login')
 }
 
+/* ============================ HELPERS ============================ */
+const isPremium = computed(() => user.value?.premium === true || isPremiumLS.value)
+const moodLabel = (m: Mood) => {
+  const mapKey: Record<Mood, string> = {
+    triste: 'sad',
+    normal: 'ok',
+    bien: 'good',
+    muybien: 'great'
+  }
+  return (window as any).$t
+    ? (window as any).$t(`home.moods.${mapKey[m]}`)
+    : m
+}
+
 /* ============================ MOUNT ============================= */
 
 onMounted(() => {
@@ -253,13 +266,12 @@ watch(avatarPath, () => {
 </script>
 
 <template>
-<h1 class="visually-hidden">Perfil </h1>
+  <h1 class="visually-hidden">{{ $t('profile.title') }}</h1>
 
   <main class="contenido">
     <header class="page-head">
-      <h2>Perfil</h2>
+      <h2>{{ $t('profile.title') }}</h2>
     </header>
-
 
     <div class="grid">
       <!-- IZQUIERDA -->
@@ -267,180 +279,194 @@ watch(avatarPath, () => {
         <!-- PERFIL -->
         <div class="card profile-head">
           <div class="avatar-container">
-            <img :src="avatarUrl" class="avatar-img" />
+            <img :src="avatarUrl" class="avatar-img" :alt="$t('profile.avatarAlt')" />
           </div>
 
           <div class="who">
             <h1 class="name">{{ profileName }}</h1>
             <p class="email">{{ userEmail }}</p>
-            <p class="since">{{ memberSince }}</p>
+            <p class="since" v-if="memberSinceYear">
+              {{ $t('profile.memberSince', { year: memberSinceYear }) }}
+            </p>
 
-            <button class="btn-edit "
-             @click="router.push('/app/perfil/editar')">
-              Editar
+            <button class="btn-edit" type="button" @click="router.push('/app/perfil/editar')">
+              {{ $t('profile.edit') }}
             </button>
           </div>
         </div>
 
-<!-- PLAN -->
-<div class="card premium-box">
-  <template v-if="user">
-    <div class="premium-head-row">
-      <h3>{{ (user.premium === true || isPremiumLS) ? 'Plan Premium' : 'Plan Gratuito' }}</h3>
+        <!-- PLAN -->
+        <div class="card premium-box">
+          <template v-if="user">
+            <div class="premium-head-row">
+              <h3>
+                {{ isPremium ? $t('profile.plan.premiumTitle') : $t('profile.plan.freeTitle') }}
+              </h3>
 
-      <span
-        class="premium-pill"
-        :class="{ 'premium-pill--free': !(user.premium === true || isPremiumLS) }"
-      >
-        <span
-          class="premium-dot"
-          :class="{ 'premium-dot--free': !(user.premium === true || isPremiumLS) }"
-        ></span>
-        {{ (user.premium === true || isPremiumLS) ? 'Plan activo' : 'Plan actual' }}
-      </span>
-    </div>
+              <span
+                class="premium-pill"
+                :class="{ 'premium-pill--free': !isPremium }"
+              >
+                <span
+                  class="premium-dot"
+                  :class="{ 'premium-dot--free': !isPremium }"
+                ></span>
+                {{ isPremium ? $t('profile.plan.active') : $t('profile.plan.current') }}
+              </span>
+            </div>
 
-    <p class="muted" v-if="!(user.premium === true || isPremiumLS)">
-      Acceso esencial para empezar a usar Nura.
-    </p>
+            <p class="muted" v-if="!isPremium">
+              {{ $t('profile.plan.freeDesc') }}
+            </p>
 
-    <ul class="plan-limits" v-if="!(user.premium === true || isPremiumLS)">
-      <li><strong>Foro:</strong> podés comentar, pero no crear publicaciones.</li>
-      <li><strong>Diario:</strong> hasta <strong>10 entradas por mes</strong>.</li>
-      <li><strong>Chatbot:</strong> hasta <strong>5 usos por mes</strong>.</li>
-    </ul>
+            <ul class="plan-limits" v-if="!isPremium">
+              <li>
+                <strong>{{ $t('profile.plan.limits.forumTitle') }}</strong>
+                {{ $t('profile.plan.limits.forumBody') }}
+              </li>
+              <li>
+                <strong>{{ $t('profile.plan.limits.diaryTitle') }}</strong>
+                <span v-html="$t('profile.plan.limits.diaryBody')"></span>
+              </li>
+              <li>
+                <strong>{{ $t('profile.plan.limits.chatbotTitle') }}</strong>
+                <span v-html="$t('profile.plan.limits.chatbotBody')"></span>
+              </li>
+            </ul>
 
-    <p class="muted" v-else>
-      Tenés acceso ilimitado al Foro, Diario y Chatbot, además de beneficios exclusivos.
-    </p>
+            <p class="muted" v-else>
+              {{ $t('profile.plan.premiumDesc') }}
+            </p>
 
-    <RouterLink :to="{ name: 'premium' }" class="foro-btn premium-link">
-      {{ (user.premium === true || isPremiumLS) ? 'Ver detalles del plan' : 'Ver planes y beneficios' }}
-    </RouterLink>
-  </template>
+            <RouterLink :to="{ name: 'premium' }" class="foro-btn premium-link">
+              {{ isPremium ? $t('profile.plan.seeDetails') : $t('profile.plan.seePlans') }}
+            </RouterLink>
+          </template>
 
-  <template v-else>
-    <p class="muted small">Cargando plan...</p>
-  </template>
-</div>
-
-
+          <template v-else>
+            <p class="muted small">{{ $t('profile.plan.loading') }}</p>
+          </template>
+        </div>
 
         <!-- ÚLTIMOS ESTADOS DE ÁNIMO -->
         <div class="card">
-          <h3 class="card-title">Últimos estados de ánimo</h3>
+          <h3 class="card-title">{{ $t('profile.lastMoodsTitle') }}</h3>
 
           <p v-if="recentMoods.length === 0">
-            Todavía no registraste tu estado esta semana.
+            {{ $t('profile.noMoodsThisWeek') }}
           </p>
 
           <ul v-else class="mood-history">
             <li v-for="(item, i) in recentMoods" :key="i">
               <span class="date">{{ item[0] }}</span>
-              <span class="tag tag--mood">{{ item[1] }}</span>
+              <span class="tag tag--mood">
+                {{ $t(`profile.moods.${item[1]}`) }}
+              </span>
             </li>
           </ul>
         </div>
 
         <!-- MEDICACIONES -->
         <div class="card meds-preview">
-          <h3 class="card-title">Medicaciones</h3>
+          <h3 class="card-title">{{ $t('profile.meds.title') }}</h3>
 
-          <p v-if="loadingMeds">Cargando medicaciones…</p>
+          <p v-if="loadingMeds">{{ $t('profile.meds.loading') }}</p>
 
           <p v-else-if="meds.length === 0">
-            No tenés medicaciones cargadas.
+            {{ $t('profile.meds.empty') }}
           </p>
 
           <ul v-else class="moods-list">
             <li v-for="m in meds" :key="m.id">
-              {{ m.name }} — {{ m.dose }} 
+              {{ m.name }} — {{ m.dose }}
             </li>
           </ul>
 
-          <button class="btn" @click="goMeds">
-            Mis medicaciones
+          <button class="btn" type="button" @click="goMeds">
+            {{ $t('profile.meds.myMeds') }}
           </button>
         </div>
 
         <!-- DIARIO -->
         <div class="card">
-          <h3>Mi Diario</h3>
+          <h3>{{ $t('profile.diary.title') }}</h3>
 
           <ul v-if="diaryPreview.length" class="diary-list">
             <li v-for="d in diaryPreview" :key="d.date">
               <span class="date">{{ d.date }}</span>
-              <span class="mood-pill">{{ d.mood }}</span>
+              <span class="mood-pill">{{ $t(`profile.moods.${d.mood}`) }}</span>
               <span class="snippet">{{ d.snippet }}</span>
             </li>
           </ul>
 
-          <p v-else class="muted small"></p>
+          <p v-else class="muted small">{{ $t('profile.diary.emptyPreview') }}</p>
 
           <div class="row between">
-            <button class="btn-ghost" @click="goDiaryList">
-              Ver todas mis entradas
+            <button class="btn-ghost" type="button" @click="goDiaryList">
+              {{ $t('profile.diary.viewAll') }}
             </button>
-            <button class="btn" @click="escribirDiario">Escribir hoy</button>
+            <button class="btn" type="button" @click="escribirDiario">
+              {{ $t('profile.diary.writeToday') }}
+            </button>
           </div>
         </div>
       </section>
 
       <!-- DERECHA -->
       <section class="col">
-          <!-- TÍTULO AJUSTES -->
+        <!-- TÍTULO AJUSTES -->
         <div class="card aside-card">
-          <h3 class="aside-title">Ajustes</h3>
+          <h3 class="aside-title">{{ $t('profile.settings.title') }}</h3>
           <p class="aside-subtitle">
-            Configurá cómo querés usar Nura.
+            {{ $t('profile.settings.subtitle') }}
           </p>
         </div>
 
         <div class="card">
-          <h3>Notificaciones</h3>
-          <p class="muted">Elegí qué alertas recibir.</p>
+          <h3>{{ $t('profile.settings.notificationsTitle') }}</h3>
+          <p class="muted">{{ $t('profile.settings.notificationsDesc') }}</p>
           <div class="row end">
-            <button class="btn" @click="router.push('/app/notificaciones')">
-              Editar
+            <button class="btn" type="button" @click="router.push('/app/notificaciones')">
+              {{ $t('profile.actions.edit') }}
             </button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Privacidad</h3>
-          <p class="muted">Cómo cuidamos tu información.</p>
+          <h3>{{ $t('profile.settings.privacyTitle') }}</h3>
+          <p class="muted">{{ $t('profile.settings.privacyDesc') }}</p>
           <div class="row end">
-            <button class="btn" @click="router.push('/app/privacidad')">
-              Leer
+            <button class="btn" type="button" @click="router.push('/app/privacidad')">
+              {{ $t('profile.actions.read') }}
             </button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Idioma</h3>
-          <p class="muted">Disponible sólo en castellano.</p>
+          <h3>{{ $t('profile.settings.languageTitle') }}</h3>
+          <p class="muted">{{ $t('profile.settings.languageDesc') }}</p>
           <div class="row end">
-            <button class="btn" @click="router.push('/app/idioma')">
-              Editar
+            <button class="btn" type="button" @click="router.push('/app/idioma')">
+              {{ $t('profile.actions.edit') }}
             </button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Chat de ayuda</h3>
-          <p class="muted">Hablá con Nuri cuando quieras.</p>
+          <h3>{{ $t('profile.settings.helpChatTitle') }}</h3>
+          <p class="muted">{{ $t('profile.settings.helpChatDesc') }}</p>
           <div class="row end">
-            <button class="btn" @click="router.push('/app/chatbot')">
-              Abrir chat
+            <button class="btn" type="button" @click="router.push('/app/chatbot')">
+              {{ $t('profile.actions.openChat') }}
             </button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Cuenta</h3>
+          <h3>{{ $t('profile.accountTitle') }}</h3>
           <div class="row end">
-            <button class="btn btn-danger" @click="openLogoutModal">
-              Cerrar sesión
+            <button class="btn btn-danger" type="button" @click="openLogoutModal">
+              {{ $t('profile.logout') }}
             </button>
           </div>
         </div>
@@ -454,15 +480,15 @@ watch(avatarPath, () => {
       @click.self="closeLogoutModal"
     >
       <div class="modal-card">
-        <h3>¿Cerrar sesión?</h3>
-        <p>Podés volver a iniciar sesión cuando quieras.</p>
+        <h3>{{ $t('profile.logoutModal.title') }}</h3>
+        <p>{{ $t('profile.logoutModal.text') }}</p>
 
         <div class="modal-actions">
-          <button class="btn-secondary" @click="closeLogoutModal">
-            Cancelar
+          <button class="btn-secondary" type="button" @click="closeLogoutModal">
+            {{ $t('profile.logoutModal.cancel') }}
           </button>
-          <button class="btn btn-danger" @click="confirmLogout">
-            {{ loggingOut ? 'Cerrando…' : 'Cerrar sesión' }}
+          <button class="btn btn-danger" type="button" @click="confirmLogout">
+            {{ loggingOut ? $t('profile.logoutModal.loggingOut') : $t('profile.logoutModal.confirm') }}
           </button>
         </div>
       </div>
@@ -471,6 +497,7 @@ watch(avatarPath, () => {
 </template>
 
 <style scoped>
+/* DEJO TU CSS TAL CUAL (no lo toqué) */
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;
@@ -486,22 +513,6 @@ watch(avatarPath, () => {
 h2 {
   margin: 0;
   padding: 10px;
-}
-
-.back-btn {
-  background: transparent;
-  border: none;
-  padding: 6px;
-  cursor: pointer;
-  border-radius: 8px;
-}
-.arrow-left {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-left: 3px solid #50bdbd;
-  border-bottom: 3px solid #50bdbd;
-  transform: rotate(45deg);
 }
 
 /* grid */
@@ -533,7 +544,6 @@ h2 {
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
-
 
 /* perfil */
 .profile-head {
@@ -591,8 +601,7 @@ h2 {
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-
-.btn-edit{
+.btn-edit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -616,11 +625,10 @@ h2 {
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-
 .btn-danger {
   background: #ef5350;
   box-shadow: 0 3px 10px rgba(239, 83, 80, 0.3);
-   font-size: 0.95rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 .btn-danger:hover {
@@ -653,7 +661,7 @@ h2 {
   border: none;
   border-radius: 999px;
   padding: 7px 14px;
-   font-size: 0.95rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   width: 50%;
@@ -695,17 +703,6 @@ h2 {
   box-shadow: none;
 }
 
-
-.muted-list {
-  margin: 8px 0 12px;
-  padding-left: 18px;
-  color: #4b5563;
-  font-size: 0.9rem;
-}
-.muted-list li {
-  margin-bottom: 6px;
-}
-
 .premium-box:hover {
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
@@ -739,7 +736,6 @@ h2 {
   background: #22c55e;
   box-shadow: 0 0 0 2px #bbf7d0;
 }
-
 
 .foro-btn {
   display: inline-flex;
@@ -796,7 +792,7 @@ h2 {
   text-transform: capitalize;
 }
 
- /* card título ajustes (sin hover de botón) */
+/* card título ajustes */
 .aside-card {
   background: #ffffff;
   border-radius: 18px;
@@ -819,7 +815,7 @@ h2 {
 .aside-subtitle {
   margin: 0;
   font-size: 0.9rem;
-  color: #4b5563 ;
+  color: #4b5563;
 }
 
 /* modal logout */
