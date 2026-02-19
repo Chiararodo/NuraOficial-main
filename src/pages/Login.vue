@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import InstallButton from '@/components/InstallButton.vue'
 import { supabase } from '@/composables/useSupabase'
@@ -9,38 +9,56 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 
+type Provider = 'google' | 'facebook'
+
 async function ensureProfileForUser(user: any) {
-  // Por si el nombre se guardó en metadata en el onboarding
   const metaName =
     (user.user_metadata as any)?.name?.trim() ||
     user.email?.split('@')[0] ||
     null
-  const metaAvatar =
-    (user.user_metadata as any)?.avatar_url || null
 
-  const { data: existing } = await supabase
+  const metaAvatar = (user.user_metadata as any)?.avatar_url || null
+
+  const { data: existing, error: existingErr } = await supabase
     .from('profiles')
     .select('id, full_name')
     .eq('id', user.id)
     .maybeSingle()
 
+  if (existingErr) {
+    // No bloqueamos login por esto, pero lo logueamos:
+    console.warn('ensureProfileForUser: error leyendo profile', existingErr)
+    return
+  }
+
   if (!existing) {
-    await supabase.from('profiles').upsert({
+    const { error: upsertErr } = await supabase.from('profiles').upsert({
       id: user.id,
       full_name: metaName,
       name: metaName,
       avatar_url: metaAvatar
     })
+    if (upsertErr) console.warn('ensureProfileForUser: error upsert', upsertErr)
   } else if (!existing.full_name && metaName) {
-    await supabase
+    const { error: updErr } = await supabase
       .from('profiles')
-      .update({
-        full_name: metaName,
-        name: metaName
-      })
+      .update({ full_name: metaName, name: metaName })
       .eq('id', user.id)
+
+    if (updErr) console.warn('ensureProfileForUser: error update', updErr)
   }
 }
+
+// Cuando volvés del OAuth, Supabase deja sesión guardada.
+// Entonces acá detectamos sesión y mandamos a /app/home.
+onMounted(async () => {
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
+  if (user) {
+    await ensureProfileForUser(user)
+    router.replace('/app/home')
+  }
+})
 
 async function emailLogin() {
   try {
@@ -51,14 +69,12 @@ async function emailLogin() {
     })
     if (error) throw error
 
-    // Aseguramos perfil con nombre para foro/perfil público
     const { data: userRes } = await supabase.auth.getUser()
     if (userRes?.user) {
       await ensureProfileForUser(userRes.user)
     }
 
-    await supabase.auth.refreshSession()
-    window.location.replace('/app/home')
+    router.replace('/app/home')
   } catch (e: any) {
     alert(e?.message ?? 'No pudimos iniciar sesión.')
   } finally {
@@ -66,12 +82,19 @@ async function emailLogin() {
   }
 }
 
-async function oauth(provider: 'google' | 'facebook') {
+async function oauth(provider: Provider) {
   try {
     loading.value = true
+
+    // IMPORTANTÍSIMO:
+    // - Esto hace que en local vaya a localhost
+    // - y en Netlify vaya a tu dominio real.
+    // - Volvemos a /login para correr ensureProfileForUser() y luego redirigir.
+    const redirectTo = `${window.location.origin}/login`
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin + '/app/home' }
+      options: { redirectTo }
     })
     if (error) throw error
   } catch (e: any) {
@@ -90,7 +113,7 @@ async function forgot() {
     const { error } = await supabase.auth.resetPasswordForEmail(
       email.value.trim(),
       {
-        redirectTo: window.location.origin + '/login'
+        redirectTo: `${window.location.origin}/login`
       }
     )
     if (error) throw error
@@ -107,13 +130,14 @@ function goRegister() {
 
 <template>
   <h1 class="visually-hidden">Login</h1>
+
   <section class="login-page">
     <!-- Logo -->
     <img
       src="/logos/OFICIALwhite.png"
       alt="Nura"
       class="brand"
-      onerror="this.src='/icons/icon-192.png'"
+      @error="(e: any) => (e.target.src = '/icons/icon-192.png')"
     />
 
     <!-- Card -->
@@ -121,6 +145,7 @@ function goRegister() {
       <!-- OAuth -->
       <button
         class="btn btn-oauth facebook with-icon w-field"
+        type="button"
         @click="oauth('facebook')"
         :disabled="loading"
       >
@@ -130,6 +155,7 @@ function goRegister() {
 
       <button
         class="btn btn-oauth google with-icon w-field"
+        type="button"
         @click="oauth('google')"
         :disabled="loading"
       >
@@ -177,6 +203,7 @@ function goRegister() {
         >
           {{ loading ? 'Ingresando…' : 'Entrar' }}
         </button>
+
         <button
           type="button"
           class="btn btn-primary w-actions"
@@ -186,6 +213,9 @@ function goRegister() {
           Registrarse
         </button>
       </form>
+
+      <!-- (Si lo querés usar en login, lo dejé importado) -->
+      <!-- <InstallButton class="w-field" /> -->
     </div>
   </section>
 </template>
@@ -211,7 +241,7 @@ function goRegister() {
 
 /* ===== Card ===== */
 .card {
- width: 100%;
+  width: 100%;
   max-width: 540px;
   background: #ffffff;
   border-radius: 60px;
@@ -220,7 +250,7 @@ function goRegister() {
 }
 
 .form {
-  padding: 0px 36px 4px;
+  padding: 0 36px 4px;
 }
 
 /* Helpers de ancho */
@@ -253,8 +283,8 @@ function goRegister() {
 .field label {
   font-size: 0.93rem;
   font-weight: 600;
-  color: #000000ff;
-   padding: 0.62rem 0.3rem;
+  color: #000000;
+  padding: 0.62rem 0.3rem;
 }
 
 /* Inputs */
@@ -289,85 +319,66 @@ function goRegister() {
   color: #85b6e0;
   font-size: 0.9rem;
   text-decoration: none;
-   padding: 0.62rem 0.9rem;
+  padding: 0.62rem 0.9rem;
 }
 .forgot:hover {
   text-decoration: underline;
 }
 
-/* Botones */
+/* ===== Botones base ===== */
 .btn {
   border: none;
-  border-radius: 16px;
-  padding: 0.62rem 0.9rem;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
   font-weight: 600;
+  font-size: 0.98rem;
   cursor: pointer;
-  transition: 0.2s ease;
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   margin: 0.5rem auto;
 }
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Primarios (Entrar / Registrarse) – VERDE NURA */
-
-.btn {
-  width: 74%;
-  border: none;
-  border-radius: 999px;
-  padding: 0.75rem 1rem;
-  background: #50bdbd;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 0.98rem;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
-  transition: background 0.15s ease, transform 0.08s ease,
-    box-shadow 0.15s ease;
-}
-
-.btn:hover{
-  background: #a9873eff;
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
-}
+/* Primario */
 .btn-primary {
   background: #50bdbd;
   color: #fff;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
 }
 .btn-primary:hover {
   background: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
 
-
-
-/* OAuth */
-
+/* ===== OAuth ===== */
 .btn-oauth.with-icon img {
   width: 20px;
   height: 20px;
   object-fit: contain;
 }
+
 .btn-oauth.facebook {
   background: #1877f2;
   color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 .btn-oauth.facebook:hover {
   filter: brightness(0.95);
 }
+
 .btn-oauth.google {
   background: #fff;
   color: #2b2b2b;
   border: 1px solid #d1d5db;
   box-shadow: none;
-  
 }
 .btn-oauth.google:hover {
   background: #fafafa;
