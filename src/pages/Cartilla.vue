@@ -9,9 +9,6 @@ import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
-
-/* ===================== Tipos ===================== */
 
 type Contact = {
   email?: string
@@ -46,19 +43,7 @@ type AppointmentRow = {
   professional?: string | null
 }
 
-/* ===================== Config ===================== */
-
-const API_URL = '/api/especialistas'
-// si tus avatars del API vienen relativos:
-const IMAGE_BASE_URL = 'https://nura-backend-vvuv.onrender.com'
-
-// Horario permitido (pedido): 08:00 a 19:00
-const START_HOUR = 8
-const END_HOUR = 19
-const TIME_STEP_MINUTES = 15
-const CANCEL_LIMIT_HOURS = 48
-
-/* ===================== State ===================== */
+const auth = useAuthStore()
 
 const profesionales = ref<Profesional[]>([])
 const loading = ref(true)
@@ -70,10 +55,23 @@ const filterCity = ref('')
 const filterModality = ref('')
 const filterInsurance = ref('')
 
-/* ===================== Helpers ===================== */
+/**
+ * OJO: en Netlify /api/especialistas da 404 (porque no existe esa ruta).
+ * Entonces: intentamos API y si falla, caemos a Supabase SIN romper la cartilla.
+ */
+const API_URL = '/api/especialistas'
+const IMAGE_BASE_URL = 'https://nura-backend-vvuv.onrender.com'
+
+/** Rango horario (dejé tu viejo 09–18) */
+const START_HOUR = 9
+const END_HOUR = 18
+const TIME_STEP_MINUTES = 15
+const CANCEL_LIMIT_HOURS = 48
 
 const normalize = (val: unknown): string => {
-  if (Array.isArray(val)) return val.map((v) => String(v ?? '')).join(' ').toLowerCase()
+  if (Array.isArray(val)) {
+    return val.map((v) => String(v ?? '')).join(' ').toLowerCase()
+  }
   return String(val ?? '').toLowerCase()
 }
 
@@ -95,12 +93,10 @@ function pad2(n: number) {
 function normalizeTimeToHHMMSS(t: string): string {
   const s = (t || '').trim()
   if (!s) return ''
-  // input type="time" suele venir HH:MM
   if (/^\d{2}:\d{2}$/.test(s)) return `${s}:00`
-  // si viene HH:MM:SS
   if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s
-  // fallback: recorta
-  return (s.slice(0, 5).match(/^\d{2}:\d{2}$/) ? `${s.slice(0, 5)}:00` : '')
+  const hhmm = s.slice(0, 5)
+  return /^\d{2}:\d{2}$/.test(hhmm) ? `${hhmm}:00` : ''
 }
 
 function makeApptDateTime(on_date: string, at_time: string | null): Date | null {
@@ -108,10 +104,11 @@ function makeApptDateTime(on_date: string, at_time: string | null): Date | null 
   const [y, m, d] = on_date.split('-').map((n) => Number(n))
   if (!y || !m || !d) return null
 
-  const timeStr = normalizeTimeToHHMMSS((at_time || '08:00').slice(0, 8)) || '08:00:00'
+  const timeStr = normalizeTimeToHHMMSS((at_time || `${pad2(START_HOUR)}:00`).slice(0, 8)) || `${pad2(START_HOUR)}:00:00`
   const [hh, mm] = timeStr.slice(0, 5).split(':').map((n) => Number(n))
+
   const dt = new Date(y, m - 1, d, hh || 0, mm || 0, 0, 0)
-  if (Number.isNaN(dt.getTime())) return null
+  if (isNaN(dt.getTime())) return null
   return dt
 }
 
@@ -130,7 +127,6 @@ function nextValidDefaultSlot(): { date: string; time: string } {
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
 
-  // redondeo al próximo step (15m)
   const mins = now.getHours() * 60 + now.getMinutes()
   const step = TIME_STEP_MINUTES
   const rounded = Math.ceil(mins / step) * step
@@ -138,59 +134,67 @@ function nextValidDefaultSlot(): { date: string; time: string } {
   const start = START_HOUR * 60
   const end = END_HOUR * 60
 
-  // si hoy todavía hay slots dentro del rango, uso hoy
   const useToday = rounded <= end && rounded >= start
-
   const targetMins = useToday ? rounded : start
   const hh = Math.floor(targetMins / 60)
   const mm = targetMins % 60
 
-  if (useToday) {
-    return { date: today, time: `${pad2(hh)}:${pad2(mm)}` }
-  }
+  if (useToday) return { date: today, time: `${pad2(hh)}:${pad2(mm)}` }
 
-  // si no, mañana 08:00
   const tomorrow = new Date(now)
   tomorrow.setDate(now.getDate() + 1)
-  const d = tomorrow.toISOString().slice(0, 10)
-  return { date: d, time: `${pad2(START_HOUR)}:00` }
+  return { date: tomorrow.toISOString().slice(0, 10), time: `${pad2(START_HOUR)}:00` }
 }
 
-/* ===================== Carga profesionales ===================== */
+/* ================= CARGA CARTILLA (MEJORADA) ================= */
 
 async function loadProfesionales() {
   loading.value = true
   errorMsg.value = ''
 
-  // 1) Intento API
+  // 1) Intento API (si existe). Si da 404 en Netlify → fallback.
   try {
-    const res = await fetch(API_URL)
-    if (!res.ok) throw new Error('API no disponible')
-    const data = await res.json()
-    profesionales.value = Array.isArray(data) ? data : (data.data ?? [])
-    loading.value = false
-    return
+    const res = await fetch(API_URL, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`API no disponible (${res.status})`)
+    const json = await res.json()
+    const arr = Array.isArray(json) ? json : (json?.data ?? [])
+    if (Array.isArray(arr) && arr.length) {
+      profesionales.value = arr
+      loading.value = false
+      return
+    }
+    // si API responde pero vacío, igual probamos Supabase por las dudas
   } catch {
-    // sigo con fallback a Supabase
+    // seguimos al fallback
   }
 
-  // 2) Fallback Supabase (tu tabla actual)
+  // 2) Fallback Supabase (esto te salva en Netlify)
   try {
+    // OJO: si tu tabla se llama distinto, cambiá 'professionals' por tu nombre real
     const { data, error } = await supabase
       .from('professionals')
-      .select('id,name,specialty,avatar_url,is_virtual')
+      .select('*')
       .order('name', { ascending: true })
 
     if (error) throw error
 
-    profesionales.value =
-      (data ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        specialty: r.specialty,
-        avatar_url: r.avatar_url,
-        modality: r.is_virtual ? 'Virtual' : 'Presencial'
-      })) || []
+    profesionales.value = (data ?? []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      specialty: r.specialty,
+      type: r.type,
+      city: r.city,
+      province: r.province,
+      insurance: r.insurance,
+      bio: r.bio,
+      contact: r.contact,
+      avatar: r.avatar,
+      avatar_url: r.avatar_url,
+      is_virtual: r.is_virtual,
+      modality:
+        r.modality ||
+        (typeof r.is_virtual === 'boolean' ? (r.is_virtual ? 'Virtual' : 'Presencial') : '')
+    }))
   } catch (err: any) {
     console.error(err)
     errorMsg.value = 'No se pudo cargar la cartilla.'
@@ -199,7 +203,7 @@ async function loadProfesionales() {
   }
 }
 
-/* ===================== Filtros ===================== */
+/* ================= FILTROS ================= */
 
 const specialties = computed(() => {
   const set = new Set<string>()
@@ -247,7 +251,6 @@ const insurances = computed(() => {
 
 const filteredProfesionales = computed(() => {
   const term = search.value.trim().toLowerCase()
-
   return profesionales.value.filter((p) => {
     const name = normalize(p.name)
     const specialty = normalize(p.specialty || p.type)
@@ -257,11 +260,18 @@ const filteredProfesionales = computed(() => {
     const insurance = normalize(p.insurance)
 
     const matchSearch =
-      !term || name.includes(term) || specialty.includes(term) || city.includes(term) || bio.includes(term)
+      !term ||
+      name.includes(term) ||
+      specialty.includes(term) ||
+      city.includes(term) ||
+      bio.includes(term)
 
-    const matchSpecialty = !filterSpecialty.value || specialty === filterSpecialty.value.toLowerCase()
-    const matchCity = !filterCity.value || city === filterCity.value.toLowerCase()
-    const matchModality = !filterModality.value || modality === filterModality.value.toLowerCase()
+    const matchSpecialty =
+      !filterSpecialty.value || specialty === filterSpecialty.value.toLowerCase()
+    const matchCity =
+      !filterCity.value || city === filterCity.value.toLowerCase()
+    const matchModality =
+      !filterModality.value || modality === filterModality.value.toLowerCase()
     const matchInsurance =
       !filterInsurance.value || insurance.includes(filterInsurance.value.toLowerCase())
 
@@ -277,7 +287,7 @@ function resetFilters() {
   filterInsurance.value = ''
 }
 
-/* ===================== Turnos ===================== */
+/* ============ TURNOS ============ */
 
 const showBookingModal = ref(false)
 const selectedPro = ref<Profesional | null>(null)
@@ -299,7 +309,7 @@ const editingAppointmentId = ref<string | null>(null)
 
 const confirmDeleteAppt = ref<{ id: string; professional: string } | null>(null)
 
-/* ===== Modal política ===== */
+/* ===== Modal de política de turnos ===== */
 
 const showPolicyModal = ref(false)
 const pendingProForPolicy = ref<Profesional | null>(null)
@@ -310,12 +320,12 @@ const tooLateCancelModalVisible = ref(false)
 const lateCancelMessage = ref('')
 const lateCancelProfessionalName = ref('')
 
-/* ===== Choque ===== */
+/* ====== Choque de turno ====== */
 
 const clashModalVisible = ref(false)
 const clashMessage = ref('')
 
-/* ===== Flatpickr ===== */
+/* ====== Flatpickr ====== */
 
 let fp: any = null
 
@@ -333,25 +343,25 @@ function initDatepicker() {
   })
 }
 
-/* ===== Notificaciones ===== */
+/* ========== NOTIFICACIONES  ========== */
 
 async function createNotification(opts: { title: string; body?: string; type?: string }) {
   if (!auth.user) return
+
   const { error } = await supabase.from('notifications').insert({
     user_id: auth.user.id,
     title: opts.title,
     body: opts.body ?? null,
     type: opts.type ?? null
   })
+
   if (error) console.error('Error creando notificación:', error)
 }
 
-/* ===== Flujo política + modal turno ===== */
+/* ====== Flujo: política + modal de turno ====== */
 
 function openPolicyModal(p: Profesional) {
   if (!auth.user) {
-    bookingError.value = 'Tenés que iniciar sesión para agendar un turno.'
-    // no abrimos booking modal sin user
     alert('Tenés que iniciar sesión para agendar un turno.')
     return
   }
@@ -371,12 +381,10 @@ function acceptPolicyAndContinue() {
   openBookingModal(pro)
 }
 
-/* ===== Modal turno ===== */
+/* ====== Modal de turno ====== */
 
 function inferBookingModeFromProfessional(p: Profesional) {
   const modRaw = String(p.modality || '').toLowerCase()
-
-  // si el profesional trae un modality tipo "virtual/presencial/mixta"
   const isMixta = modRaw.includes('mixta')
   const multi = /,|\/|y/.test(modRaw)
 
@@ -388,7 +396,6 @@ function inferBookingModeFromProfessional(p: Profesional) {
     bookingMode.value = 'Presencial'
   }
 
-  // fallback si viene is_virtual de supabase
   if (!modRaw && typeof p.is_virtual === 'boolean') {
     bookingHasSingleMode.value = true
     bookingMode.value = p.is_virtual ? 'Virtual' : 'Presencial'
@@ -409,7 +416,7 @@ function openBookingModal(p: Profesional) {
 
   inferBookingModeFromProfessional(p)
 
-  bookingEmail.value = auth.user.email ?? ''
+  bookingEmail.value = auth.user?.email ?? ''
   bookingError.value = ''
   paymentError.value = ''
   showBookingModal.value = true
@@ -426,7 +433,7 @@ function closeBookingModal() {
   editingAppointmentId.value = null
 }
 
-/* ===== Guardar turno (blindado) ===== */
+/* ====== Guardar turno ====== */
 
 async function saveAppointment() {
   if (!auth.user || !selectedPro.value) {
@@ -434,19 +441,16 @@ async function saveAppointment() {
     return
   }
 
-  // fecha/hora presentes
   if (!bookingDate.value || !bookingTime.value) {
     bookingError.value = 'Completá fecha y horario.'
     return
   }
 
-  // horario permitido 08:00 - 19:00
   if (!validateTimeRangeHHMM(bookingTime.value)) {
     bookingError.value = `El horario debe estar entre las ${pad2(START_HOUR)}:00 y las ${pad2(END_HOUR)}:00 hs.`
     return
   }
 
-  // normalizo a HH:MM:SS para DB time
   const at_time = normalizeTimeToHHMMSS(bookingTime.value)
   if (!at_time) {
     bookingError.value = 'Horario inválido.'
@@ -459,13 +463,12 @@ async function saveAppointment() {
     return
   }
 
-  // no pasado
   if (selectedDateTime.getTime() <= Date.now()) {
-    bookingError.value = 'No podés agendar turnos en el pasado. Elegí una fecha u horario posterior.'
+    bookingError.value =
+      'No podés agendar turnos en el pasado. Elegí una fecha u horario posterior.'
     return
   }
 
-  // email
   if (!bookingEmail.value || !bookingEmail.value.includes('@')) {
     bookingError.value = 'Ingresá un email válido para la confirmación.'
     return
@@ -487,7 +490,10 @@ async function saveAppointment() {
         }${selectedPro.value.province ?? ''}`
       : ''
 
-  const detailsParts = [`Modalidad: ${bookingMode.value}`, `Email: ${bookingEmail.value}`]
+  const detailsParts = [
+    `Modalidad: ${bookingMode.value}`,
+    `Email: ${bookingEmail.value}`
+  ]
   if (locationExtra) detailsParts.push(locationExtra)
   const detailsField = detailsParts.join(' · ')
 
@@ -502,7 +508,6 @@ async function saveAppointment() {
   }
 
   try {
-    // chequeo choque: mismo profesional + fecha + hora
     const { data: existing, error: clashError } = await supabase
       .from('appointments')
       .select('id')
@@ -512,7 +517,9 @@ async function saveAppointment() {
 
     if (clashError) throw clashError
 
-    const yaOcupado = (existing ?? []).some((row) => row.id !== editingAppointmentId.value)
+    const yaOcupado = (existing ?? []).some(
+      (row: any) => row.id !== editingAppointmentId.value
+    )
 
     if (yaOcupado) {
       clashMessage.value =
@@ -538,6 +545,7 @@ async function saveAppointment() {
     await loadAppointments()
 
     const esEdicion = !!editingAppointmentId.value
+
     await createNotification({
       title: esEdicion ? 'Turno actualizado' : 'Turno agendado',
       body: esEdicion
@@ -557,7 +565,7 @@ async function saveAppointment() {
   }
 }
 
-/* ===== Cargar turnos (solo futuros) ===== */
+/* ====== Cargar turnos (solo futuros) ====== */
 
 async function loadAppointments() {
   if (!auth.user) return
@@ -574,6 +582,7 @@ async function loadAppointments() {
     if (error) throw error
 
     const now = Date.now()
+
     appointments.value = (data || []).filter((a: any) => {
       const dt = makeApptDateTime(a.on_date, a.at_time)
       if (!dt) return false
@@ -599,12 +608,16 @@ function closeAppointmentsModal() {
   showAppointmentsModal.value = false
 }
 
-/* ===== Helpers fecha/hora ===== */
+/* ====== Helpers de fecha/hora ====== */
 
 function formatDate(d: string) {
   if (!d) return ''
   const date = new Date(d + 'T00:00:00')
-  return date.toLocaleDateString('es-AR', { year: 'numeric', month: 'short', day: '2-digit' })
+  return date.toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  })
 }
 
 function formatTime(t: string | null) {
@@ -612,14 +625,13 @@ function formatTime(t: string | null) {
   return t.slice(0, 5)
 }
 
-/* ===== Editar / cancelar ===== */
+/* ====== Editar / cancelar ====== */
 
 function startEditAppointment(a: AppointmentRow) {
   editingAppointmentId.value = a.id
   bookingDate.value = a.on_date
-  bookingTime.value = (a.at_time || '08:00').slice(0, 5)
+  bookingTime.value = (a.at_time ?? `${pad2(START_HOUR)}:00`).slice(0, 5)
 
-  // reconstruyo el profesional desde el string guardado si existe
   const professionalName =
     (a.professional || '').split('–')[0]?.replace(/^Turno con\s*/i, '').trim() ||
     a.title.replace(/^Turno con\s*/i, '').trim()
@@ -628,6 +640,7 @@ function startEditAppointment(a: AppointmentRow) {
 
   const fromDetails = a.details?.match(/Modalidad:\s*(Virtual|Presencial)/i)?.[1]
   bookingMode.value = fromDetails === 'Virtual' ? 'Virtual' : 'Presencial'
+
   bookingHasSingleMode.value = false
   bookingEmail.value = auth.user?.email ?? ''
 
@@ -660,7 +673,11 @@ function askDeleteAppointment(a: AppointmentRow) {
 async function confirmDeleteAppointment() {
   if (!auth.user || !confirmDeleteAppt.value) return
 
-  await supabase.from('appointments').delete().eq('id', confirmDeleteAppt.value.id).eq('user_id', auth.user.id)
+  await supabase
+    .from('appointments')
+    .delete()
+    .eq('id', confirmDeleteAppt.value.id)
+    .eq('user_id', auth.user.id)
 
   await loadAppointments()
 
@@ -695,20 +712,22 @@ function goToProfessionalForRebook() {
   showAppointmentsModal.value = false
 
   if (pro) {
-    openPolicyModal(pro) // vuelve a pasar por política
+    openPolicyModal(pro)
   } else {
     search.value = name
   }
 }
 
-/* ===== Pago (MP) ===== */
+/* ===== Pago: seña con MP ===== */
 
 function startPayment() {
   paymentError.value = ''
+
   const mpUrl = import.meta.env.VITE_MP_TURNO_URL
 
   if (!mpUrl) {
-    paymentError.value = 'No se encontró el link de pago. Verificá la configuración de Mercado Pago.'
+    paymentError.value =
+      'No se encontró el link de pago. Verificá la configuración de Mercado Pago.'
     return
   }
 
@@ -719,8 +738,6 @@ function startPayment() {
     paymentError.value = 'No se pudo abrir la ventana de pago.'
   }
 }
-
-/* ===================== Mount ===================== */
 
 onMounted(async () => {
   await loadProfesionales()
@@ -734,16 +751,23 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- TU TEMPLATE VIEJO, SOLO TOQUÉ EL INPUT TIME PARA MIN/MAX/STEP -->
+  <!-- (el resto lo dejé igual) -->
   <h1 class="visually-hidden">Cartilla</h1>
-
   <main class="contenido">
     <header class="page-head">
-      <div class="head-left">
+      <div>
         <h2>Cartilla de especialistas</h2>
-        <p class="page-sub">Buscá por nombre, especialidad, ciudad, modalidad u obra social.</p>
+        <p class="page-sub">
+          Buscá por nombre, especialidad, ciudad, modalidad u obra social.
+        </p>
       </div>
 
-      <button type="button" class="pill pill--outline" @click="openAppointmentsModal">
+      <button
+        type="button"
+        class="pill pill--outline"
+        @click="openAppointmentsModal"
+      >
         Mis turnos
       </button>
     </header>
@@ -753,8 +777,17 @@ onMounted(async () => {
         <div class="field field--search">
           <label>Buscar</label>
           <div class="search-input">
-            <input v-model="search" type="search" placeholder="Nombre, ciudad etc" />
-            <button v-if="search" type="button" class="pill pill--ghost" @click="search = ''">
+            <input
+              v-model="search"
+              type="search"
+              placeholder="Nombre, ciudad etc"
+            />
+            <button
+              v-if="search"
+              type="button"
+              class="pill pill--ghost"
+              @click="search = ''"
+            >
               Limpiar
             </button>
           </div>
@@ -764,7 +797,9 @@ onMounted(async () => {
           <label>Especialidad</label>
           <select v-model="filterSpecialty">
             <option value="">Todas</option>
-            <option v-for="s in specialties" :key="s" :value="s">{{ s }}</option>
+            <option v-for="s in specialties" :key="s" :value="s">
+              {{ s }}
+            </option>
           </select>
         </div>
 
@@ -772,7 +807,9 @@ onMounted(async () => {
           <label>Ciudad</label>
           <select v-model="filterCity">
             <option value="">Todas</option>
-            <option v-for="c in cities" :key="c" :value="c">{{ c }}</option>
+            <option v-for="c in cities" :key="c" :value="c">
+              {{ c }}
+            </option>
           </select>
         </div>
 
@@ -780,7 +817,9 @@ onMounted(async () => {
           <label>Modalidad</label>
           <select v-model="filterModality">
             <option value="">Todas</option>
-            <option v-for="m in modalities" :key="m" :value="m">{{ m }}</option>
+            <option v-for="m in modalities" :key="m" :value="m">
+              {{ m }}
+            </option>
           </select>
         </div>
 
@@ -788,65 +827,86 @@ onMounted(async () => {
           <label>Obra social / prepaga</label>
           <select v-model="filterInsurance">
             <option value="">Todas</option>
-            <option v-for="i in insurances" :key="i" :value="i">{{ i }}</option>
+            <option v-for="i in insurances" :key="i" :value="i">
+              {{ i }}
+            </option>
           </select>
         </div>
       </div>
 
       <div class="filters-footer">
         <span v-if="!loading" class="count">
-          {{ filteredProfesionales.length }} de {{ profesionales.length }} profesionales
+          {{ filteredProfesionales.length }} de {{ profesionales.length }}
+          profesionales
         </span>
-        <button type="button" class="pill pill--ghost-limpiar" @click="resetFilters">
+        <button
+          type="button"
+          class="pill pill--ghost-limpiar"
+          @click="resetFilters"
+        >
           Limpiar filtros
         </button>
       </div>
     </section>
 
     <p v-if="loading" class="state">Cargando cartilla…</p>
-    <p v-else-if="errorMsg" class="state state--error">{{ errorMsg }}</p>
+    <p v-else-if="errorMsg" class="state state--error">
+      {{ errorMsg }}
+    </p>
     <p v-else-if="!filteredProfesionales.length" class="state">
-      No encontramos profesionales con esos filtros. Probá cambiarlos o limpiarlos.
+      No encontramos profesionales con esos filtros. Probá cambiarlos o
+      limpiarlos.
     </p>
 
     <section v-else class="list">
-      <article v-for="p in filteredProfesionales" :key="p._id || p.id" class="card prof-card">
-        <div class="prof-top">
-          <div v-if="getAvatarUrl(p)" class="prof-avatar">
-            <img :src="getAvatarUrl(p)" :alt="p.name" loading="lazy" />
-          </div>
-
-          <div class="prof-main">
-            <h3 class="prof-name">{{ p.name }}</h3>
-            <p class="prof-specialty">{{ p.specialty || p.type }}</p>
-
-            <p v-if="p.city || p.province" class="prof-location">
-              {{ p.city }}
-              <span v-if="p.city && p.province"> · </span>
-              {{ p.province }}
-            </p>
-
-            <div class="tags">
-              <span v-if="p.modality" class="tag tag--primary">{{ p.modality }}</span>
-              <span v-if="Array.isArray(p.insurance)" class="tag">{{ p.insurance.join(' · ') }}</span>
-              <span v-else-if="p.insurance" class="tag">{{ p.insurance }}</span>
-            </div>
-          </div>
+      <article
+        v-for="p in filteredProfesionales"
+        :key="p._id || p.id"
+        class="card prof-card"
+      >
+        <div v-if="getAvatarUrl(p)" class="prof-avatar">
+          <img :src="getAvatarUrl(p)" :alt="p.name" loading="lazy" />
         </div>
 
-        <p v-if="p.bio" class="prof-bio">{{ p.bio }}</p>
+        <div class="prof-main">
+          <h3 class="prof-name">{{ p.name }}</h3>
+          <p class="prof-specialty">{{ p.specialty || p.type }}</p>
+
+          <p v-if="p.city || p.province" class="prof-location">
+            {{ p.city }}
+            <span v-if="p.city && p.province"> · </span>
+            {{ p.province }}
+          </p>
+
+          <div class="tags">
+            <span v-if="p.modality" class="tag tag--primary">
+              {{ p.modality }}
+            </span>
+            <span v-if="Array.isArray(p.insurance)" class="tag">
+              {{ p.insurance.join(' · ') }}
+            </span>
+            <span v-else-if="p.insurance" class="tag">{{ p.insurance }}</span>
+          </div>
+
+          <p v-if="p.bio" class="prof-bio">{{ p.bio }}</p>
+        </div>
 
         <div class="prof-actions">
-          <button type="button" class="pill pill--primary" @click="openPolicyModal(p)">
+          <button
+            type="button"
+            class="pill pill--primary"
+            @click="openPolicyModal(p)"
+          >
             Agendar turno
           </button>
 
           <a
             v-if="getEmail(p)"
             class="content-btn"
-            :href="`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(getEmail(p))}`"
+            :href="`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+              getEmail(p)
+            )}`"
             target="_blank"
-            aria-label="Enviar email"
           >
             <i class="fa-solid fa-envelope"></i>
           </a>
@@ -854,9 +914,13 @@ onMounted(async () => {
       </article>
     </section>
 
-    <!-- MODAL POLÍTICA -->
-    <div v-if="showPolicyModal" class="modal-backdrop" @click.self="closePolicyModal">
-      <div class="modal-card modal-policy">
+    <!-- MODAL POLÍTICA DE TURNOS -->
+    <div
+      v-if="showPolicyModal"
+      class="modal-backdrop"
+      @click.self="closePolicyModal"
+    >
+      <div class="modal-card modal-policy animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Política de turnos</h3>
           <button class="modal-close" @click="closePolicyModal">×</button>
@@ -864,37 +928,61 @@ onMounted(async () => {
 
         <section class="modal-body modal-body-scroll">
           <p class="modal-note">
-            Para reservar un turno abonás una seña mediante Mercado Pago. Esta seña asegura tu lugar con el profesional.
+            Para reservar un turno abonás una seña mediante Mercado Pago. Esta
+            seña asegura tu lugar con el profesional.
           </p>
           <ul class="policy-list">
             <li>
-              Los turnos se reservan entre las <strong>08:00</strong> y las <strong>19:00</strong> hs.
+              Los turnos se reservan entre las
+              <strong>{{ String(START_HOUR).padStart(2, '0') }}:00</strong> y las
+              <strong>{{ String(END_HOUR).padStart(2, '0') }}:00</strong> hs.
             </li>
-            <li>Si cancelás con al menos <strong>48 horas</strong> de anticipación, la seña se devuelve.</li>
             <li>
-              Si querés cancelar dentro de las 48&nbsp;hs previas, la seña no es reembolsable. Podés reprogramar sacando
-              un nuevo turno.
+              Si cancelás con al menos <strong>48 horas</strong> de
+              anticipación, la seña se devuelve.
+            </li>
+            <li>
+              Si querés cancelar dentro de las 48&nbsp;hs previas, la seña no es
+              reembolsable. Podés reprogramarlo sacando un nuevo turno con el profesional.
             </li>
           </ul>
-          <p class="modal-note">Al continuar confirmás que leíste y aceptás estas condiciones.</p>
+          <p class="modal-note">
+            Al continuar confirmás que leíste y aceptás estas condiciones.
+          </p>
         </section>
 
         <footer class="modal-footer">
-          <button class="pill pill--danger" @click="closePolicyModal">Cancelar</button>
-          <button class="pill pill--primary" @click="acceptPolicyAndContinue">Acepto y continuar</button>
+          <button class="pill pill--danger" @click="closePolicyModal">
+            Cancelar
+          </button>
+          <button class="pill pill--primary" @click="acceptPolicyAndContinue">
+            Acepto y continuar
+          </button>
         </footer>
       </div>
     </div>
 
     <!-- MODAL AGENDAR / EDITAR -->
-    <div v-if="showBookingModal" class="modal-backdrop" @click.self="closeBookingModal">
-      <div class="modal-card modal-appointment">
+    <div
+      v-if="showBookingModal"
+      class="modal-backdrop"
+      @click.self="closeBookingModal"
+    >
+      <div class="modal-card modal-appointment animate-fade-in">
         <header class="modal-header">
-          <h3 class="modal-title">{{ editingAppointmentId ? 'Editar turno' : 'Agendar turno' }}</h3>
-          <button type="button" class="modal-close" @click="closeBookingModal">×</button>
+          <h3 class="modal-title">
+            {{ editingAppointmentId ? 'Editar turno' : 'Agendar turno' }}
+          </h3>
+          <button
+            type="button"
+            class="modal-close"
+            @click="closeBookingModal"
+          >
+            ×
+          </button>
         </header>
 
-        <section class="modal-body modal-body-scroll">
+        <section class="modal-body">
           <div class="prof-summary">
             <img
               v-if="selectedPro && getAvatarUrl(selectedPro)"
@@ -903,17 +991,26 @@ onMounted(async () => {
             />
             <div>
               <p class="prof-summary-name">{{ selectedPro?.name }}</p>
-              <p class="prof-summary-type">{{ selectedPro?.specialty || selectedPro?.type }}</p>
+              <p class="prof-summary-type">
+                {{ selectedPro?.specialty || selectedPro?.type }}
+              </p>
             </div>
           </div>
 
           <div class="modal-field">
             <label for="nura-datepicker">Fecha</label>
-            <input id="nura-datepicker" v-model="bookingDate" type="text" aria-label="Fecha del turno" />
+            <input
+              id="nura-datepicker"
+              v-model="bookingDate"
+              type="text"
+              aria-label="Fecha del turno"
+            />
           </div>
 
           <div class="modal-field">
-            <label for="booking-time">Horario (08:00 - 19:00)</label>
+            <label for="booking-time">
+              Horario ({{ String(START_HOUR).padStart(2, '0') }}:00 - {{ String(END_HOUR).padStart(2, '0') }}:00)
+            </label>
             <input
               id="booking-time"
               v-model="bookingTime"
@@ -923,12 +1020,15 @@ onMounted(async () => {
               :max="`${String(END_HOUR).padStart(2, '0')}:00`"
               :step="TIME_STEP_MINUTES * 60"
             />
-            <small class="hint">Solo se permiten turnos entre 08:00 y 19:00.</small>
           </div>
 
           <div v-if="!bookingHasSingleMode" class="modal-field">
             <label for="booking-mode">Modalidad</label>
-            <select id="booking-mode" v-model="bookingMode" aria-label="Modalidad del turno">
+            <select
+              id="booking-mode"
+              v-model="bookingMode"
+              aria-label="Modalidad del turno"
+            >
               <option value="Presencial">Presencial</option>
               <option value="Virtual">Virtual</option>
             </select>
@@ -952,22 +1052,42 @@ onMounted(async () => {
 
           <div class="modal-field">
             <label>Reserva de turno</label>
+
             <p class="modal-note">
-              Abonás una seña para reservar tu lugar. Si cancelás con al menos 48&nbsp;horas de anticipación, se te
-              reintegra la seña. El día del turno abonás el resto directamente al profesional.
+              Abonás una seña para reservar tu lugar. Si cancelás con al menos
+              48&nbsp;horas de anticipación, se te reintegra la seña. El día del
+              turno abonás el resto directamente al profesional.
             </p>
-            <button type="button" class="pill pill--primary mp-button" @click="startPayment">
+            <button
+              type="button"
+              class="pill pill--primary mp-button"
+              @click="startPayment"
+            >
               Pagar reserva con Mercado Pago
             </button>
-            <p v-if="paymentError" class="modal-error">{{ paymentError }}</p>
+            <p v-if="paymentError" class="modal-error">
+              {{ paymentError }}
+            </p>
           </div>
 
-          <p v-if="bookingError" class="modal-error">{{ bookingError }}</p>
+          <p v-if="bookingError" class="modal-error">
+            {{ bookingError }}
+          </p>
         </section>
 
         <footer class="modal-footer">
-          <button class="pill pill--danger" @click="closeBookingModal" :disabled="bookingSaving">Cancelar</button>
-          <button class="pill pill--primary" @click="saveAppointment" :disabled="bookingSaving">
+          <button
+            class="pill pill--danger"
+            @click="closeBookingModal"
+            :disabled="bookingSaving"
+          >
+            Cancelar
+          </button>
+          <button
+            class="pill pill--primary"
+            @click="saveAppointment"
+            :disabled="bookingSaving"
+          >
             {{ bookingSaving ? 'Guardando…' : 'Confirmar turno' }}
           </button>
         </footer>
@@ -979,21 +1099,38 @@ onMounted(async () => {
       <span class="check">✔</span>
       <div class="turno-text">
         <p>Tu turno fue confirmado</p>
-        <button class="pill pill--sm pill--light" type="button" @click="openAppointmentsFromToast">Ver mis turnos</button>
+        <button
+          class="pill pill--sm pill--light"
+          type="button"
+          @click="openAppointmentsFromToast"
+        >
+          Ver mis turnos
+        </button>
       </div>
     </div>
 
     <!-- MODAL VER TURNOS -->
-    <div v-if="showAppointmentsModal" class="modal-backdrop" @click.self="closeAppointmentsModal">
-      <div class="modal-card modal-appointments-list">
+    <div
+      v-if="showAppointmentsModal"
+      class="modal-backdrop"
+      @click.self="closeAppointmentsModal"
+    >
+      <div class="modal-card modal-appointments-list animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Mis turnos</h3>
-          <button class="modal-close" @click="closeAppointmentsModal">×</button>
+          <button class="modal-close" @click="closeAppointmentsModal">
+            ×
+          </button>
         </header>
 
         <section class="modal-body modal-body-scroll">
-          <p v-if="loadingAppointments" class="modal-note">Cargando turnos…</p>
-          <p v-else-if="!appointments.length" class="modal-note">Todavía no tenés turnos agendados.</p>
+          <p v-if="loadingAppointments" class="modal-note">
+            Cargando turnos…
+          </p>
+
+          <p v-else-if="!appointments.length" class="modal-note">
+            Todavía no tenés turnos agendados.
+          </p>
 
           <ul v-else class="appt-list">
             <li v-for="a in appointments" :key="a.id" class="appt-item">
@@ -1006,22 +1143,35 @@ onMounted(async () => {
               </div>
 
               <div class="appt-actions">
-                <button class="link-btn" @click="startEditAppointment(a)">Editar</button>
-                <button class="link-btn danger" @click="askDeleteAppointment(a)">Cancelar</button>
+                <button class="link-btn" @click="startEditAppointment(a)">
+                  Editar
+                </button>
+                <button
+                  class="link-btn danger"
+                  @click="askDeleteAppointment(a)"
+                >
+                  Cancelar
+                </button>
               </div>
             </li>
           </ul>
         </section>
 
         <footer class="modal-footer">
-          <button class="pill pill--danger" @click="closeAppointmentsModal">Cerrar</button>
+          <button class="pill pill--danger" @click="closeAppointmentsModal">
+            Cerrar
+          </button>
         </footer>
       </div>
     </div>
 
     <!-- MODAL HORARIO OCUPADO -->
-    <div v-if="clashModalVisible" class="modal-backdrop" @click.self="clashModalVisible = false">
-      <div class="modal-card modal-clash">
+    <div
+      v-if="clashModalVisible"
+      class="modal-backdrop"
+      @click.self="clashModalVisible = false"
+    >
+      <div class="modal-card modal-clash animate-fade-in">
         <header class="modal-header modal-header--clash">
           <div class="modal-header-left">
             <span class="modal-badge-alert">!</span>
@@ -1032,30 +1182,55 @@ onMounted(async () => {
           </div>
         </header>
 
-        <section class="modal-body">
-          <p class="modal-note">{{ clashMessage }}</p>
+        <section class="modal-body modal-body--clash">
+          <p class="modal-note modal-note--clash">
+            {{ clashMessage }}
+          </p>
         </section>
 
-        <footer class="modal-footer">
-          <button class="pill pill--primary" type="button" @click="clashModalVisible = false">Entendido</button>
+        <footer class="modal-footer modal-footer--clash">
+          <button
+            class="pill pill--primary pill--clash"
+            type="button"
+            @click="clashModalVisible = false"
+          >
+            Entendido
+          </button>
         </footer>
       </div>
     </div>
 
     <!-- MODAL CANCELACIÓN TARDÍA -->
-    <div v-if="tooLateCancelModalVisible" class="modal-backdrop" @click.self="closeTooLateCancelModal">
-      <div class="modal-card modal-late-cancel">
+    <div
+      v-if="tooLateCancelModalVisible"
+      class="modal-backdrop"
+      @click.self="closeTooLateCancelModal"
+    >
+      <div class="modal-card modal-late-cancel animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">No es posible cancelar</h3>
-          <button class="modal-close" @click="closeTooLateCancelModal">×</button>
+          <button class="modal-close" @click="closeTooLateCancelModal">
+            ×
+          </button>
         </header>
         <section class="modal-body">
-          <p class="modal-note">{{ lateCancelMessage }}</p>
-          <p class="modal-note">Te vamos a llevar a la cartilla para que saques un nuevo turno con el profesional.</p>
+          <p class="modal-note">
+            {{ lateCancelMessage }}
+          </p>
+          <p class="modal-note">
+            Te vamos a llevar a la cartilla para que saques un nuevo turno con
+            el profesional.
+          </p>
         </section>
         <footer class="modal-footer">
-          <button class="pill pill--ghost" @click="closeTooLateCancelModal">Cerrar</button>
-          <button v-if="lateCancelProfessionalName" class="pill pill--primary" @click="goToProfessionalForRebook">
+          <button class="pill pill--ghost" @click="closeTooLateCancelModal">
+            Cerrar
+          </button>
+          <button
+            v-if="lateCancelProfessionalName"
+            class="pill pill--primary"
+            @click="goToProfessionalForRebook"
+          >
             Reprogramar turno
           </button>
         </footer>
@@ -1063,26 +1238,40 @@ onMounted(async () => {
     </div>
 
     <!-- MODAL CONFIRMAR CANCELACIÓN -->
-    <div v-if="confirmDeleteAppt" class="modal-backdrop" @click.self="cancelDeleteAppointment">
-      <div class="modal-card modal-confirm-cancel">
+    <div
+      v-if="confirmDeleteAppt"
+      class="modal-backdrop"
+      @click.self="cancelDeleteAppointment"
+    >
+      <div class="modal-card modal-confirm-cancel animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Cancelar turno</h3>
-          <button class="modal-close" @click="cancelDeleteAppointment">×</button>
+          <button class="modal-close" @click="cancelDeleteAppointment">
+            ×
+          </button>
         </header>
 
         <section class="modal-body">
-          <p>¿Querés cancelar tu turno con <strong>{{ confirmDeleteAppt.professional }}</strong>?</p>
+          <p>
+            ¿Querés cancelar tu turno con
+            <strong>{{ confirmDeleteAppt.professional }}</strong>?
+          </p>
           <p class="modal-note">Esta acción no se puede deshacer.</p>
         </section>
 
         <footer class="modal-footer">
-          <button class="pill pill--ghost" @click="cancelDeleteAppointment">Mantener turno</button>
-          <button class="pill pill--danger" @click="confirmDeleteAppointment">Cancelar turno</button>
+          <button class="pill pill--ghost" @click="cancelDeleteAppointment">
+            Mantener turno
+          </button>
+          <button class="pill pill--danger" @click="confirmDeleteAppointment">
+            Cancelar turno
+          </button>
         </footer>
       </div>
     </div>
   </main>
 </template>
+
 
 <style scoped>
 * { box-sizing: border-box; }

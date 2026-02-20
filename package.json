@@ -31,5 +31,9 @@
     "vite": "^6.4.1",
     "vite-plugin-pwa": "^1.1.0",
     "vue-tsc": "^3.1.0"
+  },
+  "overrides": {
+    "minipass": "7.1.2"
   }
+
 }
