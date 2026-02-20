@@ -55,11 +55,8 @@ const filterCity = ref('')
 const filterModality = ref('')
 const filterInsurance = ref('')
 
-/**
- * OJO: en Netlify /api/especialistas da 404 (porque no existe esa ruta).
- * Entonces: intentamos API y si falla, caemos a Supabase SIN romper la cartilla.
- */
-const API_URL = '/api/especialistas'
+
+const API_URL = 'https://nura-backend-vvuv.onrender.com/api/especialistas'
 const IMAGE_BASE_URL = 'https://nura-backend-vvuv.onrender.com'
 
 /** Rango horario (dejé tu viejo 09–18) */
