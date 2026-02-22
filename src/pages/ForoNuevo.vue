@@ -1,130 +1,182 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
-import { useAuthStore } from '@/store/auth'
 
-const router = useRouter()
-const auth = useAuthStore()
-
-const title = ref('')
-const body = ref('')
-const categories = ['Alimentación', 'Ansiedad', 'Autoestima'] as const
-const activeCat = ref<(typeof categories)[number] | null>('Ansiedad')
-
-const loading = ref(false)
-const errorMsg = ref('')
-const successMsg = ref('')
-
-const canSubmit = computed(() => {
-  return (
-    !loading.value &&
-    title.value.trim().length > 3 &&
-    body.value.trim().length > 5 &&
-    !!activeCat.value
-  )
-})
-
-async function submit() {
-  errorMsg.value = ''
-  successMsg.value = ''
-
-  if (!canSubmit.value) return
-
-  loading.value = true
-  try {
-    const { error } = await supabase
-      .from('forums')
-      .insert({
-        title: title.value.trim(),
-        body: body.value.trim(),
-        category: activeCat.value,
-        user_id: auth.user?.id ?? null
-      })
-      .select('id')
-      .single()
-
-    if (error) throw error
-
-    successMsg.value = 'Tu foro se publicó correctamente.'
-    router.push({ name: 'foro' })
-  } catch (err: any) {
-    console.error(err)
-    errorMsg.value = 'No se pudo publicar el foro. Intentá de nuevo.'
-  } finally {
-    loading.value = false
-  }
+type ForumRow = {
+  id: string
+  user_id: string | null
+  title: string
+  body: string | null
+  category: 'Alimentación' | 'Ansiedad' | 'Autoestima' | string
+  created_at: string
 }
 
-function goBack() {
-  router.back()
+type CommentRow = {
+  id: string
+  forum_id: string
+  user_id: string | null
+  body: string
+  created_at: string
+}
+
+const router = useRouter()
+
+const q = ref('')
+const categories = ['Alimentación', 'Ansiedad', 'Autoestima'] as const
+const activeCat = ref<string | 'Todas'>('Todas')
+
+const forums = ref<ForumRow[]>([])
+const commentCount = ref<Map<string, number>>(new Map())
+const loading = ref(true)
+
+async function loadForums() {
+  loading.value = true
+  const { data: f } = await supabase
+    .from('forums')
+    .select('id,user_id,title,body,category,created_at')
+    .order('created_at', { ascending: false })
+  forums.value = (f as ForumRow[]) ?? []
+
+  const { data: c } = await supabase
+    .from('forum_comments')
+    .select('id,forum_id')
+    .order('created_at', { ascending: false })
+    .limit(2000)
+
+  const map = new Map<string, number>()
+  ;(c as CommentRow[] | null)?.forEach((r) => {
+    map.set(r.forum_id, (map.get(r.forum_id) ?? 0) + 1)
+  })
+  commentCount.value = map
+  loading.value = false
+}
+
+let channel: ReturnType<typeof supabase.channel> | null = null
+function setupRealtime() {
+  channel = supabase
+    .channel('forums-realtime')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'forums' },
+      (payload: any) => {
+        forums.value = [payload.new as ForumRow, ...forums.value]
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'forum_comments' },
+      (payload: any) => {
+        const fid = (payload.new as CommentRow).forum_id
+        commentCount.value.set(fid, (commentCount.value.get(fid) ?? 0) + 1)
+        commentCount.value = new Map(commentCount.value)
+      }
+    )
+    .subscribe()
+}
+
+onMounted(async () => {
+  await loadForums()
+  setupRealtime()
+})
+
+onBeforeUnmount(() => {
+  if (channel) supabase.removeChannel(channel)
+})
+
+const filtered = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  return forums.value.filter((f) => {
+    const catOk = activeCat.value === 'Todas' || f.category === activeCat.value
+    const txt = `${f.title ?? ''} ${f.body ?? ''}`.toLowerCase()
+    const textOk = !term || txt.includes(term)
+    return catOk && textOk
+  })
+})
+
+function openForum(f: ForumRow) {
+  router.push({ name: 'foro-view', params: { id: f.id } })
+}
+function goNewForum() {
+  router.push({ name: 'foro-new' })
+}
+
+function countFor(id: string) {
+  return commentCount.value.get(id) ?? 0
 }
 </script>
 
 <template>
-  <h1 class="visually-hidden">Crear nuevo foro en Nura</h1>
-  <main class="foro-new">
-    <header class="head">
-      <button class="back-link" type="button" @click="goBack">
-        <span class="arrow">←</span>
-      </button>
-      <h2>Nuevo foro</h2>
+  <h1 class="visually-hidden">Foro Nura</h1>
+  <main class="contenido foro">
+    <header class="page-head">
+      <h2>Foro</h2>
+      <p class="subtitle">
+        Compartí experiencias, dudas y recursos con la comunidad.
+      </p>
     </header>
 
-    <section class="content">
-      <div class="field">
-        <label class="label" for="forum-title">Título</label>
-        <input
-          id="forum-title"
-          v-model="title"
-          type="text"
-          placeholder="Tips para manejar la ansiedad"
-        />
-      </div>
+    <!-- Buscador -->
+    <div class="search">
+      <label for="forum-search" class="visually-hidden">
+        Buscar en el foro
+      </label>
+      <span class="loupe">🔍</span>
+      <input
+        id="forum-search"
+        v-model="q"
+        type="search"
+        placeholder="Buscar por tema o palabra clave"
+      />
+    </div>
 
-      <div class="field">
-        <label class="label" for="forum-body">Descripción</label>
-        <textarea
-          id="forum-body"
-          v-model="body"
-          rows="4"
-          placeholder="Estos días me costó mantener la calma antes de comer. ¿Qué estrategias les sirven a ustedes para bajar la ansiedad?"
-        ></textarea>
-      </div>
-
-      <div class="field">
-        <span class="label">Categoría</span>
-        <div class="pills" aria-label="Elegir categoría del foro">
-          <button
-            v-for="c in categories"
-            :key="c"
-            type="button"
-            class="pill"
-            :class="{ active: activeCat === c }"
-            @click="activeCat = c"
-          >
-            {{ c }}
-          </button>
-        </div>
-      </div>
-
-      <div class="note">
-        Nura es un espacio de apoyo. Cuidemos el tono y la forma de hablarle a
-        las demás personas.
-      </div>
-
-      <p v-if="errorMsg" class="msg error">{{ errorMsg }}</p>
-      <p v-if="successMsg" class="msg success">{{ successMsg }}</p>
-
+    <!-- Filtros por categoría -->
+    <div class="filters" aria-label="Filtrar por categoría">
       <button
-        class="btn-primary"
+        class="pill"
+        :class="{ active: activeCat === 'Todas' }"
         type="button"
-        :disabled="!canSubmit"
-        @click="submit"
+        @click="activeCat = 'Todas'"
       >
-        {{ loading ? 'Publicando…' : 'Publicar' }}
+        Todas
       </button>
-    </section>
+      <button
+        v-for="c in categories"
+        :key="c"
+        class="pill"
+        type="button"
+        :class="{ active: activeCat === c }"
+        @click="activeCat = c"
+      >
+        {{ c }}
+      </button>
+    </div>
+
+    <!-- Lista de foros -->
+    <div v-if="loading" class="loading">Cargando foros…</div>
+    <p v-else-if="!filtered.length" class="empty">
+      No hay foros para mostrar con esos filtros.
+    </p>
+
+    <ul v-else class="forum-list">
+      <li
+        v-for="f in filtered"
+        :key="f.id"
+        class="forum-item"
+        @click="openForum(f)"
+      >
+        <span class="dot"></span>
+        <span class="title">{{ f.title }}</span>
+        <small class="count">({{ countFor(f.id) }})</small>
+      </li>
+    </ul>
+
+    <!-- Acción principal -->
+    <div class="cta">
+      <button class="btn-primary" type="button" @click="goNewForum">
+        Nuevo foro
+      </button>
+    </div>
   </main>
 </template>
 
@@ -141,95 +193,80 @@ function goBack() {
   border: 0;
 }
 
-.foro-new {
+.contenido {
+  background: #fff;
+  padding: 24px 18px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.foro {
   background: #fff;
   max-width: 900px;
   margin: 0 auto;
-  padding: 0 18px 32px;
+  padding: 18px 18px 26px;
 }
 
-/* Header */
-.head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 0 10px;
-}
-.head h2 {
-  margin: 0;
-  font-size: 1.3rem;
+h2 {
+  margin: 0 0 4px;
   color: #111827;
-}
-.back-link {
-  border: none;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 0;
-}
-.arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
+  font-size: 1.4rem;
 }
 
-/* Contenido */
-.content {
-  display: grid;
-  gap: 16px;
-}
-
-/* Campos */
-.field {
-  display: grid;
-  gap: 6px;
-}
-.label {
+.subtitle {
+  margin: 0 0 10px;
   font-size: 0.9rem;
-  font-weight: 500;
-  color: #374151;
+  color: #6b7280;
 }
-input,
-textarea {
-  border-radius: 12px;
+
+/* Search */
+.search {
+  position: relative;
+  margin-bottom: 16px;
+}
+.search .loupe {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  padding: 12px 14px 12px 36px;
+  border-radius: 999px;
   border: 1px solid #e3edf2;
   background: #f6fbff;
-  padding: 10px 12px;
-  font-size: 0.95rem;
   outline: none;
-  resize: vertical;
+  font-size: 0.95rem;
 }
-input:focus,
-textarea:focus {
+.search input:focus {
   border-color: #50bdbd;
   background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.18);
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
 }
 
 /* Pills */
-.pills {
+.filters {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin: 8px 0 14px;
 }
 .pill {
   padding: 8px 14px;
   border-radius: 999px;
-  border: 2px solid #bbe4f8;
+  border: 1px solid #cfe7f3;
   background: #eaf6ff;
-  color: #50bdbd;
+  color: #2d2d2d;
   cursor: pointer;
   transition: all 0.15s ease;
   font-size: 0.9rem;
 }
-
 .pill:hover {
-  background: #caf0f0;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
   transform: translateY(-1px);
 }
-
 .pill.active {
   background: #50bdbd;
   color: #fff;
@@ -237,32 +274,55 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 
-/* Nota */
-.note {
-  margin-top: 4px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #eaf6ff;
-  text-align: center;
-  font-size: 0.9rem;
-  color: #475569;
+/* List */
+.forum-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 18px;
+  display: grid;
+  gap: 10px;
 }
-
-/* Mensajes */
-.msg {
+.forum-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e8eef3;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.forum-item:hover {
+  background: #f1fbfb;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #50bdbd;
+  flex: 0 0 8px;
+}
+.title {
+  flex: 1;
+  color: #111827;
+  font-size: 0.95rem;
+}
+.count {
+  opacity: 0.7;
   font-size: 0.85rem;
 }
-.msg.error {
-  color: #b3261e;
-}
-.msg.success {
-  color: #087f23;
-}
 
-/* Botón publicar */
+/* CTA */
+.cta {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
 .btn-primary {
-  margin-top: 4px;
-  width: 100%;
   padding: 12px 20px;
   border-radius: 999px;
   border: none;
@@ -270,18 +330,19 @@ textarea:focus {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
   box-shadow: 0 10px 26px rgba(80, 189, 189, 0.45);
 }
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-.btn-primary:not(:disabled):hover {
+.btn-primary:hover {
   background: #3ea9a9;
   box-shadow: 0 12px 30px rgba(80, 189, 189, 0.55);
   transform: translateY(-1px);
+}
+
+/* Misc */
+.loading,
+.empty {
+  opacity: 0.75;
+  font-size: 0.9rem;
 }
 </style>

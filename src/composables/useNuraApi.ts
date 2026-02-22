@@ -1,7 +1,13 @@
 // src/composables/useNuraApi.ts
 import { ref } from 'vue'
 
-const API_BASE = import.meta.env.VITE_NURA_API_URL || 'https://nura-backend-vvuv.onrender.com/api'
+function normalizeBase(base: string) {
+  return base.replace(/\/+$/, '')
+}
+
+const API_BASE = normalizeBase(
+  import.meta.env.VITE_NURA_API_URL || '/api'
+)
 
 export function useNuraApi() {
   const loading = ref(false)
@@ -13,12 +19,12 @@ export function useNuraApi() {
 
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
-      if (value && value.trim() !== '') {
-        searchParams.append(key, value.trim())
-      }
+      if (value && value.trim() !== '') searchParams.append(key, value.trim())
     })
 
-    const url = `${API_BASE}/especialistas${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+    const url =
+      `${API_BASE}/especialistas` +
+      (searchParams.toString() ? `?${searchParams.toString()}` : '')
 
     const res = await fetch(url)
     if (!res.ok) {

@@ -4,8 +4,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 
+import UsageBanner from '@/components/UsageBanner.vue'
+import { useFeatureGate } from '@/composables/useFeatureGate'
+
 const router = useRouter()
 const auth = useAuthStore()
+
+const gate = useFeatureGate('diary')
 
 type Entry = {
   id: number | string
@@ -18,15 +23,12 @@ type Entry = {
 const entries = ref<Entry[]>([])
 const loading = ref(true)
 
-/* MODAL BORRAR */
 const showDeleteModal = ref(false)
 const entryToDelete = ref<Entry | null>(null)
 const deletingId = ref<number | string | null>(null)
 
-/* ARCHIVADAS */
 const showArchived = ref(false)
 
-/* FECHA LINDO */
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('es-AR', {
@@ -37,7 +39,6 @@ function formatDate(dateStr: string) {
   })
 }
 
-/* Moods con colores */
 function moodLabel(mood: string) {
   return (
     {
@@ -60,8 +61,9 @@ function moodColor(mood: string) {
   )
 }
 
-/* CARGAR ENTRADAS */
 onMounted(async () => {
+  await gate.refresh()
+
   if (!auth.user) {
     loading.value = false
     return
@@ -73,19 +75,13 @@ onMounted(async () => {
     .eq('user_id', auth.user.id)
     .order('on_date', { ascending: false })
 
-  if (data) entries.value = data
+  if (data) entries.value = data as Entry[]
   loading.value = false
 })
 
-const visibleEntries = computed(() =>
-  entries.value.filter((e) => !e.archived)
-)
+const visibleEntries = computed(() => entries.value.filter((e) => !e.archived))
+const archivedEntries = computed(() => entries.value.filter((e) => e.archived))
 
-const archivedEntries = computed(() =>
-  entries.value.filter((e) => e.archived)
-)
-
-/* ACCIONES BÁSICAS */
 function goBack() {
   router.push('/app/diario')
 }
@@ -94,7 +90,6 @@ function editEntry(entry: Entry) {
   router.push({ path: '/app/diario', query: { date: entry.on_date } })
 }
 
-/* ARCHIVAR / DESARCHIVAR */
 async function toggleArchive(entry: Entry) {
   if (!auth.user) return
 
@@ -113,12 +108,9 @@ async function toggleArchive(entry: Entry) {
   }
 
   const idx = entries.value.findIndex((e) => e.id === entry.id)
-  if (idx !== -1) {
-    entries.value[idx] = { ...entries.value[idx], archived: newValue }
-  }
+  if (idx !== -1) entries.value[idx] = { ...entries.value[idx], archived: newValue }
 }
 
-/* COMPARTIR POR MAIL */
 function shareEntry(entry: Entry) {
   const subject = `Mi entrada de diario en Nura (${formatDate(entry.on_date)})`
   const mood = moodLabel(entry.mood)
@@ -142,10 +134,6 @@ ${text}
   window.open(gmailUrl, '_blank')
 }
 
-
-
-
-/* BORRAR */
 function openDelete(entry: Entry) {
   entryToDelete.value = entry
   showDeleteModal.value = true
@@ -172,6 +160,52 @@ async function confirmDelete() {
   deletingId.value = null
   closeDelete()
 }
+
+const isPremium = computed(() => !!gate.premium.value)
+const remainingThisPeriod = computed(() => {
+  if (isPremium.value) return Infinity
+  return gate.freeStats.value.remaining
+})
+
+const canCreateThisPeriod = computed(() => {
+  if (isPremium.value) return true
+  return gate.canUse.value
+})
+
+const showPremiumCta = computed(() => {
+  if (gate.loading.value) return false
+  if (isPremium.value) return false
+  const rem = Number(remainingThisPeriod.value ?? 0)
+  return !canCreateThisPeriod.value || rem <= 3
+})
+
+const ctaTitle = computed(() => {
+  if (!canCreateThisPeriod.value) return 'Sin entradas disponibles'
+  return 'Premium sin límites'
+})
+
+const ctaText = computed(() => {
+  if (!canCreateThisPeriod.value) return 'Con Premium podés crear entradas sin límite.'
+  return 'Te quedan pocas entradas. Con Premium podés crear sin límite.'
+})
+
+const ctaRight = computed(() => {
+  if (gate.loading.value) return ''
+  const label = gate.limits.value.period === 'month' ? 'este mes' : 'hoy'
+  if (isPremium.value) return 'Ilimitado'
+  return `${remainingThisPeriod.value} ${label}`
+})
+
+const showBanner = computed(() => !gate.premium.value && !gate.loading.value)
+const remainingText = computed(() => gate.bannerText.value)
+
+function goPremium() {
+  router.push('/app/premium')
+}
+
+function goWriteNew() {
+  router.push('/app/diario')
+}
 </script>
 
 <template>
@@ -181,28 +215,44 @@ async function confirmDelete() {
         <span class="arrow">←</span>
       </button>
 
-      <div>
+      <div class="head-text">
         <h2>Mis entradas de diario</h2>
-        <p class="subtitle">Revisá, editá o archiva tus registros.</p>
+        <p class="subtitle">Revisá, editá o archivá tus registros.</p>
+
+        <div v-if="showPremiumCta" class="premium-inline">
+          <div class="premium-inline__left">
+            <div class="premium-inline__top">
+              <span class="premium-badge">Gratis</span>
+              <span class="premium-inline__right">{{ ctaRight }}</span>
+            </div>
+            <p class="premium-inline__title">{{ ctaTitle }}</p>
+            <p class="premium-inline__desc">{{ ctaText }}</p>
+          </div>
+
+          <button type="button" class="premium-inline__btn" @click="goPremium">
+            Pasar a Premium
+          </button>
+        </div>
+
+       <div class="usage-wrapper">
+  <UsageBanner :show="showBanner" :text="remainingText" variant="info" />
+</div>
+        <button class="btn-main" type="button" @click="goWriteNew">
+          Escribir nueva entrada
+        </button>
       </div>
     </header>
 
-    <!-- Loading -->
     <section v-if="loading" class="card empty">
       Cargando…
     </section>
 
-    <!-- Sin entradas -->
-    <section
-      v-else-if="!visibleEntries.length && !archivedEntries.length"
-      class="card empty"
-    >
+    <section v-else-if="!visibleEntries.length && !archivedEntries.length" class="card empty">
       <h3>Todavía no tenés entradas</h3>
       <p>Podés comenzar hoy mismo.</p>
       <button class="btn-main" @click="goBack">Escribir mi primera entrada</button>
     </section>
 
-    <!-- ENTRADAS VISIBLES -->
     <section v-else class="entries">
       <h3 v-if="visibleEntries.length" class="section-title">
         Entradas recientes
@@ -244,7 +294,6 @@ async function confirmDelete() {
         </p>
       </article>
 
-      <!-- ARCHIVADAS -->
       <section v-if="archivedEntries.length" class="archived-block">
         <button class="archived-toggle" @click="showArchived = !showArchived">
           <span>
@@ -297,12 +346,7 @@ async function confirmDelete() {
       </section>
     </section>
 
-    <!-- MODAL BORRAR -->
-    <div
-      v-if="showDeleteModal"
-      class="modal-backdrop"
-      @click.self="closeDelete"
-    >
+    <div v-if="showDeleteModal" class="modal-backdrop" @click.self="closeDelete">
       <div class="modal-card modal-confirm-cancel">
         <header class="modal-header">
           <h3 class="modal-title">Borrar entrada</h3>
@@ -311,7 +355,7 @@ async function confirmDelete() {
 
         <section class="modal-body">
           <p>¿Querés borrar esta entrada de tu diario?</p>
-          <p >Esta acción no se puede deshacer.</p>
+          <p>Esta acción no se puede deshacer.</p>
         </section>
 
         <footer class="modal-footer">
@@ -338,8 +382,14 @@ async function confirmDelete() {
 .top-bar {
   display: flex;
   gap: 14px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20px;
+}
+
+.head-text {
+  flex: 1;
+  display: grid;
+  gap: 10px;
 }
 
 .subtitle {
@@ -362,8 +412,86 @@ async function confirmDelete() {
   color: #46bdbd;
 }
 
+.premium-inline {
+  margin: 0;
+  background: #fdf6ff;
+  border: 1px solid #b6ebe5;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 18px rgba(80, 189, 189, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.premium-inline__left {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.premium-inline__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.premium-inline__right {
+  font-size: 0.78rem;
+  color: #475569;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(80, 189, 189, 0.15);
+  color: #137b7b;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+.premium-inline__title {
+  margin: 0;
+  font-weight: 900;
+  color: #0f172a;
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.premium-inline__desc {
+  margin: 0;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.premium-inline__btn {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-weight: 900;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: #50bdbd;
+  color: #fff;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.premium-inline__btn:hover {
+  background: #3daaaa;
+  transform: translateY(-1px);
+}
+
 .card.empty {
-  background: #e6f8f8;
+  background: #eee6f8;
   border-radius: 18px;
   padding: 16px 20px;
   border: 1px solid #cfeeee;
@@ -371,7 +499,6 @@ async function confirmDelete() {
 }
 
 .btn-main {
-  margin-top: 10px;
   border-radius: 999px;
   padding: 8px 18px;
   border: none;
@@ -379,6 +506,7 @@ async function confirmDelete() {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+  width: fit-content;
 }
 
 .entries {
@@ -434,6 +562,20 @@ async function confirmDelete() {
   font-weight: 600;
   font-size: 14px;
   color: white;
+}
+
+/* ===== Usage Banner compacto ===== */
+.usage-wrapper {
+  display: flex;
+  justify-content: flex-start;  
+}
+
+:deep(.usage-banner) {
+  width: auto !important;
+  max-width: 420px;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  font-size: 0.85rem !important;
 }
 
 .actions {
@@ -661,23 +803,32 @@ async function confirmDelete() {
   transform: translateY(-1px);
 }
 
-/* ====== RESPONSIVE MOBILE / iOS ====== */
 @media (max-width: 768px) {
   .page {
     padding: 16px 12px 72px;
   }
 
-  .top-bar {
-    align-items: flex-start;
+  .premium-inline {
+    flex-direction: column;
+    align-items: stretch;
     gap: 10px;
   }
 
-  .top-bar h2 {
-    font-size: 1.2rem;
+  .premium-inline__top {
+    justify-content: flex-start;
   }
 
-  .subtitle {
-    font-size: 0.85rem;
+  .premium-inline__right {
+    margin-left: auto;
+  }
+
+  .premium-inline__btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .btn-main {
+    width: 100%;
   }
 
   .entry-card {
@@ -726,7 +877,6 @@ async function confirmDelete() {
   }
 }
 
-/* Ajustes específicos para Safari iOS (safe area y modales) */
 @supports (-webkit-touch-callout: none) {
   .page {
     padding-bottom: calc(60px + env(safe-area-inset-bottom));
@@ -743,4 +893,3 @@ async function confirmDelete() {
   }
 }
 </style>
-

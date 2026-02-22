@@ -15,7 +15,6 @@ export function useFeatureGate(feature: FeatureKey) {
   const premium = ref<boolean>(false)
   const loading = ref(true)
 
-  // ✅ hace reactivo el estado de uso (porque localStorage no es reactivo)
   const usageVersion = ref(0)
   function refresh() {
     usageVersion.value++
@@ -60,7 +59,9 @@ export function useFeatureGate(feature: FeatureKey) {
     if (premium.value) return ''
     const { remaining, limit } = freeStats.value
     if (!limit) return ''
-    return `Te quedan ${remaining} usos hoy`
+
+    const periodLabel = limits.value?.period === 'month' ? 'este mes' : 'hoy'
+    return `Te quedan ${remaining} usos ${periodLabel}`
   })
 
   function consume(amount = 1) {

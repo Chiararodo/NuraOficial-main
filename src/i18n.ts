@@ -145,7 +145,7 @@ const messages = {
           diaryTitle: 'Diario:',
           diaryBody: ' hasta <strong>10 entradas por mes</strong>.',
           chatbotTitle: 'Chatbot:',
-          chatbotBody: ' hasta <strong>5 usos por mes</strong>.'
+          chatbotBody: ' hasta <strong>10 mensajes por día</strong>.'
         }
       },
 

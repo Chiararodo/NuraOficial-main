@@ -4,21 +4,18 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 
-import UsageBanner from '@/components/UsageBanner.vue'
 import { useFeatureGate } from '@/composables/useFeatureGate'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
+/** Gate: 10 por mes para CREAR (editar no consume) */
 const gate = useFeatureGate('diary')
 
-/* ============================
-   Helpers fecha (AR)
-============================ */
+/* ========= Fechas AR ========= */
 const TZ = 'America/Argentina/Buenos_Aires'
 function isoDateInAR(d: Date) {
-  // YYYY-MM-DD en timezone Argentina
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ,
     year: 'numeric',
@@ -32,9 +29,7 @@ function isoDateInAR(d: Date) {
   return `${y}-${m}-${day}`
 }
 
-/* ============================
-   ESTADO
-============================ */
+/* ========= Estado UI ========= */
 const showSavedModal = ref(false)
 const viewDate = ref(new Date())
 const selectedDate = ref(new Date())
@@ -46,24 +41,20 @@ const errorMsg = ref('')
 const existingEntry = ref(false)
 const showLimitModal = ref(false)
 
-/* ============================
-   RECIBIR FECHA DESDE ENTRADAS
-============================ */
 let tick: number | null = null
 
 onMounted(async () => {
   const param = route.query.date as string | undefined
   if (param) selectedDate.value = new Date(param)
 
+  await gate.reloadPremium() // asegura premium actualizado
+  await gate.refresh() // refresca stats locales
+
   await loadCalendarHistory()
   await loadDraft()
 
-  // refresca banner/contador al entrar
-  await gate.refresh()
-
-  // refresca automático si cambia el día (AR)
-  tick = window.setInterval(async () => {
-    await gate.refresh()
+  tick = window.setInterval(() => {
+    gate.refresh()
   }, 30_000)
 })
 
@@ -71,9 +62,7 @@ onBeforeUnmount(() => {
   if (tick) window.clearInterval(tick)
 })
 
-/* ============================
-   CALENDARIO
-============================ */
+/* ========= Calendario ========= */
 const monthName = computed(() => {
   const str = viewDate.value.toLocaleString('es-AR', {
     month: 'long',
@@ -89,7 +78,7 @@ const lastOfMonth = computed(
   () => new Date(viewDate.value.getFullYear(), viewDate.value.getMonth() + 1, 0)
 )
 
-const weekdayFirst = computed(() => (firstOfMonth.value.getDay() + 6) % 7)
+const weekdayFirst = computed(() => (firstOfMonth.value.getDay() + 6) % 7) // lunes=0
 const daysInMonth = computed(() => lastOfMonth.value.getDate())
 
 function prevMonth() {
@@ -108,7 +97,6 @@ function nextMonth() {
   )
 }
 
-/* Bloquear días futuros */
 const isFuture = (day: number) => {
   const date = new Date(
     viewDate.value.getFullYear(),
@@ -118,9 +106,7 @@ const isFuture = (day: number) => {
   return date > new Date()
 }
 
-/* ============================
-   HISTORIAL EN EL CALENDARIO
-============================ */
+/* ========= DB ========= */
 type Mood = 'triste' | 'normal' | 'bien' | 'muybien'
 const calendarMap = ref<Record<string, Mood>>({})
 
@@ -140,13 +126,11 @@ async function loadCalendarHistory() {
     return
   }
 
-  if (data) {
-    const map: Record<string, Mood> = {}
-    ;(data as any[]).forEach((d) => {
-      if (d.on_date && d.mood) map[d.on_date] = d.mood as Mood
-    })
-    calendarMap.value = map
-  }
+  const map: Record<string, Mood> = {}
+  ;(data as any[] | null)?.forEach((d) => {
+    if (d?.on_date && d?.mood) map[d.on_date] = d.mood as Mood
+  })
+  calendarMap.value = map
 }
 
 async function pickDay(d: number) {
@@ -159,9 +143,6 @@ async function pickDay(d: number) {
   await loadDraft()
 }
 
-/* ============================
-   REGISTRO - FORM
-============================ */
 const mood = ref<Mood>('triste')
 const content = ref('')
 
@@ -198,10 +179,38 @@ async function loadDraft() {
   }
 }
 
+/* ========= Límite (solo CREAR consume) ========= */
 const canSave = computed(() => {
   if (!auth.user) return false
   if (saving.value || loadingEntry.value) return false
   return content.value.trim().length > 1
+})
+
+const isPremium = computed(() => !!gate.premium.value)
+
+const remainingThisMonth = computed(() => {
+  if (isPremium.value) return Infinity
+  return gate.freeStats.value.remaining
+})
+
+/** solo aplica para CREAR */
+const canCreateThisMonth = computed(() => {
+  if (isPremium.value) return true
+  return gate.canUse.value
+})
+
+/** CTA tipo Foro: siempre visible si NO es premium */
+const showPremiumCta = computed(() => {
+  if (gate.loading.value) return false
+  return !isPremium.value
+})
+
+const ctaTitle = computed(() => 'Solo Premium')
+const ctaText = computed(() => 'Para crear entradas sin límite necesitás el plan Premium.')
+const ctaRight = computed(() => {
+  if (gate.loading.value) return ''
+  if (isPremium.value) return 'Ilimitado'
+  return `Te quedan ${remainingThisMonth.value} usos este mes`
 })
 
 async function saveEntry() {
@@ -213,8 +222,8 @@ async function saveEntry() {
 
   const isCreate = !existingEntry.value
 
-  // solo bloquea si es crear y no quedan usos
-  if (isCreate && !gate.canUse.value) {
+  // ✅ SOLO bloquea si es NUEVA entrada
+  if (isCreate && !canCreateThisMonth.value) {
     showLimitModal.value = true
     return
   }
@@ -236,20 +245,21 @@ async function saveEntry() {
 
     if (error) throw error
 
-    // actualizar mapa + estado
     calendarMap.value[selectedISO.value] = mood.value
-    existingEntry.value = true
 
-    // consumir SOLO si fue crear
-    if (isCreate) gate.consume(1)
+    // ✅ si era NUEVO, ahora consume 1
+    if (isCreate) {
+      existingEntry.value = true
+      gate.consume(1)
+    } else {
+      existingEntry.value = true
+    }
 
-    // ✅ vaciar textarea después de guardar
+    // si preferís NO limpiar al editar, comentá la línea:
     content.value = ''
 
-    // ✅ refrescar banner/contador automáticamente
-    await gate.refresh()
+    gate.refresh()
 
-    // toast
     showSavedModal.value = true
     setTimeout(() => (showSavedModal.value = false), 4000)
   } catch (e: any) {
@@ -260,9 +270,7 @@ async function saveEntry() {
   }
 }
 
-/* ============================
-   GOOGLE CALENDAR
-============================ */
+/* ========= Export ========= */
 function exportToGoogle() {
   const base = selectedISO.value.replace(/-/g, '')
   const start = `${base}T090000`
@@ -285,10 +293,15 @@ function exportToGoogle() {
   window.open(url.toString(), '_blank')
 }
 
+/* ========= Navegación ========= */
 function goRecent() {
   router.push('/app/diario/entradas')
 }
+function goPremium() {
+  router.push('/app/premium')
+}
 
+/* ========= Estilos días ========= */
 function dayStyle(day: number) {
   const key = isoDateInAR(
     new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), day)
@@ -317,16 +330,6 @@ function dayStyle(day: number) {
 
   return {}
 }
-
-/* ============================
-   Banner
-============================ */
-const showBanner = computed(() => !gate.premium.value && !gate.loading.value)
-const remainingText = computed(() => gate.bannerText.value)
-
-function goPremium() {
-  router.push('/app/premium')
-}
 </script>
 
 <template>
@@ -335,11 +338,24 @@ function goPremium() {
       <h2>Diario emocional</h2>
       <p class="subtitle">Registrá tu estado día por día.</p>
 
-      <UsageBanner :show="showBanner" :text="remainingText" variant="info" />
+      <!-- ✅ CTA igual Foro (y NO se duplica con banner) -->
+      <div v-if="showPremiumCta" class="premium-cta">
+        <div class="premium-cta__left">
+          <div class="premium-cta__top">
+            <span class="premium-cta__badge">Gratis</span>
+            <span class="premium-cta__right">{{ ctaRight }}</span>
+          </div>
+          <p class="premium-cta__title">{{ ctaTitle }}</p>
+          <p class="premium-cta__text">{{ ctaText }}</p>
+        </div>
+
+        <button type="button" class="premium-cta__btn" @click="goPremium">
+          Pasar a Premium
+        </button>
+      </div>
     </header>
 
     <section class="diary-grid">
-      <!-- CALENDARIO -->
       <section class="card card-calendar">
         <header class="card-header">
           <div>
@@ -348,9 +364,9 @@ function goPremium() {
           </div>
 
           <div class="month-switch">
-            <button class="month-btn" @click="prevMonth">‹</button>
+            <button type="button" class="month-btn" @click="prevMonth">‹</button>
             <span class="month-label">{{ monthName }}</span>
-            <button class="month-btn" @click="nextMonth">›</button>
+            <button type="button" class="month-btn" @click="nextMonth">›</button>
           </div>
         </header>
 
@@ -373,7 +389,7 @@ function goPremium() {
               selected:
                 selectedDate.getDate() === d &&
                 selectedDate.getMonth() === viewDate.getMonth(),
-              future: isFuture(d)
+              future: isFuture(d),
             }"
             :disabled="isFuture(d)"
             :style="dayStyle(d)"
@@ -383,49 +399,43 @@ function goPremium() {
           </button>
         </div>
 
-        <button class="btn-outline" @click="goRecent">
+        <button type="button" class="btn-outline" @click="goRecent">
           Ver entradas recientes
         </button>
       </section>
 
-      <!-- FORM -->
       <section class="card card-form">
         <h3 class="card-title">
           Escribí tu registro
-          <span
-            v-if="existingEntry"
-            style="font-size:0.85rem; color:#5c6a75; font-weight:600;"
-          >
-            (editando)
-          </span>
-          <span
-            v-else
-            style="font-size:0.85rem; color:#5c6a75; font-weight:600;"
-          >
-            (nuevo)
+          <span class="mode">
+            {{ existingEntry ? '(editando)' : '(nuevo)' }}
           </span>
         </h3>
 
         <div class="chips">
           <button
+            type="button"
             :class="['chip','chip-triste',{ active: mood === 'triste' }]"
             @click="mood='triste'"
           >
             Triste
           </button>
           <button
+            type="button"
             :class="['chip','chip-normal',{ active: mood === 'normal' }]"
             @click="mood='normal'"
           >
             Normal
           </button>
           <button
+            type="button"
             :class="['chip','chip-bien',{ active: mood === 'bien' }]"
             @click="mood='bien'"
           >
             Bien
           </button>
           <button
+            type="button"
             :class="['chip','chip-muybien',{ active: mood === 'muybien' }]"
             @click="mood='muybien'"
           >
@@ -440,33 +450,31 @@ function goPremium() {
           placeholder="Escribí aquí..."
         />
 
-        <p v-if="errorMsg" style="color:#b3261e; margin:6px 0 0;">
+        <p v-if="errorMsg" class="err">
           {{ errorMsg }}
         </p>
 
         <div class="actions">
-          <button class="btn-primary" :disabled="!canSave" @click="saveEntry">
+          <button type="button" class="btn-primary" :disabled="!canSave" @click="saveEntry">
             {{ saving ? 'Guardando…' : 'Guardar' }}
           </button>
-          <button class="btn-outline" @click="exportToGoogle">
+          <button type="button" class="btn-outline" @click="exportToGoogle">
             Añadir a Google Calendar
           </button>
         </div>
       </section>
     </section>
 
-    <!-- TOAST -->
     <div v-if="showSavedModal" class="toast">
       <div class="toast-content">
         <span class="check">✓</span>
         <div class="textos">
           <p class="titulo">Entrada guardada</p>
-          <button class="toast-btn" @click="goRecent">Ver mis entradas</button>
+          <button type="button" class="toast-btn" @click="goRecent">Ver mis entradas</button>
         </div>
       </div>
     </div>
 
-    <!-- MODAL LIMITE -->
     <div
       v-if="showLimitModal"
       class="limit-overlay"
@@ -475,17 +483,17 @@ function goPremium() {
       <div class="limit-card">
         <h3 class="limit-title">Límite alcanzado</h3>
         <p class="limit-text">
-          En el plan gratuito tenés hasta <strong>10 entradas</strong>.
+          En el plan gratuito podés <strong>crear</strong> hasta <strong>10 entradas por mes</strong>.
         </p>
         <p class="limit-text">
           Podés esperar al próximo período o pasar a <strong>Premium</strong>.
         </p>
 
         <div class="limit-actions">
-          <button class="limit-btn soft" @click="showLimitModal = false">
+          <button type="button" class="limit-btn soft" @click="showLimitModal = false">
             Entendido
           </button>
-          <button class="limit-btn" @click="goPremium">Ver Premium</button>
+          <button type="button" class="limit-btn" @click="goPremium">Ver Premium</button>
         </div>
       </div>
     </div>
@@ -493,7 +501,6 @@ function goPremium() {
 </template>
 
 <style scoped>
-/* ✅ Dejé tu CSS igual (no lo toco) */
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;
@@ -522,7 +529,90 @@ function goPremium() {
   line-height: 1.45rem;
 }
 
-/* GRID PRINCIPAL */
+/* ============================
+   PREMIUM CTA (igual Foro)
+============================ */
+.premium-cta {
+  margin: 0;
+  background: #f6fffe;
+  border: 1px solid #b6ebe5;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 18px rgba(80, 189, 189, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.premium-cta__left {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.premium-cta__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.premium-cta__right {
+  font-size: 0.78rem;
+  color: #475569;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.premium-cta__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(80, 189, 189, 0.15);
+  color: #137b7b;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+.premium-cta__title {
+  margin: 0;
+  font-weight: 900;
+  color: #0f172a;
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.premium-cta__text {
+  margin: 0;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.premium-cta__btn {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-weight: 900;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: #50bdbd;
+  color: #fff;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.premium-cta__btn:hover {
+  background: #3daaaa;
+  transform: translateY(-1px);
+}
+
+/* ============================
+   GRID PRINCIPAL
+============================ */
 .diary-grid {
   max-width: 1120px;
   margin: 18px auto 0;
@@ -538,7 +628,9 @@ function goPremium() {
   }
 }
 
-/* CARD BASE */
+/* ============================
+   CARD BASE
+============================ */
 .card {
   background: #ffffff;
   border-radius: 18px;
@@ -561,6 +653,13 @@ function goPremium() {
   font-size: 1.1rem;
   font-weight: 700;
   color: #50bdbd;
+}
+
+.mode {
+  font-size: 0.85rem;
+  color: #5c6a75;
+  font-weight: 600;
+  margin-left: 6px;
 }
 
 .card-subtitle-small {
@@ -588,11 +687,9 @@ function goPremium() {
   border-radius: 999px;
   border: 1px solid #e3ecf6;
   background: #50bdbd;
-  color: #ffffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
   cursor: pointer;
   padding: 0;
   font-size: 1.4rem;
@@ -603,6 +700,7 @@ function goPremium() {
   background: #3daaaa;
 }
 
+/* ===== MODAL LIMITE ===== */
 .limit-overlay {
   position: fixed;
   inset: 0;
@@ -663,6 +761,7 @@ function goPremium() {
   color: #50bdbd;
   border: 1px solid #b6ebe5;
 }
+
 .limit-btn.soft:hover {
   background: #e0faf7;
 }
@@ -703,14 +802,13 @@ function goPremium() {
   border-color: #50bdbd;
 }
 
-.cal-day.today {
-  border-color: #50bdbd;
-  background-color: #50bdbd;
-  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
-}
-
 .cal-day.selected {
   border: 2px solid #50bdbd;
+}
+
+.future {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* BOTÓN VER ENTRADAS / GOOGLE CALENDAR */
@@ -726,6 +824,8 @@ function goPremium() {
   text-align: center;
   text-decoration: none;
   transition: background 0.2s;
+  border: none;
+  cursor: pointer;
 }
 
 .btn-outline:hover {
@@ -734,12 +834,7 @@ function goPremium() {
 
 /* ===== FORMULARIO ===== */
 .card-form {
-  height: 90%;
-  background: #ffffffff;
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
-  padding: 16px 18px 18px;
-  border: 0.3px solid #50bdbd;
+  background: #ffffff;
 }
 
 .chips {
@@ -749,7 +844,6 @@ function goPremium() {
   margin: 10px 0 8px;
 }
 
-/* Base chip */
 .chip {
   border-radius: 999px;
   padding: 0.38rem 0.9rem;
@@ -767,44 +861,20 @@ function goPremium() {
 }
 
 /* TRISTE – azul */
-.chip-triste {
-  border-color: #74c0f4;
-  color: #24527a;
-}
-.chip-triste.active {
-  background: #74c0f4;
-  color: #ffffff;
-}
+.chip-triste { border-color: #74c0f4; color: #24527a; }
+.chip-triste.active { background: #74c0f4; color: #ffffff; }
 
 /* NORMAL – violeta */
-.chip-normal {
-  border-color: #b197fc;
-  color: #4b3f86;
-}
-.chip-normal.active {
-  background: #b197fc;
-  color: #ffffff;
-}
+.chip-normal { border-color: #b197fc; color: #4b3f86; }
+.chip-normal.active { background: #b197fc; color: #ffffff; }
 
 /* BIEN – verde */
-.chip-bien {
-  border-color: #8ce99a;
-  color: #22543d;
-}
-.chip-bien.active {
-  background: #8ce99a;
-  color: #ffffff;
-}
+.chip-bien { border-color: #8ce99a; color: #22543d; }
+.chip-bien.active { background: #8ce99a; color: #ffffff; }
 
 /* MUY BIEN – naranja */
-.chip-muybien {
-  border-color: #ffa94d;
-  color: #7c3a03;
-}
-.chip-muybien.active {
-  background: #ffa94d;
-  color: #ffffff;
-}
+.chip-muybien { border-color: #ffa94d; color: #7c3a03; }
+.chip-muybien.active { background: #ffa94d; color: #ffffff; }
 
 .area {
   border: none;
@@ -817,6 +887,11 @@ function goPremium() {
   padding: 10px 12px;
   resize: vertical;
   font: inherit;
+}
+
+.err {
+  color: #b3261e;
+  margin: 6px 0 0;
 }
 
 /* BOTONES DEL FORM (Guardar + Google) */
@@ -838,8 +913,6 @@ function goPremium() {
   border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 600;
-  text-align: center;
-  text-decoration: none;
   transition: background 0.2s;
   border: none;
   cursor: pointer;
@@ -867,7 +940,7 @@ function goPremium() {
   gap: 12px;
   border-radius: 16px;
   padding: 14px 20px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.15);
 }
 
 .check {
@@ -898,21 +971,11 @@ function goPremium() {
 }
 
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.future {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .contenido {
     padding: 16px 12px 72px;
@@ -924,6 +987,26 @@ function goPremium() {
 
   .page-head .subtitle {
     font-size: 0.9rem;
+  }
+
+  .premium-cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .premium-cta__top {
+    justify-content: flex-start;
+  }
+
+  .premium-cta__right {
+    margin-left: auto;
+  }
+
+  .premium-cta__btn {
+    width: 100%;
+    text-align: center;
   }
 
   .card {

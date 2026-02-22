@@ -149,13 +149,11 @@ function goTo(path: string) {
           <ul class="benefits">
             <li><strong>Foro:</strong> Podés comentar, pero no crear publicaciones.</li>
             <li><strong>Diario:</strong> Hasta <strong>10 entradas por mes</strong>.</li>
-            <li><strong>Chatbot:</strong> Hasta <strong>5 usos por mes</strong>.</li>
+            <li><strong>Chatbot:</strong> Hasta <strong>10 mensajes por día</strong>.</li>
             <li><strong>Contenido:</strong> Acceso a materiales generales.</li>
           </ul>
 
-          <button class="btn btn-soft btn-full" type="button" @click="goPerfil">
-            Usar plan gratuito
-          </button>
+          
         </article>
 
         <article class="plan plan--premium">

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 import MoodSuccessModal from '@/components/MoodSuccessModal.vue'
 import { useI18n } from 'vue-i18n'
+import { useFeatureGate } from '@/composables/useFeatureGate'
 
 type ForoResumen = {
   id: string
@@ -28,6 +29,53 @@ type Appt = {
 const router = useRouter()
 const auth = useAuthStore()
 const { locale, t, tm } = useI18n()
+
+/* ========= Premium Popup (1 vez por día) ========= */
+const gate = useFeatureGate('diary')
+const showPremiumPopup = ref(false)
+
+const isPremium = computed(() => !!gate.premium.value)
+
+function goPremium() {
+  router.push('/app/premium')
+}
+
+function premiumPopupKey() {
+  return auth.user ? `nura_premium_popup_${auth.user.id}` : 'nura_premium_popup'
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function shouldShowPremiumPopupToday() {
+  if (!auth.user) return false
+  const last = localStorage.getItem(premiumPopupKey())
+  return last !== todayISO()
+}
+
+function markPremiumPopupShownToday() {
+  if (!auth.user) return
+  localStorage.setItem(premiumPopupKey(), todayISO())
+}
+
+function openPremiumPopupOncePerDay() {
+  if (isPremium.value) return
+  if (!shouldShowPremiumPopupToday()) return
+
+  // Marcamos acá para que cuente como "ya mostrado" aunque no lo cierre
+  markPremiumPopupShownToday()
+
+  setTimeout(() => {
+    showPremiumPopup.value = true
+  }, 350)
+}
+
+function closePremiumPopup() {
+  showPremiumPopup.value = false
+ 
+  markPremiumPopupShownToday()
+}
 
 /* ========= Navegación ========= */
 function goDiaryList() {
@@ -59,19 +107,12 @@ const diasCuidado = computed(() => {
 
   const inicio = new Date(auth.user.created_at)
   const hoy = new Date()
-
-  const diff = Math.floor(
-    (hoy.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)
-  )
-
+  const diff = Math.floor((hoy.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
   return diff + 1
 })
 
 const meta = 30
-
-const progresoPorcentaje = computed(() =>
-  Math.min((diasCuidado.value / meta) * 100, 100)
-)
+const progresoPorcentaje = computed(() => Math.min((diasCuidado.value / meta) * 100, 100))
 
 /* ========= Foro activo ========= */
 const forosActivos = ref<ForoResumen[]>([])
@@ -126,7 +167,6 @@ function irAlForo(id: string) {
 const hoyYYYYMMDD = new Date().toISOString().slice(0, 10)
 
 const frases = computed(() => {
-  // tm devuelve "unknown" si no existe; lo casteamos a string[]
   const arr = tm('home.quotes') as unknown as string[]
   return Array.isArray(arr) && arr.length ? arr : []
 })
@@ -134,8 +174,7 @@ const frases = computed(() => {
 const fraseDelDia = computed(() => {
   if (!frases.value.length) return ''
   const idx =
-    [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) %
-    frases.value.length
+    [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % frases.value.length
   return frases.value[idx]
 })
 
@@ -149,10 +188,7 @@ function setMood(mood: Mood) {
 
   if (auth.user) {
     const key = `nura_moods_${auth.user.id}`
-    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<
-      string,
-      Mood
-    >
+    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, Mood>
     stored[today] = mood
     localStorage.setItem(key, JSON.stringify(stored))
   }
@@ -167,7 +203,7 @@ function handleWriteDiaryFromModal() {
   escribirDiario()
 }
 
-/* ========= Calendario simple (mes actual) ========= */
+/* ========= Calendario  ========= */
 const today = new Date()
 
 const monthName = computed(() => {
@@ -175,16 +211,11 @@ const monthName = computed(() => {
   return today.toLocaleString(loc, { month: 'long' })
 })
 
-const weekdays = computed(() => {
-  // Para calendario Lunes->Domingo
-  return tm('home.weekdays') as unknown as string[]
-})
+const weekdays = computed(() => tm('home.weekdays') as unknown as string[])
 
 const first = new Date(today.getFullYear(), today.getMonth(), 1)
 const last = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-const jsWeekday = first.getDay()
-const mondayBased = (jsWeekday + 6) % 7
-
+const mondayBased = (first.getDay() + 6) % 7
 const leadingBlanks = mondayBased
 const daysInMonth = last.getDate()
 
@@ -195,16 +226,12 @@ function formatTime(ti: string) {
   return ti?.slice(0, 5) ?? ''
 }
 
-/* Google Calendar para turno */
 function exportApptToGoogle(a: Appt) {
   const date = a.on_date.replace(/-/g, '')
   const baseTime = (a.at_time || '09:00').slice(0, 5)
   const [hh, mm] = baseTime.split(':')
-  const startTimeRaw = `${hh}${mm}00`
-  const endTimeRaw = `${String(Number(hh) + 1).padStart(2, '0')}${mm}00`
-
-  const start = `${date}T${startTimeRaw}`
-  const end = `${date}T${endTimeRaw}`
+  const start = `${date}T${hh}${mm}00`
+  const end = `${date}T${String(Number(hh) + 1).padStart(2, '0')}${mm}00`
 
   const url = new URL('https://calendar.google.com/calendar/render')
   url.searchParams.set('action', 'TEMPLATE')
@@ -231,6 +258,10 @@ onMounted(async () => {
     .order('at_time', { ascending: true })
 
   if (!error && data) activities.value = data as Appt[]
+
+  // Premium popup (1 vez por día)
+  await gate.refresh()
+  openPremiumPopupOncePerDay()
 })
 </script>
 
@@ -250,6 +281,7 @@ onMounted(async () => {
             <button class="mood" @click="setMood('triste')" type="button">
               <img
                 src="/icons/nuri-triste.png"
+
                 :alt="$t('home.moods.sad')"
               />
               <span>{{ $t('home.moods.sad') }}</span>
@@ -390,7 +422,7 @@ onMounted(async () => {
             {{ $t('home.noActivities') }}
           </p>
 
-          <!-- CALENDARIO SIMPLE -->
+          <!-- CALENDARIO  -->
           <div class="calendar">
             <div class="cal-head">
               <span class="month-and-day">
@@ -445,6 +477,53 @@ onMounted(async () => {
     </div>
   </main>
 
+  <!-- Premium Popup (al entrar) -->
+  <div
+    v-if="showPremiumPopup"
+    class="premium-pop-overlay"
+    @click.self="closePremiumPopup"
+  >
+    <div class="premium-pop-card" role="dialog" aria-modal="true" aria-label="Pasar a Premium">
+      <div class="premium-pop-top">
+        <span class="premium-pop-badge">Gratis</span>
+        <button class="premium-pop-x" type="button" @click="closePremiumPopup" aria-label="Cerrar">
+          ✕
+        </button>
+      </div>
+
+      <h3 class="premium-pop-title">Pasate a Premium</h3>
+      <p class="premium-pop-text">
+        Desbloqueá accesos sin límites en Diario, NuraBot y en el Foro.
+      </p>
+
+      <div class="premium-pop-benefits">
+        <div class="benefit">
+          <span class="dot"></span>
+          <span>Diario emocional ilimitado</span>
+        </div>
+        <div class="benefit">
+          <span class="dot"></span>
+          <span>NuraBot sin límite diario</span>
+        </div>
+        <div class="benefit">
+          <span class="dot"></span>
+          <span> Crear y comentar sin límites en el foro</span>
+        </div>
+      </div>
+
+      <div class="premium-pop-actions">
+        <button class="premium-pop-btn soft" type="button" @click="closePremiumPopup">
+          Ahora no
+        </button>
+        <button class="premium-pop-btn" type="button" @click="goPremium">
+          Ver Premium
+        </button>
+      </div>
+
+     
+    </div>
+  </div>
+
   <MoodSuccessModal
     :open="showMoodModal"
     :mood="moodSeleccionado"
@@ -455,7 +534,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* (DEJO TU CSS TAL CUAL) */
+
 .home-page {
   background: #fff;
   padding: 24px 18px 48px;
@@ -656,7 +735,7 @@ h3 {
   font-weight: 600;
 }
 
-/* Botones pill reutilizados */
+/* Botones pill  */
 .foro-btn {
   display: inline-block;
   box-sizing: border-box;
@@ -681,7 +760,7 @@ h3 {
   box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
 
-/* ==== Calendario simple ==== */
+/* ==== Calendario  ==== */
 .calendar {
   margin-top: 20px;
   padding: 10px 6px 16px;
@@ -832,6 +911,159 @@ h3 {
   margin: 0 0 8px;
   font-size: 0.85rem;
   color: #6b7280;
+}
+
+/* =========================
+   PREMIUM POPUP (HOME)
+========================= */
+.premium-pop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 16px;
+}
+
+.premium-pop-card {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px 14px 12px;
+  border: 1px solid #e8eef3;
+  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
+}
+
+.premium-pop-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.premium-pop-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(80, 189, 189, 0.15);
+  color: #137b7b;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+.premium-pop-x {
+  width: 50px;
+  height: 45px;
+  border-radius: 999px;
+  border: 1px solid #e8eef3;
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.premium-pop-x:hover {
+  background: #f6fffe;
+  border-color: #b6ebe5;
+}
+
+.premium-pop-title {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  font-weight: 950;
+  color: #50bdbd;
+}
+
+.premium-pop-text {
+  margin: 0 0 12px;
+  color: #475569;
+  line-height: 1.35;
+  font-size: 0.92rem;
+}
+
+.premium-pop-benefits {
+  border: 1px solid #b6ebe5;
+  background: #f6fffe;
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.benefit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.18);
+}
+
+.premium-pop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.premium-pop-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 9px 14px;
+  font-weight: 900;
+  cursor: pointer;
+  background: #50bdbd;
+  color: #fff;
+}
+
+.premium-pop-btn:hover {
+  background: #3daaaa;
+}
+
+.premium-pop-btn.soft {
+  background: #ffffff;
+  color: #50bdbd;
+  border: 1px solid #b6ebe5;
+}
+
+.premium-pop-btn.soft:hover {
+  background: #e0faf7;
+}
+
+.premium-pop-foot {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .premium-pop-card {
+    max-width: 520px;
+    padding: 12px 12px 10px;
+  }
+  .premium-pop-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .premium-pop-btn {
+    width: 100%;
+  }
 }
 
 /* ===== Chatbot Banner (NuriChat) ===== */

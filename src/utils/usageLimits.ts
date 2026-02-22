@@ -1,36 +1,48 @@
 export type FeatureKey = 'foro' | 'diary' | 'chatbot'
 
+type Period = 'day' | 'month'
+
 type FeatureLimit = {
-  dailyLimit: number // para free (por día)
+  limit: number
   label: string
+  period: Period
 }
 
 const TZ = 'America/Argentina/Buenos_Aires'
 
 export const FEATURE_LIMITS: Record<FeatureKey, FeatureLimit> = {
-  // foro: gratis NO puede crear publicaciones (limit 0)
-  foro: { dailyLimit: 0, label: 'Foro' },
-
-  // diario: 10 por día (gratis)
-  diary: { dailyLimit: 10, label: 'Diario' },
-
-  // chatbot: 10 por día (gratis) — como pediste
-  chatbot: { dailyLimit: 10, label: 'Chatbot' },
+  foro: { limit: 0, label: 'Foro', period: 'day' },
+  diary: { limit: 10, label: 'Diario', period: 'month' },
+  chatbot: { limit: 10, label: 'Chatbot', period: 'day' },
 }
 
-/** YYYY-MM-DD en timezone Argentina */
-function dayKeyAR(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
+function partsAR(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).formatToParts(date)
+}
 
+function dayKeyAR(date = new Date()) {
+  const parts = partsAR(date)
   const y = parts.find((p) => p.type === 'year')?.value ?? '1970'
   const m = parts.find((p) => p.type === 'month')?.value ?? '01'
   const d = parts.find((p) => p.type === 'day')?.value ?? '01'
-  return `${y}-${m}-${d}` // "2026-02-03"
+  return `${y}-${m}-${d}`
+}
+
+function monthKeyAR(date = new Date()) {
+  const parts = partsAR(date)
+  const y = parts.find((p) => p.type === 'year')?.value ?? '1970'
+  const m = parts.find((p) => p.type === 'month')?.value ?? '01'
+  return `${y}-${m}`
+}
+
+function windowKeyAR(feature: FeatureKey, date = new Date()) {
+  const { period } = FEATURE_LIMITS[feature]
+  return period === 'month' ? monthKeyAR(date) : dayKeyAR(date)
 }
 
 function storageKey(feature: FeatureKey) {
@@ -38,16 +50,16 @@ function storageKey(feature: FeatureKey) {
 }
 
 type StoredUsage = {
-  day: string
+  window: string
   used: number
 }
 
 export function getUsage(feature: FeatureKey) {
   const raw = localStorage.getItem(storageKey(feature))
-  const current = dayKeyAR()
+  const currentWindow = windowKeyAR(feature)
 
   if (!raw) {
-    const initial: StoredUsage = { day: current, used: 0 }
+    const initial: StoredUsage = { window: currentWindow, used: 0 }
     localStorage.setItem(storageKey(feature), JSON.stringify(initial))
     return initial
   }
@@ -55,35 +67,34 @@ export function getUsage(feature: FeatureKey) {
   try {
     const parsed = JSON.parse(raw) as StoredUsage
 
-    // si cambió el día (según Argentina), reset
-    if (parsed.day !== current) {
-      const reset: StoredUsage = { day: current, used: 0 }
+    if (parsed.window !== currentWindow) {
+      const reset: StoredUsage = { window: currentWindow, used: 0 }
       localStorage.setItem(storageKey(feature), JSON.stringify(reset))
       return reset
     }
 
     return parsed
   } catch {
-    const reset: StoredUsage = { day: current, used: 0 }
+    const reset: StoredUsage = { window: currentWindow, used: 0 }
     localStorage.setItem(storageKey(feature), JSON.stringify(reset))
     return reset
   }
 }
 
 export function setUsage(feature: FeatureKey, used: number) {
-  const current = dayKeyAR()
-  const next: StoredUsage = { day: current, used: Math.max(0, used) }
+  const currentWindow = windowKeyAR(feature)
+  const next: StoredUsage = { window: currentWindow, used: Math.max(0, used) }
   localStorage.setItem(storageKey(feature), JSON.stringify(next))
   return next
 }
 
 export function incrementUsage(feature: FeatureKey, amount = 1) {
   const current = getUsage(feature)
-  return setUsage(feature, current.used + amount)
+  return setUsage(feature, current.used + Math.max(0, amount))
 }
 
 export function remainingForFree(feature: FeatureKey) {
-  const limit = FEATURE_LIMITS[feature].dailyLimit
+  const { limit } = FEATURE_LIMITS[feature]
   const usage = getUsage(feature).used
   const remaining = Math.max(0, limit - usage)
   return { limit, used: usage, remaining }
@@ -91,23 +102,25 @@ export function remainingForFree(feature: FeatureKey) {
 
 export function canUseFree(feature: FeatureKey) {
   const { limit, remaining } = remainingForFree(feature)
-
-  // si limit es 0 -> no permitido (ej: crear post)
   if (limit <= 0) return false
-
   return remaining > 0
 }
 
-/** util opcional: texto para UI */
-export function nextResetInfoAR() {
-  // próximo reset: mañana 00:00 AR
+export function nextResetInfoAR(feature: FeatureKey) {
+  const { period } = FEATURE_LIMITS[feature]
+
+  if (period === 'month') {
+    const now = new Date()
+    const current = monthKeyAR(now)
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const nextKey = monthKeyAR(next)
+    return { current, next: nextKey, timezone: TZ, period }
+  }
+
   const now = new Date()
   const today = dayKeyAR(now)
-
-  // construimos fecha "mañana" sumando 1 día en local y formateamos AR
   const tomorrow = new Date(now)
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowKey = dayKeyAR(tomorrow)
-
-  return { today, tomorrow: tomorrowKey, timezone: TZ }
+  return { current: today, next: tomorrowKey, timezone: TZ, period }
 }
