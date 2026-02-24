@@ -138,7 +138,7 @@ const messages = {
         premiumDesc:
           'Tenés acceso ilimitado al Foro, Diario y Chatbot, además de beneficios exclusivos.',
         seeDetails: 'Ver detalles',
-        seePlans: 'Ver planes y beneficios',
+        seePlans: 'Ver planes',
         limits: {
           forumTitle: 'Foro:',
           forumBody: ' podés comentar, pero no crear publicaciones.',
@@ -162,13 +162,13 @@ const messages = {
         title: 'Medicaciones',
         loading: 'Cargando medicaciones…',
         empty: 'No tenés medicaciones cargadas.',
-        myMeds: 'Mis medicaciones'
+        myMeds: 'Medicaciones'
       },
 
       diary: {
         title: 'Mi Diario',
         emptyPreview: '',
-        viewAll: 'Mis entradas',
+        viewAll: 'Entradas',
         writeToday: 'Escribir hoy'
       },
 

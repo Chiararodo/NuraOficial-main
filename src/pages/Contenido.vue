@@ -1,614 +1,3 @@
-<template>
-  <main class="contenido">
-    <header class="page-head">
-      <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
-
-      <h2>{{ $t('content.pageTitle') }}</h2>
-
-      <nav class="tabs" :aria-label="$t('content.tabsAria')">
-        <button
-          v-for="t in tabs"
-          :key="t.key"
-          class="tab"
-          :class="{ active: tab === t.key }"
-          type="button"
-          @click="tab = t.key"
-        >
-          {{ t.label }}
-        </button>
-      </nav>
-    </header>
-
-    <!-- VIDEOS -->
-    <section v-if="tab === 'videos'" class="section">
-      <div v-if="isAdmin" class="content-row">
-        <!-- LISTA VIDEOS IZQUIERDA -->
-        <div class="content-main">
-          <div v-if="loading.videos" class="loading">
-            {{ $t('content.loadingVideos') }}
-          </div>
-          <p v-else-if="!videos.length" class="empty">
-            {{ $t('content.emptyVideos') }}
-          </p>
-
-          <div v-else class="grid">
-            <article
-              v-for="v in videos"
-              :key="v.id"
-              class="card video-card"
-              @click="openVideo(v)"
-            >
-              <div class="thumb">
-                <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-                <span class="duration" v-if="v.duration_seconds">
-                  {{ mmss(v.duration_seconds) }}
-                </span>
-              </div>
-
-              <h3 class="title">{{ v.title }}</h3>
-
-              <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button
-                  class="abm-btn abm-btn--edit"
-                  type="button"
-                  @click="startEditVideo(v)"
-                >
-                  🖊 {{ $t('content.actions.edit') }}
-                </button>
-                <button
-                  class="abm-btn abm-btn--delete"
-                  type="button"
-                  @click="askDelete('video', v.id, v.title)"
-                >
-                  🗑 {{ $t('content.actions.delete') }}
-                </button>
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <!-- ABM VIDEO DERECHA -->
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.video.newTitle') }}</h3>
-
-          <div class="abm-grid abm-2col">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="videoCreateForm.title" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="videoCreateForm.cover_path" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.video.filePath') }}</label>
-              <input v-model="videoCreateForm.file_path" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.video.duration') }}</label>
-              <input
-                v-model.number="videoCreateForm.duration_seconds"
-                type="number"
-                min="0"
-              />
-            </div>
-
-            <div class="field field--full">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="2" v-model="videoCreateForm.description" />
-            </div>
-          </div>
-
-          <div class="abm-actions">
-            <button
-              type="button"
-              class="pill pill--primary"
-              @click="createVideo"
-            >
-              {{ $t('content.video.create') }}
-            </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetVideoCreateForm"
-            >
-              {{ $t('content.actions.clear') }}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <!-- VISTA SOLO LISTA PARA NO ADMIN -->
-      <div v-else class="content-main">
-        <div v-if="loading.videos" class="loading">
-          {{ $t('content.loadingVideos') }}
-        </div>
-        <p v-else-if="!videos.length" class="empty">
-          {{ $t('content.emptyVideos') }}
-        </p>
-
-        <div v-else class="grid">
-          <article
-            v-for="v in videos"
-            :key="v.id"
-            class="card video-card"
-            @click="openVideo(v)"
-          >
-            <div class="thumb">
-              <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-              <span class="duration" v-if="v.duration_seconds">
-                {{ mmss(v.duration_seconds) }}
-              </span>
-            </div>
-            <h3 class="title">{{ v.title }}</h3>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- BIBLIOTECA -->
-    <section v-else-if="tab === 'biblioteca'" class="section">
-      <div v-if="isAdmin" class="content-row">
-        <!-- LISTA LIBROS + ARTÍCULOS IZQUIERDA -->
-        <div class="content-main">
-          <div v-if="loading.books" class="loading">
-            {{ $t('content.loadingLibrary') }}
-          </div>
-          <p v-else-if="!books.length" class="empty">
-            {{ $t('content.emptyBooks') }}
-          </p>
-
-          <div v-else class="grid">
-            <article
-              v-for="b in books"
-              :key="b.id"
-              class="card book-card"
-              @click="openBook(b)"
-            >
-              <div class="book-thumb">
-                <img :src="publicUrl(b.cover_path)" :alt="b.title" />
-              </div>
-              <h3 class="title">{{ b.title }}</h3>
-
-              <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button
-                  class="abm-btn abm-btn--edit"
-                  type="button"
-                  @click="startEditBook(b)"
-                >
-                  🖊 {{ $t('content.actions.edit') }}
-                </button>
-                <button
-                  class="abm-btn abm-btn--delete"
-                  type="button"
-                  @click="askDelete('book', b.id, b.title)"
-                >
-                  🗑 {{ $t('content.actions.delete') }}
-                </button>
-              </div>
-            </article>
-          </div>
-
-          <h3 class="subhead" v-if="articles.length">
-            {{ $t('content.articles.title') }}
-          </h3>
-
-          <div class="articles" v-if="articles.length">
-            <article v-for="a in articles" :key="a.id" class="article-card">
-              <img
-                class="art-cover"
-                :src="publicUrl(a.cover_path)"
-                :alt="a.title"
-              />
-              <div class="art-body">
-                <h4 class="art-title">{{ a.title }}</h4>
-                <p class="art-summary">{{ a.summary }}</p>
-                <small v-if="a.read_minutes">
-                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
-                </small>
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <!-- ABM LIBROS DERECHA -->
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.book.newTitle') }}</h3>
-
-          <div class="abm-2col">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="bookCreateForm.title" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="bookCreateForm.cover_path" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.book.filePath') }}</label>
-              <input
-                v-model="bookCreateForm.file_path"
-                type="text"
-                :placeholder="$t('content.book.filePlaceholder')"
-              />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.pdf.orUpload') }}</label>
-              <div class="upload-row">
-                <input
-                  ref="bookPdfInput"
-                  type="file"
-                  accept="application/pdf"
-                  class="file-input"
-                  @change="onBookPdfSelected"
-                />
-                <button
-                  type="button"
-                  class="upload-btn"
-                  @click="bookPdfInput?.click()"
-                >
-                  {{ $t('content.pdf.select') }}
-                </button>
-                <span v-if="bookPdfName" class="file-name">
-                  {{ bookPdfName }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createBook">
-              {{ $t('content.book.create') }}
-            </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetBookCreateForm"
-            >
-              {{ $t('content.actions.clear') }}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <!-- SOLO LISTA PARA NO ADMIN -->
-      <div v-else class="content-main">
-        <div v-if="loading.books" class="loading">
-          {{ $t('content.loadingLibrary') }}
-        </div>
-        <p v-else-if="!books.length" class="empty">
-          {{ $t('content.emptyBooks') }}
-        </p>
-
-        <div v-else class="grid">
-          <article
-            v-for="b in books"
-            :key="b.id"
-            class="card book-card"
-            @click="openBook(b)"
-          >
-            <div class="book-thumb">
-              <img :src="publicUrl(b.cover_path)" :alt="b.title" />
-            </div>
-            <h3 class="title">{{ b.title }}</h3>
-          </article>
-        </div>
-
-        <h3 class="subhead" v-if="articles.length">
-          {{ $t('content.articles.title') }}
-        </h3>
-        <div class="articles" v-if="articles.length">
-          <article v-for="a in articles" :key="a.id" class="article-card">
-            <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
-            <div class="art-body">
-              <h4 class="art-title">{{ a.title }}</h4>
-              <p class="art-summary">{{ a.summary }}</p>
-              <small v-if="a.read_minutes">
-                {{ $t('content.articles.reading', { m: a.read_minutes }) }}
-              </small>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- GUÍAS -->
-    <section v-else-if="tab === 'guias'" class="section">
-      <div v-if="isAdmin" class="content-row">
-        <!-- LISTA GUÍAS IZQUIERDA -->
-        <div class="content-main">
-          <div v-if="loading.guides" class="loading">
-            {{ $t('content.loadingGuides') }}
-          </div>
-          <p v-else-if="!guides.length" class="empty">
-            {{ $t('content.emptyGuides') }}
-          </p>
-
-          <div v-else class="grid">
-            <article
-              v-for="g in guides"
-              :key="g.id"
-              class="card guide-card"
-              @click="openGuide(g)"
-            >
-              <div class="guide-thumb">
-                <img :src="publicUrl(g.cover_path)" :alt="g.title" />
-              </div>
-              <div class="guide-body">
-                <h3 class="guide-title">{{ g.title }}</h3>
-                <p class="guide-summary">{{ g.description }}</p>
-
-                <div class="guide-actions">
-                  <button class="btn" type="button" @click.stop="openGuide(g)">
-                    {{ $t('content.actions.continue') }}
-                  </button>
-
-                  <div class="progress" v-if="progressMap.get(g.id) !== undefined">
-                    <div
-                      class="bar"
-                      :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
-                    />
-                  </div>
-
-                  <small class="pct" v-if="progressMap.get(g.id) !== undefined">
-                    {{ progressMap.get(g.id) }}%
-                  </small>
-                </div>
-
-                <div v-if="isAdmin" class="small-actions" @click.stop>
-                  <button
-                    class="abm-btn abm-btn--edit"
-                    type="button"
-                    @click="startEditGuide(g)"
-                  >
-                    🖊 {{ $t('content.actions.edit') }}
-                  </button>
-                  <button
-                    class="abm-btn abm-btn--delete"
-                    type="button"
-                    @click="askDelete('guide', g.id, g.title)"
-                  >
-                    🗑 {{ $t('content.actions.delete') }}
-                  </button>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <!-- ABM GUÍAS DERECHA -->
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.guide.newTitle') }}</h3>
-
-          <div class="abm-2col">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="guideCreateForm.title" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="guideCreateForm.cover_path" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.guide.filePath') }}</label>
-              <input
-                v-model="guideCreateForm.file_path"
-                type="text"
-                :placeholder="$t('content.guide.filePlaceholder')"
-              />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.pdf.orUpload') }}</label>
-              <div class="upload-row">
-                <input
-                  ref="guidePdfInput"
-                  type="file"
-                  accept="application/pdf"
-                  class="file-input"
-                  @change="onGuidePdfSelected"
-                />
-                <button
-                  type="button"
-                  class="upload-btn"
-                  @click="guidePdfInput?.click()"
-                >
-                  {{ $t('content.pdf.select') }}
-                </button>
-                <span v-if="guidePdfName" class="file-name">
-                  {{ guidePdfName }}
-                </span>
-              </div>
-            </div>
-
-            <div class="field field--full">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="2" v-model="guideCreateForm.description" />
-            </div>
-          </div>
-
-          <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createGuide">
-              {{ $t('content.guide.create') }}
-            </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetGuideCreateForm"
-            >
-              {{ $t('content.actions.clear') }}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <!-- SOLO LISTA PARA NO ADMIN -->
-      <div v-else class="content-main">
-        <div v-if="loading.guides" class="loading">
-          {{ $t('content.loadingGuides') }}
-        </div>
-        <p v-else-if="!guides.length" class="empty">
-          {{ $t('content.emptyGuides') }}
-        </p>
-
-        <div v-else class="grid">
-          <article
-            v-for="g in guides"
-            :key="g.id"
-            class="card guide-card"
-            @click="openGuide(g)"
-          >
-            <div class="guide-thumb">
-              <img :src="publicUrl(g.cover_path)" :alt="g.title" />
-            </div>
-            <div class="guide-body">
-              <h3 class="guide-title">{{ g.title }}</h3>
-              <p class="guide-summary">{{ g.description }}</p>
-
-              <div class="guide-actions">
-                <button class="btn" type="button" @click.stop="openGuide(g)">
-                  {{ $t('content.actions.continue') }}
-                </button>
-
-                <div class="progress" v-if="progressMap.get(g.id) !== undefined">
-                  <div
-                    class="bar"
-                    :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
-                  />
-                </div>
-
-                <small class="pct" v-if="progressMap.get(g.id) !== undefined">
-                  {{ progressMap.get(g.id) }}%
-                </small>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- OVERLAYS Y MODALES -->
-    <div v-if="currentVideo" class="overlay">
-      <div class="modal-card">
-        <button type="button" class="close" @click="closeVideo">×</button>
-        <div class="player">
-          <video v-if="videoSrc" :src="videoSrc" controls playsinline />
-        </div>
-        <h3 class="modal-title">{{ currentVideo?.title }}</h3>
-        <p class="modal-desc" v-if="currentVideo?.description">
-          {{ currentVideo?.description }}
-        </p>
-      </div>
-    </div>
-
-    <div v-if="currentPdf" class="overlay" @click.self="closePdf">
-      <div class="modal-card">
-        <button type="button" class="close" @click="closePdf">×</button>
-        <h3 class="modal-title">{{ currentPdf?.title }}</h3>
-        <p class="modal-desc" v-if="currentPdf?.description">
-          {{ currentPdf?.description }}
-        </p>
-        <div class="pdf">
-          <iframe v-if="pdfSrc" :src="pdfSrc" :title="$t('content.pdf.iframeTitle')" />
-        </div>
-      </div>
-    </div>
-
-    <div v-if="editModal" class="overlay" @click.self="closeEditModal">
-      <div class="edit-card">
-        <header class="edit-header">
-          <h3 class="edit-title">
-            <span v-if="editModal.type === 'video'">{{ $t('content.edit.video') }}</span>
-            <span v-else-if="editModal.type === 'book'">{{ $t('content.edit.book') }}</span>
-            <span v-else>{{ $t('content.edit.guide') }}</span>
-          </h3>
-          <button class="edit-close" type="button" @click="closeEditModal">
-            ×
-          </button>
-        </header>
-
-        <section class="edit-body">
-          <div class="abm-grid">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="editModal.title" type="text" />
-            </div>
-
-            <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="editModal.cover_path" type="text" />
-            </div>
-
-            <div class="field">
-              <label>
-                {{ $t('content.fields.file') }}
-                <span v-if="editModal.type === 'video'">{{ $t('content.video.fileLabelSuffix') }}</span>
-                <span v-else>{{ $t('content.pdf.fileLabelSuffix') }}</span>
-                (file_path)
-              </label>
-              <input v-model="editModal.file_path" type="text" />
-            </div>
-
-            <div v-if="editModal.type === 'video'" class="field">
-              <label>{{ $t('content.video.duration') }}</label>
-              <input
-                v-model.number="editModal.duration_seconds"
-                type="number"
-                min="0"
-              />
-            </div>
-
-            <div v-if="editModal.type !== 'book'" class="field field--full">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="3" v-model="editModal.description" />
-            </div>
-          </div>
-        </section>
-
-        <footer class="edit-footer">
-          <button class="pill pill--ghost" type="button" @click="closeEditModal">
-            {{ $t('content.actions.cancel') }}
-          </button>
-          <button class="pill pill--primary" type="button" @click="saveEdit">
-            {{ $t('content.actions.save') }}
-          </button>
-        </footer>
-      </div>
-    </div>
-
-    <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
-      <div class="confirm-card">
-        <h3>
-          {{ $t('content.delete.title', { item: $t(`content.delete.labels.${confirmDelete.type}`) }) }}
-        </h3>
-        <p>
-          {{ $t('content.delete.text') }}
-          <strong>«{{ confirmDelete.title }}»</strong>?
-        </p>
-        <div class="confirm-actions">
-          <button class="pill pill--primary" type="button" @click="cancelDelete">
-            {{ $t('content.actions.cancel') }}
-          </button>
-          <button class="pill pill--danger" type="button" @click="performDelete">
-            🗑 {{ $t('content.actions.delete') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="toast" class="toast" :class="toast.kind">
-      {{ toast.message }}
-    </div>
-  </main>
-</template>
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
@@ -1108,6 +497,619 @@ function mmss(total: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 </script>
+
+<template>
+  <main class="contenido">
+    <header class="page-head">
+      <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
+
+      <h2>{{ $t('content.pageTitle') }}</h2>
+
+      <nav class="tabs" :aria-label="$t('content.tabsAria')">
+        <button
+          v-for="t in tabs"
+          :key="t.key"
+          class="tab"
+          :class="{ active: tab === t.key }"
+          type="button"
+          @click="tab = t.key"
+        >
+          {{ t.label }}
+        </button>
+      </nav>
+    </header>
+
+    <!-- VIDEOS -->
+    <section v-if="tab === 'videos'" class="section">
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA VIDEOS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.videos" class="loading">
+            {{ $t('content.loadingVideos') }}
+          </div>
+          <p v-else-if="!videos.length" class="empty">
+            {{ $t('content.emptyVideos') }}
+          </p>
+
+          <div v-else class="grid">
+            <article
+              v-for="v in videos"
+              :key="v.id"
+              class="card video-card"
+              @click="openVideo(v)"
+            >
+              <div class="thumb">
+                <img :src="publicUrl(v.cover_path)" :alt="v.title" />
+                <span class="duration" v-if="v.duration_seconds">
+                  {{ mmss(v.duration_seconds) }}
+                </span>
+              </div>
+
+              <h3 class="title">{{ v.title }}</h3>
+
+              <div v-if="isAdmin" class="small-actions" @click.stop>
+                <button
+                  class="abm-btn abm-btn--edit"
+                  type="button"
+                  @click="startEditVideo(v)"
+                >
+                  {{ $t('content.actions.edit') }}
+                </button>
+                <button
+                  class="abm-btn abm-btn--delete"
+                  type="button"
+                  @click="askDelete('video', v.id, v.title)"
+                >
+                  {{ $t('content.actions.delete') }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- ABM VIDEO DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">{{ $t('content.video.newTitle') }}</h3>
+
+          <div class="abm-grid abm-2col">
+            <div class="field">
+              <label>{{ $t('content.fields.title') }}</label>
+              <input v-model="videoCreateForm.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.fields.coverPath') }}</label>
+              <input v-model="videoCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.video.filePath') }}</label>
+              <input v-model="videoCreateForm.file_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.video.duration') }}</label>
+              <input
+                v-model.number="videoCreateForm.duration_seconds"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div class="field field--full">
+              <label>{{ $t('content.fields.description') }}</label>
+              <textarea rows="2" v-model="videoCreateForm.description" />
+            </div>
+          </div>
+
+          <div class="abm-actions">
+            <button
+              type="button"
+              class="pill pill--primary"
+              @click="createVideo"
+            >
+              {{ $t('content.video.create') }}
+            </button>
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetVideoCreateForm"
+            >
+              {{ $t('content.actions.clear') }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- VISTA SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.videos" class="loading">
+          {{ $t('content.loadingVideos') }}
+        </div>
+        <p v-else-if="!videos.length" class="empty">
+          {{ $t('content.emptyVideos') }}
+        </p>
+
+        <div v-else class="grid">
+          <article
+            v-for="v in videos"
+            :key="v.id"
+            class="card video-card"
+            @click="openVideo(v)"
+          >
+            <div class="thumb">
+              <img :src="publicUrl(v.cover_path)" :alt="v.title" />
+              <span class="duration" v-if="v.duration_seconds">
+                {{ mmss(v.duration_seconds) }}
+              </span>
+            </div>
+            <h3 class="title">{{ v.title }}</h3>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- BIBLIOTECA -->
+    <section v-else-if="tab === 'biblioteca'" class="section">
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA LIBROS + ARTÍCULOS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.books" class="loading">
+            {{ $t('content.loadingLibrary') }}
+          </div>
+          <p v-else-if="!books.length" class="empty">
+            {{ $t('content.emptyBooks') }}
+          </p>
+
+          <div v-else class="grid">
+            <article
+              v-for="b in books"
+              :key="b.id"
+              class="card book-card"
+              @click="openBook(b)"
+            >
+              <div class="book-thumb">
+                <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+              </div>
+              <h3 class="title">{{ b.title }}</h3>
+
+              <div v-if="isAdmin" class="small-actions" @click.stop>
+                <button
+                  class="abm-btn abm-btn--edit"
+                  type="button"
+                  @click="startEditBook(b)"
+                >
+                  {{ $t('content.actions.edit') }}
+                </button>
+                <button
+                  class="abm-btn abm-btn--delete"
+                  type="button"
+                  @click="askDelete('book', b.id, b.title)"
+                >
+                  {{ $t('content.actions.delete') }}
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <h3 class="subhead" v-if="articles.length">
+            {{ $t('content.articles.title') }}
+          </h3>
+
+          <div class="articles" v-if="articles.length">
+            <article v-for="a in articles" :key="a.id" class="article-card">
+              <img
+                class="art-cover"
+                :src="publicUrl(a.cover_path)"
+                :alt="a.title"
+              />
+              <div class="art-body">
+                <h4 class="art-title">{{ a.title }}</h4>
+                <p class="art-summary">{{ a.summary }}</p>
+                <small v-if="a.read_minutes">
+                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                </small>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- ABM LIBROS DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">{{ $t('content.book.newTitle') }}</h3>
+
+          <div class="abm-2col">
+            <div class="field">
+              <label>{{ $t('content.fields.title') }}</label>
+              <input v-model="bookCreateForm.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.fields.coverPath') }}</label>
+              <input v-model="bookCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.book.filePath') }}</label>
+              <input
+                v-model="bookCreateForm.file_path"
+                type="text"
+                :placeholder="$t('content.book.filePlaceholder')"
+              />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.pdf.orUpload') }}</label>
+              <div class="upload-row">
+                <input
+                  ref="bookPdfInput"
+                  type="file"
+                  accept="application/pdf"
+                  class="file-input"
+                  @change="onBookPdfSelected"
+                />
+                <button
+                  type="button"
+                  class="upload-btn"
+                  @click="bookPdfInput?.click()"
+                >
+                  {{ $t('content.pdf.select') }}
+                </button>
+                <span v-if="bookPdfName" class="file-name">
+                  {{ bookPdfName }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="abm-actions">
+            <button type="button" class="pill pill--primary" @click="createBook">
+              {{ $t('content.book.create') }}
+            </button>
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetBookCreateForm"
+            >
+              {{ $t('content.actions.clear') }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.books" class="loading">
+          {{ $t('content.loadingLibrary') }}
+        </div>
+        <p v-else-if="!books.length" class="empty">
+          {{ $t('content.emptyBooks') }}
+        </p>
+
+        <div v-else class="grid">
+          <article
+            v-for="b in books"
+            :key="b.id"
+            class="card book-card"
+            @click="openBook(b)"
+          >
+            <div class="book-thumb">
+              <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+            </div>
+            <h3 class="title">{{ b.title }}</h3>
+          </article>
+        </div>
+
+        <h3 class="subhead" v-if="articles.length">
+          {{ $t('content.articles.title') }}
+        </h3>
+        <div class="articles" v-if="articles.length">
+          <article v-for="a in articles" :key="a.id" class="article-card">
+            <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+            <div class="art-body">
+              <h4 class="art-title">{{ a.title }}</h4>
+              <p class="art-summary">{{ a.summary }}</p>
+              <small v-if="a.read_minutes">
+                {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+              </small>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- GUÍAS -->
+    <section v-else-if="tab === 'guias'" class="section">
+      <div v-if="isAdmin" class="content-row">
+        <!-- LISTA GUÍAS IZQUIERDA -->
+        <div class="content-main">
+          <div v-if="loading.guides" class="loading">
+            {{ $t('content.loadingGuides') }}
+          </div>
+          <p v-else-if="!guides.length" class="empty">
+            {{ $t('content.emptyGuides') }}
+          </p>
+
+          <div v-else class="grid">
+            <article
+              v-for="g in guides"
+              :key="g.id"
+              class="card guide-card"
+              @click="openGuide(g)"
+            >
+              <div class="guide-thumb">
+                <img :src="publicUrl(g.cover_path)" :alt="g.title" />
+              </div>
+              <div class="guide-body">
+                <h3 class="guide-title">{{ g.title }}</h3>
+                <p class="guide-summary">{{ g.description }}</p>
+
+                <div class="guide-actions">
+                  <button class="btn" type="button" @click.stop="openGuide(g)">
+                    {{ $t('content.actions.continue') }}
+                  </button>
+
+                  <div class="progress" v-if="progressMap.get(g.id) !== undefined">
+                    <div
+                      class="bar"
+                      :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
+                    />
+                  </div>
+
+                  <small class="pct" v-if="progressMap.get(g.id) !== undefined">
+                    {{ progressMap.get(g.id) }}%
+                  </small>
+                </div>
+
+                <div v-if="isAdmin" class="small-actions" @click.stop>
+                  <button
+                    class="abm-btn abm-btn--edit"
+                    type="button"
+                    @click="startEditGuide(g)"
+                  >
+                    {{ $t('content.actions.edit') }}
+                  </button>
+                  <button
+                    class="abm-btn abm-btn--delete"
+                    type="button"
+                    @click="askDelete('guide', g.id, g.title)"
+                  >
+                   {{ $t('content.actions.delete') }}
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- ABM GUÍAS DERECHA -->
+        <section class="abm card abm-box">
+          <h3 class="abm-title">{{ $t('content.guide.newTitle') }}</h3>
+
+          <div class="abm-2col">
+            <div class="field">
+              <label>{{ $t('content.fields.title') }}</label>
+              <input v-model="guideCreateForm.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.fields.coverPath') }}</label>
+              <input v-model="guideCreateForm.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.guide.filePath') }}</label>
+              <input
+                v-model="guideCreateForm.file_path"
+                type="text"
+                :placeholder="$t('content.guide.filePlaceholder')"
+              />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.pdf.orUpload') }}</label>
+              <div class="upload-row">
+                <input
+                  ref="guidePdfInput"
+                  type="file"
+                  accept="application/pdf"
+                  class="file-input"
+                  @change="onGuidePdfSelected"
+                />
+                <button
+                  type="button"
+                  class="upload-btn"
+                  @click="guidePdfInput?.click()"
+                >
+                  {{ $t('content.pdf.select') }}
+                </button>
+                <span v-if="guidePdfName" class="file-name">
+                  {{ guidePdfName }}
+                </span>
+              </div>
+            </div>
+
+            <div class="field field--full">
+              <label>{{ $t('content.fields.description') }}</label>
+              <textarea rows="2" v-model="guideCreateForm.description" />
+            </div>
+          </div>
+
+          <div class="abm-actions">
+            <button type="button" class="pill pill--primary" @click="createGuide">
+              {{ $t('content.guide.create') }}
+            </button>
+            <button
+              type="button"
+              class="pill pill--ghost"
+              @click="resetGuideCreateForm"
+            >
+              {{ $t('content.actions.clear') }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- SOLO LISTA PARA NO ADMIN -->
+      <div v-else class="content-main">
+        <div v-if="loading.guides" class="loading">
+          {{ $t('content.loadingGuides') }}
+        </div>
+        <p v-else-if="!guides.length" class="empty">
+          {{ $t('content.emptyGuides') }}
+        </p>
+
+        <div v-else class="grid">
+          <article
+            v-for="g in guides"
+            :key="g.id"
+            class="card guide-card"
+            @click="openGuide(g)"
+          >
+            <div class="guide-thumb">
+              <img :src="publicUrl(g.cover_path)" :alt="g.title" />
+            </div>
+            <div class="guide-body">
+              <h3 class="guide-title">{{ g.title }}</h3>
+              <p class="guide-summary">{{ g.description }}</p>
+
+              <div class="guide-actions">
+                <button class="btn" type="button" @click.stop="openGuide(g)">
+                  {{ $t('content.actions.continue') }}
+                </button>
+
+                <div class="progress" v-if="progressMap.get(g.id) !== undefined">
+                  <div
+                    class="bar"
+                    :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
+                  />
+                </div>
+
+                <small class="pct" v-if="progressMap.get(g.id) !== undefined">
+                  {{ progressMap.get(g.id) }}%
+                </small>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- OVERLAYS Y MODALES -->
+    <div v-if="currentVideo" class="overlay">
+      <div class="modal-card">
+        <button type="button" class="close" @click="closeVideo">×</button>
+        <div class="player">
+          <video v-if="videoSrc" :src="videoSrc" controls playsinline />
+        </div>
+        <h3 class="modal-title">{{ currentVideo?.title }}</h3>
+        <p class="modal-desc" v-if="currentVideo?.description">
+          {{ currentVideo?.description }}
+        </p>
+      </div>
+    </div>
+
+    <div v-if="currentPdf" class="overlay" @click.self="closePdf">
+      <div class="modal-card">
+        <button type="button" class="close" @click="closePdf">×</button>
+        <h3 class="modal-title">{{ currentPdf?.title }}</h3>
+        <p class="modal-desc" v-if="currentPdf?.description">
+          {{ currentPdf?.description }}
+        </p>
+        <div class="pdf">
+          <iframe v-if="pdfSrc" :src="pdfSrc" :title="$t('content.pdf.iframeTitle')" />
+        </div>
+      </div>
+    </div>
+
+    <div v-if="editModal" class="overlay" @click.self="closeEditModal">
+      <div class="edit-card">
+        <header class="edit-header">
+          <h3 class="edit-title">
+            <span v-if="editModal.type === 'video'">{{ $t('content.edit.video') }}</span>
+            <span v-else-if="editModal.type === 'book'">{{ $t('content.edit.book') }}</span>
+            <span v-else>{{ $t('content.edit.guide') }}</span>
+          </h3>
+          <button class="edit-close" type="button" @click="closeEditModal">
+            ×
+          </button>
+        </header>
+
+        <section class="edit-body">
+          <div class="abm-grid">
+            <div class="field">
+              <label>{{ $t('content.fields.title') }}</label>
+              <input v-model="editModal.title" type="text" />
+            </div>
+
+            <div class="field">
+              <label>{{ $t('content.fields.coverPath') }}</label>
+              <input v-model="editModal.cover_path" type="text" />
+            </div>
+
+            <div class="field">
+              <label>
+                {{ $t('content.fields.file') }}
+                <span v-if="editModal.type === 'video'">{{ $t('content.video.fileLabelSuffix') }}</span>
+                <span v-else>{{ $t('content.pdf.fileLabelSuffix') }}</span>
+                (file_path)
+              </label>
+              <input v-model="editModal.file_path" type="text" />
+            </div>
+
+            <div v-if="editModal.type === 'video'" class="field">
+              <label>{{ $t('content.video.duration') }}</label>
+              <input
+                v-model.number="editModal.duration_seconds"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div v-if="editModal.type !== 'book'" class="field field--full">
+              <label>{{ $t('content.fields.description') }}</label>
+              <textarea rows="3" v-model="editModal.description" />
+            </div>
+          </div>
+        </section>
+
+        <footer class="edit-footer">
+          <button class="pill pill--ghost" type="button" @click="closeEditModal">
+            {{ $t('content.actions.cancel') }}
+          </button>
+          <button class="pill pill--primary" type="button" @click="saveEdit">
+            {{ $t('content.actions.save') }}
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
+      <div class="confirm-card">
+        <h3>
+          {{ $t('content.delete.title', { item: $t(`content.delete.labels.${confirmDelete.type}`) }) }}
+        </h3>
+        <p>
+          {{ $t('content.delete.text') }}
+          <strong>«{{ confirmDelete.title }}»</strong>?
+        </p>
+        <div class="confirm-actions">
+          <button class="pill pill--primary" type="button" @click="cancelDelete">
+            {{ $t('content.actions.cancel') }}
+          </button>
+          <button class="pill pill--danger" type="button" @click="performDelete">
+            {{ $t('content.actions.delete') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="toast" class="toast" :class="toast.kind">
+      {{ toast.message }}
+    </div>
+  </main>
+</template>
+
 
 <style scoped>
 .contenido {
@@ -1754,5 +1756,107 @@ h2 {
 }
 .toast.error {
   background: #ef4444;
+}
+
+/* =========================
+   Mobile: más aire + covers enteras (sin recorte)
+   ========================= */
+@media (max-width: 480px) {
+  /* aire a los costados */
+  .contenido {
+    padding: 18px 14px 40px; /* antes 24px 18px 48px */
+  }
+
+  /* cards más compactas, sin ese width:90% que en grid molesta */
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .card {
+    width: 100%;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .title {
+    font-size: 0.92rem;
+    margin: 8px 4px 4px;
+  }
+
+  /* ===== LIBROS: thumb más bajito + imagen ENTERA ===== */
+  .book-card .book-thumb {
+    aspect-ratio: 16 / 10;      /* más bajito => card más chica */
+    border-radius: 12px;
+    background: #ffffff;        /* marco prolijo */
+    border: 1px solid #e6f3f6;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  .book-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;        /* ✅ NO recorta */
+    padding: 6px;               /* aire dentro del thumb */
+    background: #ffffff;
+  }
+
+  /* ===== GUÍAS: thumb más bajito + imagen ENTERA ===== */
+  .guide-thumb {
+    aspect-ratio: 16 / 10;      /* más bajito => card más chica */
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e6f3f6;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  .guide-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;        /* ✅ NO recorta */
+    padding: 6px;
+    background: #ffffff;
+  }
+
+  /* textos guías más compactos */
+  .guide-title {
+    font-size: 0.92rem;
+    margin: 6px 4px 4px;
+  }
+
+  .guide-summary {
+    font-size: 0.8rem;
+    line-height: 1.15rem;
+    margin: 0 4px 8px;
+  }
+
+  /* botón continuar más chico */
+  .guide-actions .btn {
+    padding: 6px 12px;
+    font-size: 0.82rem;
+  }
+
+  .progress {
+    height: 8px;
+  }
+}
+
+/* Extra compacto */
+@media (max-width: 360px) {
+  .contenido {
+    padding: 16px 12px 36px;
+  }
+
+  .grid {
+    gap: 10px;
+  }
+
+  .title {
+    font-size: 0.88rem;
+  }
 }
 </style>

@@ -1,4 +1,3 @@
-<!-- Onboarding2.vue -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -457,19 +456,13 @@ h2 {
 @media (max-width: 480px) {
 
   .ob-page {
-    padding: 60px 18px 60px; /* mucho más aire */
-    align-items: center;
+    padding: 46px 18px 44px;  /* menos padding arriba */
+    align-items: flex-start;  /* en vez de center */
+    min-height: 100dvh;
   }
 
   .ob-card {
-    max-width: 320px;       /* más angosta */
-    width: 100%;
-    border-radius: 28px;
-    padding: 22px 18px 24px;
-    box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.22),
-      0 4px 12px rgba(0, 0, 0, 0.08);
-  }
+    margin-top: 8px;    }
 
   h2 {
     font-size: 1.35rem;

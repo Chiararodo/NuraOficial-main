@@ -100,12 +100,12 @@ setTimeout(() => {
 
 <style scoped>
 .terminos-page {
-  min-height: calc(100vh - 64px);
+   min-height: 100dvh;
+  background: url('/bgs/splash.png') center/cover no-repeat;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 24px 16px 40px;
-  background: url('/bgs/splash.png') center/cover no-repeat;
+  align-items: start;
+  padding: 48px 16px 32px;
 }
 
 .card {
@@ -113,7 +113,7 @@ setTimeout(() => {
   max-width: 540px;
   background: #ffffff;
   border-radius: 60px;
-  padding: 28px 20px 34px;
+  padding: 18px 20px 34px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
 }
 
@@ -187,20 +187,15 @@ h1 {
    ========================= */
 @media (max-width: 480px) {
   .terminos-page {
-    padding: 64px 18px 64px; /* más aire y más fondo visible */
-    align-items: center;
-    min-height: 100dvh; /* mejor en mobile que 100vh */
+    padding: 46px 18px 44px;  /* menos padding arriba */
+    align-items: flex-start;  /* en vez de center */
+    min-height: 100dvh;
   }
 
   .card {
-    max-width: 320px; /* card más chica como onboarding */
-    width: 100%;
-    border-radius: 28px;
-    padding: 22px 18px 22px;
-    box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.22),
-      0 4px 12px rgba(0, 0, 0, 0.08);
+    margin-top: 8px;          /* la sube un toque más */
   }
+
 
   h1 {
     font-size: 1.35rem;

@@ -130,7 +130,7 @@ function goChatbot() {
 
       <div class="actions">
         <button class="btn-primary" type="button" @click="goPlans">
-          Ver planes y beneficios
+          Ver planes
         </button>
         <button class="btn-secondary" type="button" @click="router.push('/app/perfil')">
           Volver al perfil

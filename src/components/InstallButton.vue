@@ -106,16 +106,21 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .install-btn {
-  background: #633266; 
+  position: fixed;
+  bottom: 88px; /* altura segura por encima de la bottom nav */
+  left: 16px;
+  z-index: 40;
+
+  background: #633266;
   color: #ffffff;
   border: none;
   border-radius: 999px;
-  padding: 10px 24px;
+  padding: 8px 18px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
 
-  box-shadow: 0 10px 24px rgba(99, 50, 102, 0.35);
+  box-shadow: 0 8px 20px rgba(99, 50, 102, 0.35);
   transition:
     background-color 0.18s ease,
     transform 0.18s ease,
@@ -123,9 +128,9 @@ onBeforeUnmount(() => {
 }
 
 .install-btn:hover {
-  background: #50bdbd; 
+  background: #50bdbd;
   transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(80, 189, 189, 0.45);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.45);
 }
 
 .install-btn:active {

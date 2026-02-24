@@ -682,8 +682,8 @@ function dayStyle(day: number) {
 }
 
 .month-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid #e3ecf6;
   background: #50bdbd;
@@ -692,8 +692,9 @@ function dayStyle(day: number) {
   place-items: center;
   cursor: pointer;
   padding: 0;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 500;
+  align-items: center;
 }
 
 .month-btn:hover {
@@ -1047,6 +1048,7 @@ function dayStyle(day: number) {
 
   .toast-content {
     justify-content: space-between;
+    width: fit-content;
   }
 }
 

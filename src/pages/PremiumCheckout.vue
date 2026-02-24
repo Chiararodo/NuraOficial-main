@@ -210,9 +210,11 @@ onMounted(() => {
 
 <style scoped>
 .page {
-  min-height: calc(100dvh - 64px);
-  background: #f5fbfd;
-  padding: 28px 16px 40px;
+   background: #fff;
+  padding: 24px 18px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
 }
 
 .wrap {
