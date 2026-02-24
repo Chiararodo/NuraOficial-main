@@ -1,4 +1,3 @@
-// src/utils/dailyLimit.ts
 export type DailyLimitState = {
   dateKey: string
   used: number
@@ -61,14 +60,14 @@ export function consumeDaily(feature: string, limit: number): DailyLimitState {
   return getDailyState(feature, limit, dateKey)
 }
 
-/** Resetea el contador del día (raro que lo uses, pero sirve para debug) */
+/** Resetea el contador del día */
 export function resetDaily(feature: string, dateKey = getTodayKeyAR()) {
   localStorage.removeItem(storageKey(feature, dateKey))
 }
 
-/** Texto amigable para UI */
+
 export function dailyLabelAR(dateKey: string) {
-  // dateKey: YYYY-MM-DD
+
   const [y, m, d] = dateKey.split('-').map((x) => Number(x))
   return `${pad2(d)}/${pad2(m)}/${y}`
 }

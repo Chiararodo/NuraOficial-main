@@ -28,7 +28,7 @@ async function prefillEmail() {
   // 1) auth email como default
   email.value = authEmail.value
 
-  // 2) si hay email guardado en profiles, lo priorizamos
+  // 2) si hay email guardado en profiles
   if (!auth.user) return
   const { data } = await supabase
     .from('profiles')

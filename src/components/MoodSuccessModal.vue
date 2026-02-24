@@ -81,7 +81,7 @@ const nuriPath = computed(
   background: #ffffff;
   padding: 22px 18px 26px;
   width: 100%;
-  max-width: 90vw;        /* clave para que se adapte en iPhone */
+  max-width: 90vw;       
   border-radius: 20px;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.25);
   animation: moodFadeIn 0.2s ease-out;

@@ -1,88 +1,3 @@
-<template>
-  <section class="register-page">
-    <!-- Logo -->
-    <img
-      src="/logos/OFICIALwhite.png"
-      alt="Nura"
-      class="brand"
-      onerror="this.src='/icons/icon-192.png'"
-    />
-
-    <!-- Formulario -->
-    <form class="form" @submit.prevent="submit">
-      <p class="hint">Ingresá tus datos:</p>
-
-      <input
-        class="field"
-        v-model="name"
-        type="text"
-        placeholder="Nombre"
-        required
-        autocomplete="name"
-      />
-
-      <input
-        class="field"
-        v-model="email"
-        type="email"
-        placeholder="Correo"
-        required
-        autocomplete="email"
-      />
-
-      <input
-        class="field"
-        v-model="password"
-        type="password"
-        placeholder="Contraseña (mínimo 6 caracteres)"
-        required
-        autocomplete="new-password"
-        minlength="6"
-      />
-
-      <p class="hint small">¿Cuál es tu fecha de nacimiento?</p>
-
-      <div class="dob">
-        <input
-          class="chip"
-          v-model.number="day"
-          type="number"
-          placeholder="Día"
-          min="1"
-          max="31"
-          required
-        />
-        <input
-          class="chip"
-          v-model.number="month"
-          type="number"
-          placeholder="Mes"
-          min="1"
-          max="12"
-          required
-        />
-        <input
-          class="chip"
-          v-model.number="year"
-          type="number"
-          placeholder="Año"
-          min="1900"
-          :max="currentYear"
-          required
-        />
-      </div>
-
-      <button class="cta" type="submit" :disabled="loading">
-        {{ loading ? 'Creando…' : 'Crear Cuenta' }}
-      </button>
-    </form>
-  </section>
-
-  <RouterLink to="/login" class="link-btn" role="button">
-    ¿Ya tenés cuenta? Iniciá sesión
-  </RouterLink>
-</template>
-
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
@@ -213,6 +128,93 @@ async function submit() {
   }
 }
 </script>
+
+<template>
+  <section class="register-page">
+    <!-- Logo -->
+    <img
+      src="/logos/OFICIALwhite.png"
+      alt="Nura"
+      class="brand"
+      onerror="this.src='/icons/icon-192.png'"
+    />
+
+    <!-- Formulario -->
+    <form class="form" @submit.prevent="submit">
+      <p class="hint">Ingresá tus datos:</p>
+
+      <input
+        class="field"
+        v-model="name"
+        type="text"
+        placeholder="Nombre"
+        required
+        autocomplete="name"
+      />
+
+      <input
+        class="field"
+        v-model="email"
+        type="email"
+        placeholder="Correo"
+        required
+        autocomplete="email"
+      />
+
+      <input
+        class="field"
+        v-model="password"
+        type="password"
+        placeholder="Contraseña (mínimo 6 caracteres)"
+        required
+        autocomplete="new-password"
+        minlength="6"
+      />
+
+      <p class="hint small">¿Cuál es tu fecha de nacimiento?</p>
+
+      <div class="dob">
+        <input
+          class="chip"
+          v-model.number="day"
+          type="number"
+          placeholder="Día"
+          min="1"
+          max="31"
+          required
+        />
+        <input
+          class="chip"
+          v-model.number="month"
+          type="number"
+          placeholder="Mes"
+          min="1"
+          max="12"
+          required
+        />
+        <input
+          class="chip"
+          v-model.number="year"
+          type="number"
+          placeholder="Año"
+          min="1900"
+          :max="currentYear"
+          required
+        />
+      </div>
+
+      <button class="cta" type="submit" :disabled="loading">
+        {{ loading ? 'Creando…' : 'Crear Cuenta' }}
+      </button>
+    </form>
+  </section>
+
+  <RouterLink to="/login" class="link-btn" role="button">
+    ¿Ya tenés cuenta? Iniciá sesión
+  </RouterLink>
+</template>
+
+
 
 <style scoped>
 /* Fondo del Splash */

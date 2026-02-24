@@ -9,8 +9,6 @@ type Mood = 'triste' | 'normal' | 'bien' | 'muybien'
 const router = useRouter()
 const auth = useAuthStore()
 
-/* ===== PERFIL + PREMIUM EN SUPABASE ===== */
-
 const profile = ref<{
   id: string
   name?: string | null
@@ -21,7 +19,6 @@ const profile = ref<{
 
 const user = ref<any>(null)
 
-/* nombre mostrado */
 const profileName = computed(() => {
   const nameFromProfile = profile.value?.name
   if (nameFromProfile && nameFromProfile.trim()) return nameFromProfile
@@ -34,7 +31,6 @@ const profileName = computed(() => {
 
 const userEmail = computed(() => auth.user?.email ?? '')
 
-/* path del avatar (guardado en user_metadata / profiles) */
 const avatarPath = computed<string | null>(() => {
   const meta = (auth.user?.user_metadata as any) || {}
   const fromProfile = profile.value?.avatar_url as string | null | undefined
@@ -42,7 +38,6 @@ const avatarPath = computed<string | null>(() => {
   return fromProfile || fromMeta || null
 })
 
-/* URL que se muestra en <img>, puede ser signed URL o placeholder */
 const avatarUrl = ref<string>('')
 
 function buildPlaceholder() {
@@ -51,7 +46,6 @@ function buildPlaceholder() {
   return `https://placehold.co/120x120/50bdbd/FFFFFF?text=${first}&font=Montserrat`
 }
 
-/* resolver signed URL si hay path, si no usar placeholder */
 async function resolveAvatarUrl() {
   const path = avatarPath.value
   if (!path) {
@@ -61,10 +55,9 @@ async function resolveAvatarUrl() {
 
   const { data, error } = await supabase.storage
     .from('avatars')
-    .createSignedUrl(path, 60 * 60 * 24 * 7) // 7 días
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
 
   if (error || !data?.signedUrl) {
-    console.error('Error creando signed URL de avatar:', error)
     avatarUrl.value = buildPlaceholder()
     return
   }
@@ -78,23 +71,16 @@ const memberSinceYear = computed(() => {
   return String(new Date(iso).getFullYear())
 })
 
-const isPremiumLS = computed(
-  () => localStorage.getItem('nura_is_premium') === 'true',
-)
+const isPremiumLS = computed(() => localStorage.getItem('nura_is_premium') === 'true')
 
-/* carga perfil desde tabla profiles */
 async function loadProfile() {
   if (!auth.user) return
 
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', auth.user.id)
     .maybeSingle()
-
-  if (error) {
-    console.error('Error cargando perfil:', error)
-  }
 
   if (!data) {
     const fallback = {
@@ -122,8 +108,6 @@ async function loadProfile() {
   user.value = profile.value
 }
 
-/* ========================= MEDICACIONES ========================= */
-
 const meds = ref<any[]>([])
 const loadingMeds = ref(true)
 
@@ -138,18 +122,13 @@ async function loadMeds() {
     .select('id, name, dose')
     .eq('user_id', auth.user.id)
 
-  if (!error && data) {
-    meds.value = data
-  }
-
+  if (!error && data) meds.value = data
   loadingMeds.value = false
 }
 
 function goMeds() {
   router.push('/app/medicaciones')
 }
-
-/* =================== ESTADOS DE ÁNIMO + DIARIO =================== */
 
 const moodsHistory = ref<{ date: string; mood: Mood }[]>([])
 const diaryPreview = ref<{ date: string; mood: Mood; snippet: string }[]>([])
@@ -158,10 +137,7 @@ function loadLocalData() {
   if (!auth.user) return
 
   const moodsKey = `nura_moods_${auth.user.id}`
-  const storedMoods = JSON.parse(localStorage.getItem(moodsKey) || '{}') as Record<
-    string,
-    Mood
-  >
+  const storedMoods = JSON.parse(localStorage.getItem(moodsKey) || '{}') as Record<string, Mood>
 
   const today = new Date()
   const sevenDaysAgoDate = new Date()
@@ -179,15 +155,10 @@ function loadLocalData() {
 
 const recentMoods = computed(() => {
   if (!auth.user) return []
-
   const key = `nura_moods_${auth.user.id}`
   const stored = JSON.parse(localStorage.getItem(key) || '{}')
   const entries = Object.entries(stored) as [string, Mood][]
-
-  const sorted = entries.sort(
-    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime(),
-  )
-
+  const sorted = entries.sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
   return sorted.slice(0, 3)
 })
 
@@ -195,10 +166,7 @@ function setMood(mood: Mood) {
   const today = new Date().toISOString().slice(0, 10)
   if (auth.user) {
     const key = `nura_moods_${auth.user.id}`
-    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<
-      string,
-      Mood
-    >
+    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, Mood>
     stored[today] = mood
     localStorage.setItem(key, JSON.stringify(stored))
   }
@@ -213,11 +181,6 @@ function goDiaryList() {
   router.push('/app/diario/entradas')
 }
 
-function escribirDiario() {
-  router.push('/app/diario')
-}
-
-/* ============================ LOGOUT ============================ */
 
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
@@ -237,21 +200,7 @@ async function confirmLogout() {
   router.replace('/login')
 }
 
-/* ============================ HELPERS ============================ */
 const isPremium = computed(() => user.value?.premium === true || isPremiumLS.value)
-const moodLabel = (m: Mood) => {
-  const mapKey: Record<Mood, string> = {
-    triste: 'sad',
-    normal: 'ok',
-    bien: 'good',
-    muybien: 'great'
-  }
-  return (window as any).$t
-    ? (window as any).$t(`home.moods.${mapKey[m]}`)
-    : m
-}
-
-/* ============================ MOUNT ============================= */
 
 onMounted(() => {
   loadProfile()
@@ -274,9 +223,7 @@ watch(avatarPath, () => {
     </header>
 
     <div class="grid">
-      <!-- IZQUIERDA -->
       <section class="col">
-        <!-- PERFIL -->
         <div class="card profile-head">
           <div class="avatar-container">
             <img :src="avatarUrl" class="avatar-img" :alt="$t('profile.avatarAlt')" />
@@ -289,13 +236,12 @@ watch(avatarPath, () => {
               {{ $t('profile.memberSince', { year: memberSinceYear }) }}
             </p>
 
-            <button class="btn-edit" type="button" @click="router.push('/app/perfil/editar')">
+            <button class="btn btn-full" type="button" @click="router.push('/app/perfil/editar')">
               {{ $t('profile.edit') }}
             </button>
           </div>
         </div>
 
-        <!-- PLAN -->
         <div class="card premium-box">
           <template v-if="user">
             <div class="premium-head-row">
@@ -303,14 +249,8 @@ watch(avatarPath, () => {
                 {{ isPremium ? $t('profile.plan.premiumTitle') : $t('profile.plan.freeTitle') }}
               </h3>
 
-              <span
-                class="premium-pill"
-                :class="{ 'premium-pill--free': !isPremium }"
-              >
-                <span
-                  class="premium-dot"
-                  :class="{ 'premium-dot--free': !isPremium }"
-                ></span>
+              <span class="premium-pill" :class="{ 'premium-pill--free': !isPremium }">
+                <span class="premium-dot" :class="{ 'premium-dot--free': !isPremium }"></span>
                 {{ isPremium ? $t('profile.plan.active') : $t('profile.plan.current') }}
               </span>
             </div>
@@ -338,7 +278,7 @@ watch(avatarPath, () => {
               {{ $t('profile.plan.premiumDesc') }}
             </p>
 
-            <RouterLink :to="{ name: 'premium' }" class="foro-btn premium-link">
+            <RouterLink :to="{ name: 'premium' }" class="btn btn-full">
               {{ isPremium ? $t('profile.plan.seeDetails') : $t('profile.plan.seePlans') }}
             </RouterLink>
           </template>
@@ -348,7 +288,6 @@ watch(avatarPath, () => {
           </template>
         </div>
 
-        <!-- ÚLTIMOS ESTADOS DE ÁNIMO -->
         <div class="card">
           <h3 class="card-title">{{ $t('profile.lastMoodsTitle') }}</h3>
 
@@ -359,14 +298,11 @@ watch(avatarPath, () => {
           <ul v-else class="mood-history">
             <li v-for="(item, i) in recentMoods" :key="i">
               <span class="date">{{ item[0] }}</span>
-              <span class="tag tag--mood">
-                {{ $t(`profile.moods.${item[1]}`) }}
-              </span>
+              <span class="tag tag--mood">{{ $t(`profile.moods.${item[1]}`) }}</span>
             </li>
           </ul>
         </div>
 
-        <!-- MEDICACIONES -->
         <div class="card meds-preview">
           <h3 class="card-title">{{ $t('profile.meds.title') }}</h3>
 
@@ -382,12 +318,11 @@ watch(avatarPath, () => {
             </li>
           </ul>
 
-          <button class="btn" type="button" @click="goMeds">
+          <button class="btn btn-full" type="button" @click="goMeds">
             {{ $t('profile.meds.myMeds') }}
           </button>
         </div>
 
-        <!-- DIARIO -->
         <div class="card">
           <h3>{{ $t('profile.diary.title') }}</h3>
 
@@ -402,31 +337,24 @@ watch(avatarPath, () => {
           <p v-else class="muted small">{{ $t('profile.diary.emptyPreview') }}</p>
 
           <div class="row between">
-            <button class="btn-ghost" type="button" @click="goDiaryList">
+            <button class="btn btn-full btn-ghost" type="button" @click="goDiaryList">
               {{ $t('profile.diary.viewAll') }}
-            </button>
-            <button class="btn" type="button" @click="escribirDiario">
-              {{ $t('profile.diary.writeToday') }}
             </button>
           </div>
         </div>
       </section>
 
-      <!-- DERECHA -->
       <section class="col">
-        <!-- TÍTULO AJUSTES -->
         <div class="card aside-card">
           <h3 class="aside-title">{{ $t('profile.settings.title') }}</h3>
-          <p class="aside-subtitle">
-            {{ $t('profile.settings.subtitle') }}
-          </p>
+          <p class="aside-subtitle">{{ $t('profile.settings.subtitle') }}</p>
         </div>
 
         <div class="card">
           <h3>{{ $t('profile.settings.notificationsTitle') }}</h3>
           <p class="muted">{{ $t('profile.settings.notificationsDesc') }}</p>
           <div class="row end">
-            <button class="btn" type="button" @click="router.push('/app/notificaciones')">
+            <button class="btn btn-full" type="button" @click="router.push('/app/notificaciones')">
               {{ $t('profile.actions.edit') }}
             </button>
           </div>
@@ -436,7 +364,7 @@ watch(avatarPath, () => {
           <h3>{{ $t('profile.settings.privacyTitle') }}</h3>
           <p class="muted">{{ $t('profile.settings.privacyDesc') }}</p>
           <div class="row end">
-            <button class="btn" type="button" @click="router.push('/app/privacidad')">
+            <button class="btn btn-full" type="button" @click="router.push('/app/privacidad')">
               {{ $t('profile.actions.read') }}
             </button>
           </div>
@@ -446,7 +374,7 @@ watch(avatarPath, () => {
           <h3>{{ $t('profile.settings.languageTitle') }}</h3>
           <p class="muted">{{ $t('profile.settings.languageDesc') }}</p>
           <div class="row end">
-            <button class="btn" type="button" @click="router.push('/app/idioma')">
+            <button class="btn btn-full" type="button" @click="router.push('/app/idioma')">
               {{ $t('profile.actions.edit') }}
             </button>
           </div>
@@ -456,7 +384,7 @@ watch(avatarPath, () => {
           <h3>{{ $t('profile.settings.helpChatTitle') }}</h3>
           <p class="muted">{{ $t('profile.settings.helpChatDesc') }}</p>
           <div class="row end">
-            <button class="btn" type="button" @click="router.push('/app/chatbot')">
+            <button class="btn btn-full" type="button" @click="router.push('/app/chatbot')">
               {{ $t('profile.actions.openChat') }}
             </button>
           </div>
@@ -465,7 +393,7 @@ watch(avatarPath, () => {
         <div class="card">
           <h3>{{ $t('profile.accountTitle') }}</h3>
           <div class="row end">
-            <button class="btn btn-danger" type="button" @click="openLogoutModal">
+            <button class="btn btn-full btn-danger" type="button" @click="openLogoutModal">
               {{ $t('profile.logout') }}
             </button>
           </div>
@@ -473,21 +401,16 @@ watch(avatarPath, () => {
       </section>
     </div>
 
-    <!-- MODAL LOGOUT -->
-    <div
-      v-if="showLogoutModal"
-      class="modal-backdrop"
-      @click.self="closeLogoutModal"
-    >
+    <div v-if="showLogoutModal" class="modal-backdrop" @click.self="closeLogoutModal">
       <div class="modal-card">
         <h3>{{ $t('profile.logoutModal.title') }}</h3>
         <p>{{ $t('profile.logoutModal.text') }}</p>
 
         <div class="modal-actions">
-          <button class="btn-secondary" type="button" @click="closeLogoutModal">
+          <button class="btn btn-full btn-secondary" type="button" @click="closeLogoutModal">
             {{ $t('profile.logoutModal.cancel') }}
           </button>
-          <button class="btn btn-danger" type="button" @click="confirmLogout">
+          <button class="btn btn-full btn-danger" type="button" @click="confirmLogout">
             {{ loggingOut ? $t('profile.logoutModal.loggingOut') : $t('profile.logoutModal.confirm') }}
           </button>
         </div>
@@ -497,10 +420,9 @@ watch(avatarPath, () => {
 </template>
 
 <style scoped>
-/* DEJO TU CSS TAL CUAL (no lo toqué) */
 .contenido {
   background: #fff;
-  padding: 24px 18px 48px;
+  padding: 20px 14px 44px;
   max-width: 1100px;
   margin: 0 auto;
 }
@@ -510,29 +432,30 @@ watch(avatarPath, () => {
   gap: 15px;
   margin-bottom: 12px;
 }
+
 h2 {
   margin: 0;
   padding: 10px;
 }
 
-/* grid */
 .grid {
   display: grid;
   gap: 22px;
   max-width: 1100px;
   margin: 0 auto;
 }
+
 @media (min-width: 980px) {
   .grid {
     grid-template-columns: 1.15fr 0.85fr;
   }
 }
+
 .col {
   display: grid;
   gap: 18px;
 }
 
-/* card genérica */
 .card {
   background: #ffffff;
   border-radius: 18px;
@@ -545,38 +468,78 @@ h2 {
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-/* perfil */
 .profile-head {
   display: flex;
   align-items: center;
   gap: 14px;
 }
+
+@media (max-width: 520px) {
+  .profile-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .avatar-container {
   width: 70px;
   height: 70px;
   border-radius: 999px;
   overflow: hidden;
   background: #d8f0ec;
+  flex: 0 0 auto;
 }
+
 .avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
+.who {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
 .name {
   font-size: 1.25rem;
   margin: 0;
 }
+
 .email {
   font-size: 0.95rem;
   color: #4b5563;
+  margin: 0;
 }
+
 .since {
   font-size: 0.85rem;
   color: #6b7280;
+  margin: 0;
 }
 
-/* botones */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.row.end {
+  justify-content: flex-end;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+@media (max-width: 520px) {
+  .row.between {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -586,96 +549,51 @@ h2 {
   color: #ffffff;
   border: none;
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 10px 16px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  width: 50%;
   text-decoration: none;
   box-shadow: 0 3px 10px rgba(80, 189, 189, 0.25);
   transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  min-height: 18px;
+  width: 45%;
 }
+
 .btn:hover {
   background: #3ea9a9;
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-.btn-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: #50bdbd;
-  color: #ffffff;
-  border: none;
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-  text-decoration: none;
-  box-shadow: 0 3px 10px rgba(80, 189, 189, 0.25);
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-}
-.btn-edit:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+.btn-full {
+  width: 45%;
 }
 
 .btn-danger {
   background: #ef5350;
   box-shadow: 0 3px 10px rgba(239, 83, 80, 0.3);
-  font-size: 0.95rem;
-  font-weight: 600;
 }
+
 .btn-danger:hover {
   background: #e53935;
 }
 
 .btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   background: #e3ecf6;
   color: #1f2937;
-  border: none;
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  width: 50%;
+  box-shadow: none;
+}
+
+.btn-secondary:hover {
+  background: #d7e6f6;
+  transform: none;
 }
 
 .btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   background: #50bdbd;
-  color: #ffffff;
-  border: none;
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  width: 50%;
-  text-decoration: none;
-  box-shadow: 0 3px 10px rgba(80, 189, 189, 0.25);
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-}
-.btn-ghost:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
-/* premium */
 .premium-box {
   background: #ffffff;
   border-radius: 18px;
@@ -683,36 +601,24 @@ h2 {
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
 }
 
-.plan-limits {
-  margin: 10px 0 14px;
-  padding-left: 18px;
-  color: #334155;
-  font-size: 0.92rem;
-}
-.plan-limits li {
-  margin-bottom: 6px;
-}
-
-.premium-pill--free {
-  border-color: #cbd5e1;
-  background: #f1f5f9;
-  color: #475569;
-}
-.premium-dot--free {
-  background: #94a3b8;
-  box-shadow: none;
-}
-
 .premium-box:hover {
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
+
 .premium-head-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+@media (max-width: 520px) {
+  .premium-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .premium-pill {
@@ -729,6 +635,12 @@ h2 {
   white-space: nowrap;
 }
 
+.premium-pill--free {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .premium-dot {
   width: 8px;
   height: 8px;
@@ -737,36 +649,28 @@ h2 {
   box-shadow: 0 0 0 2px #bbf7d0;
 }
 
-.foro-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: #50bdbd;
-  color: #ffffff;
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: none;
-  width: 50%;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-decoration: none;
-  box-shadow: 0 4px 12px rgba(80, 189, 189, 0.3);
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-}
-.foro-btn:hover {
-  background: #3ea9a9;
+.premium-dot--free {
+  background: #94a3b8;
+  box-shadow: none;
 }
 
-/* meds */
+.plan-limits {
+  margin: 10px 0 14px;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.plan-limits li {
+  margin-bottom: 6px;
+}
+
 .meds-preview {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* mood history */
 .mood-history {
   display: grid;
   gap: 8px;
@@ -774,15 +678,18 @@ h2 {
   padding: 0;
   list-style: none;
 }
+
 .mood-history li {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .mood-history .date {
   font-weight: 450;
   color: #222;
 }
+
 .tag--mood {
   background: #50bdbd;
   color: white;
@@ -792,7 +699,6 @@ h2 {
   text-transform: capitalize;
 }
 
-/* card título ajustes */
 .aside-card {
   background: #ffffff;
   border-radius: 18px;
@@ -800,6 +706,7 @@ h2 {
   padding: 16px 18px 18px;
   border: 0.3px solid #50bdbd;
 }
+
 .aside-card:hover {
   transform: none;
   box-shadow: none;
@@ -818,7 +725,6 @@ h2 {
   color: #4b5563;
 }
 
-/* modal logout */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -829,6 +735,7 @@ h2 {
   padding: 16px;
   z-index: 40;
 }
+
 .modal-card {
   background: #fff;
   border-radius: 16px;
@@ -837,10 +744,30 @@ h2 {
   max-width: 380px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
 }
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 14px;
+}
+
+@media (max-width: 520px) {
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

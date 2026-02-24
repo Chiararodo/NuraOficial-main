@@ -1110,7 +1110,6 @@ function mmss(total: number) {
 </script>
 
 <style scoped>
-/* TU CSS EXACTO, NO LO TOQUÉ */
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;

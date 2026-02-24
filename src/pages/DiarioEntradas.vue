@@ -491,7 +491,7 @@ function goWriteNew() {
 }
 
 .card.empty {
-  background: #eee6f8;
+  background: #50bdbd36;
   border-radius: 18px;
   padding: 16px 20px;
   border: 1px solid #cfeeee;

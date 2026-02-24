@@ -1,95 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '@/composables/useSupabase'
-import { useAuthStore } from '@/store/auth'
+import { useNotificationSettings } from '@/composables/useNotificationSettings'
 
 const router = useRouter()
-const auth = useAuthStore()
-
 const title = 'Notificaciones'
 
-// estado simple guardado en localStorage (front)
-// y, si hay user, también en Supabase
-const bienestar = ref(true)
-const profesional = ref(true)
-const appUpdates = ref(true)
+const gate = useNotificationSettings()
 
-function loadFromLocalStorage() {
-  try {
-    const saved = JSON.parse(
-      localStorage.getItem('nura_notifications') ?? '{}'
-    )
-    if (typeof saved.bienestar === 'boolean') bienestar.value = saved.bienestar
-    if (typeof saved.profesional === 'boolean')
-      profesional.value = saved.profesional
-    if (typeof saved.appUpdates === 'boolean')
-      appUpdates.value = saved.appUpdates
-  } catch {
-    // ignorar errores de parseo
-  }
-}
+const bienestar = computed({
+  get: () => gate.settings.value.bienestar,
+  set: (v: boolean) => (gate.settings.value.bienestar = v)
+})
 
-async function loadFromSupabase() {
-  if (!auth.user) return
+const profesional = computed({
+  get: () => gate.settings.value.profesional,
+  set: (v: boolean) => (gate.settings.value.profesional = v)
+})
 
-  const { data, error } = await supabase
-    .from('notification_settings')
-    .select('*')
-    .eq('user_id', auth.user.id)
-    .single()
-
-  if (error && error.code !== 'PGRST116') {
-    console.warn('No se pudieron cargar ajustes desde Supabase', error)
-    return
-  }
-
-  if (data) {
-    if (typeof data.bienestar === 'boolean') bienestar.value = data.bienestar
-    if (typeof data.profesional === 'boolean') profesional.value = data.profesional
-    if (typeof data.app_updates === 'boolean') appUpdates.value = data.app_updates
-  }
-}
-
-function saveToLocalStorage() {
-  const payload = {
-    bienestar: bienestar.value,
-    profesional: profesional.value,
-    appUpdates: appUpdates.value,
-  }
-  localStorage.setItem('nura_notifications', JSON.stringify(payload))
-}
-
-async function saveToSupabase() {
-  if (!auth.user) return
-
-  const payload = {
-    user_id: auth.user.id,
-    bienestar: bienestar.value,
-    profesional: profesional.value,
-    app_updates: appUpdates.value,
-  }
-
-  const { error } = await supabase
-    .from('notification_settings')
-    .upsert(payload, { onConflict: 'user_id' })
-
-  if (error) {
-    console.warn('No se pudieron guardar ajustes en Supabase', error)
-  }
-}
+const appUpdates = computed({
+  get: () => gate.settings.value.app_updates,
+  set: (v: boolean) => (gate.settings.value.app_updates = v)
+})
 
 onMounted(async () => {
-  // primero local, después intentamos sobreescribir con Supabase
-  loadFromLocalStorage()
-  await loadFromSupabase()
+  gate.loadFromLocal()
+  await gate.loadFromSupabase()
 })
 
-watch([bienestar, profesional, appUpdates], () => {
-  saveToLocalStorage()
-  // no esperamos el async, lo disparamos "fire and forget"
-  void saveToSupabase()
-})
+watch(
+  () => [gate.settings.value.bienestar, gate.settings.value.profesional, gate.settings.value.app_updates],
+  async () => {
+    await gate.upsertToSupabase()
+  }
+)
 
 function goBack() {
   router.back()

@@ -6,7 +6,7 @@
 
 <style scoped>
 .site-footer {
-  display: none; /* oculto en mobile */
+  display: none; 
   padding: 18px 16px;
   color: #ffffff;
   text-align: center;

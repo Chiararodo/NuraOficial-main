@@ -83,7 +83,7 @@ const messages = {
       }
     },
 
-    /* ✅ AGENDAR (NUEVO) */
+    /* AGENDAR (NUEVO) */
     agendar: {
       a11y: {
         pageTitle: 'Agendar'
@@ -383,7 +383,7 @@ const messages = {
       }
     },
 
-    /* ✅ AGENDAR (NUEVO) */
+    /* AGENDAR (NUEVO) */
     agendar: {
       a11y: {
         pageTitle: 'Schedule'

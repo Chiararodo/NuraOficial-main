@@ -52,40 +52,55 @@ function handleClick(id: OpcionId) {
 </script>
 
 <template>
-  <h1 class="visually-hidden">{{ t('agendar.a11y.pageTitle') }}</h1>
+ <main class="contenido">
+    <header class="page-head">
+      <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
 
-  <main class="page">
-    <section class="wrap">
-      <header class="head">
-        <p class="kicker">{{ t('agendar.header.kicker') }}</p>
-        <h2 class="title">{{ t('agendar.header.title') }}</h2>
-        <p class="sub">{{ t('agendar.header.subtitle') }}</p>
-      </header>
+      <h2>{{ $t('content.pageTitle') }}</h2>
 
-      <section class="grid">
-        <article v-for="item in opciones" :key="item.id" class="card">
-          <div class="card-row">
-            <div class="card-img">
-              <img :src="item.img" :alt="item.titulo" loading="lazy" />
-            </div>
+       </header>
 
-            <div class="card-body">
-              <h3 class="card-title">{{ item.titulo }}</h3>
-              <p class="card-desc">{{ item.descripcion }}</p>
+     <section class="lista">
+  <article v-for="item in opciones" :key="item.id" class="card">
+    <div class="card-img">
+      <img :src="item.img" :alt="item.titulo" loading="lazy" />
+    </div>
 
-              <button class="btn btn-primary" type="button" @click="handleClick(item.id)">
-                {{ item.boton }}
-              </button>
-            </div>
-          </div>
-        </article>
-      </section>
-    </section>
-  </main>
+    <div class="card-body">
+      <h3 class="title">{{ item.titulo }}</h3>
+      <p class="desc">{{ item.descripcion }}</p>
+
+      <div class="actions">
+        <button class="action-btn action-btn--primary" type="button" @click="handleClick(item.id)">
+          {{ item.boton }}
+        </button>
+      </div>
+    </div>
+  </article>
+</section>
+ </main>
+ 
 </template>
 
 <style scoped>
-/* Accesibilidad */
+.contenido {
+  background: #fff;
+  padding: 24px 18px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Head + Tabs */
+.page-head {
+  display: grid;
+  gap: 15px;
+  margin-bottom: 12px;
+}
+h2 {
+  margin: 0;
+  padding: 10px;
+}
 .visually-hidden {
   position: absolute !important;
   height: 1px;
@@ -151,13 +166,34 @@ function handleClick(id: OpcionId) {
   }
 }
 
-/* Cards */
+/* Grid  */
+.lista {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  max-width: 1050px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .lista {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card  */
 .card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 16px 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  width: 92%;
+  margin: 0 auto;
+  min-height: 200px;
+  padding: 18px 18px;
+  border-radius: 20px;
   border: 1px solid #e2edf7;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
   transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
@@ -167,87 +203,101 @@ function handleClick(id: OpcionId) {
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
 }
 
-.card-row {
-  display: flex;
-  align-items: stretch;
-  gap: 14px;
-}
-
-/* Imagen */
 .card-img {
-  flex: 0 0 110px;
+  flex: 0 0 130px;
 }
 
 .card-img img {
-  width: 110px;
-  height: 120px;
+  width: 130px;
+  height: 130px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: 18px;
   display: block;
 }
 
-/* Texto */
 .card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+  justify-content: flex-start;
+  gap: 10px;
 }
 
-.card-title {
-  margin: 0;
-  font-size: 1.08rem;
-  font-weight: 850;
-  color: #0f172a;
-}
-
-.card-desc {
-  margin: 0;
-  font-size: 0.95rem;
-  color: #475569;
-  line-height: 1.4rem;
-}
-
-/* Button */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: none;
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  font-weight: 850;
-  cursor: pointer;
-  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
-  width: fit-content;
-  margin-top: 6px;
-}
-
-.btn-primary {
-  background: #50bdbd;
-  color: #ffffff;
-  box-shadow: 0 10px 24px rgba(80, 189, 189, 0.28);
-}
-
-.btn-primary:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(80, 189, 189, 0.35);
-}
-
-@media (max-width: 520px) {
-  .card-row {
+@media (max-width: 700px) {
+  .card {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-img {
+    flex: none;
+    width: 100%;
   }
 
   .card-img img {
     width: 100%;
-    height: 160px;
+    height: auto;
   }
+}
 
-  .btn {
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.desc {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+/* Botón */
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.86rem;
+  border: none;
+  background: var(--nura-green);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.28);
+  width: 40%;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.24);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.action-btn--primary {
+  background: #50bdbd;
+}
+
+@media (max-width: 520px) {
+  .action-btn {
     width: 100%;
   }
 }

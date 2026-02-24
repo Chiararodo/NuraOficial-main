@@ -126,10 +126,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/PremiumPage.vue')
       },
 
-
-
-
-      //  Acá va TÉRMINOS como ruta hija (sin /app delante)
       {
         path: 'terminos',
         name: 'terminos',

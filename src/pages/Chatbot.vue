@@ -47,7 +47,7 @@ const canUseToday = computed(() => {
   return gate.canUse.value
 })
 
-/* CTA como Foro/Diario */
+/* CTA */
 const showPremiumCta = computed(() => {
   if (gate.loading.value) return false
   if (isPremium.value) return false
@@ -103,7 +103,7 @@ function mapRowToMsg(row: DbChatMsg): ChatMessage {
   }
 }
 
-/* ====== “IA local” (tu lógica actual) ====== */
+/* ====== “IA local”  ====== */
 function generateLocalReply(rawText: string): string {
   const text = rawText.toLowerCase()
 
@@ -187,7 +187,7 @@ async function saveText(role: Sender, content: string) {
       role,
       message_type: 'text',
       content,
-      audio_url: null, // por compatibilidad si la columna existe
+      audio_url: null, 
     } as any)
     .select('id,user_id,role,message_type,content,created_at')
     .single()
@@ -248,7 +248,7 @@ async function sendMessage() {
     return
   }
 
-  // ✅ consume SOLO al enviar un mensaje del usuario (no en respuestas)
+  // consume SOLO al enviar un mensaje del usuario (no en respuestas)
   if (!isPremium.value) gate.consume(1)
 
   // UI optimista
@@ -328,7 +328,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   }
 }
 
-/* ===== Realtime opcional (si lo querés) ===== */
+/* ===== Realtime   ===== */
 let tick: number | null = null
 let realtimeChannel: any = null
 
@@ -397,13 +397,6 @@ watch(
   }
 )
 
-/* Banner “compacto” */
-const showBanner = computed(() => !gate.loading.value && !isPremium.value)
-const bannerText = computed(() => {
-  if (gate.loading.value) return ''
-  if (isPremium.value) return 'Plan Premium: mensajes ilimitados.'
-  return `Te quedan ${remainingToday.value} mensajes hoy`
-})
 </script>
 
 <template>
@@ -414,7 +407,7 @@ const bannerText = computed(() => {
         Disponible 24/7 para acompañarte. Recordá que NuraBot no reemplaza la ayuda de un profesional de la salud.
       </p>
 
-      <!-- CTA estilo Foro/Diario -->
+      <!-- CTA  -->
       <div v-if="showPremiumCta" class="premium-cta">
         <div class="premium-cta__left">
           <div class="premium-cta__top">
@@ -430,15 +423,12 @@ const bannerText = computed(() => {
         </button>
       </div>
 
-      <div class="toolbar">
-        <div class="usage-wrapper">
-          <UsageBanner :show="showBanner" :text="bannerText" variant="info" />
-        </div>
+    
 
         <button type="button" class="ghost-btn" @click="showClearModal = true" :disabled="clearing">
           Borrar historial
         </button>
-      </div>
+     
     </header>
 
     <div ref="chatContainer" class="chat-box">
@@ -556,7 +546,7 @@ const bannerText = computed(() => {
 }
 
 /* ============================
-   PREMIUM CTA (igual Foro/Diario)
+   PREMIUM CTA 
 ============================ */
 .premium-cta {
   margin: 0;
@@ -665,7 +655,7 @@ const bannerText = computed(() => {
   cursor: not-allowed;
 }
 
-/* ===== banner compacto (como te armé antes) ===== */
+/* ===== banner compacto  ===== */
 .usage-wrapper {
   display: flex;
   justify-content: flex-start;

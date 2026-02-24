@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
 import { useNotificationsStore } from '@/store/notifications'
+import { useNotificationSettings } from '@/composables/useNotificationSettings'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 type NotificationRow = {
   id: string
@@ -19,13 +21,11 @@ type NotificationRow = {
 const router = useRouter()
 const auth = useAuthStore()
 const notifStore = useNotificationsStore()
+const prefs = useNotificationSettings()
 
 const items = ref<NotificationRow[]>([])
 const loading = ref(true)
-const channel = ref<ReturnType<typeof supabase.channel> | null>(null)
-
-const unread = computed(() => items.value.filter((n) => !n.is_read))
-const read = computed(() => items.value.filter((n) => n.is_read))
+const channel = ref<RealtimeChannel | null>(null)
 
 function formatDate(iso: string) {
   const d = new Date(iso)
@@ -37,26 +37,64 @@ function formatDate(iso: string) {
   })
 }
 
-/* AVATAR ÚNICO PARA TODAS LAS NOTIFICACIONES */
-function avatarFor() {
-  return '/public/icons/nuri-bien.png'
+const NURI_ICON = '/icons/nuri-bien.png'
+const NURA_LOGO = '/logos/isotipo.png'
+
+function isWellbeing(n: NotificationRow) {
+  const t = String(n.type || '').toLowerCase()
+  const title = String(n.title || '').toLowerCase()
+  if (t === 'daily') return true
+  if (t.includes('bienestar')) return true
+  if (t.includes('wellbeing')) return true
+  if (t.includes('reminder')) return true
+  if (
+    title.includes('micro logros') ||
+    title.includes('chequeo de sueño') ||
+    title.includes('respirá') ||
+    title.includes('respira')
+  ) return true
+  return false
 }
 
-/* ===========================
- *  DIARIAS AUTO-GENERADAS
- * =========================== */
+function categoryFor(n: NotificationRow): 'bienestar' | 'profesional' | 'app_updates' {
+  const t = String(n.type || '').toLowerCase()
+
+  if (isWellbeing(n) || t === 'daily') return 'bienestar'
+
+  if (
+    t.includes('appointment') ||
+    t.includes('turno') ||
+    t.includes('professional') ||
+    t.includes('profesional')
+  ) {
+    return 'profesional'
+  }
+
+  return 'app_updates'
+}
+
+function shouldShow(n: NotificationRow) {
+  const cat = categoryFor(n)
+  return prefs.categoryEnabled(cat)
+}
+
+function avatarFor(n: NotificationRow) {
+  return isWellbeing(n) ? NURI_ICON : NURA_LOGO
+}
+
+const visibleItems = computed(() => items.value.filter(shouldShow))
+const unread = computed(() => visibleItems.value.filter((n) => !n.is_read))
+const read = computed(() => visibleItems.value.filter((n) => n.is_read))
+
 async function ensureDailyNotificationsForToday() {
   if (!auth.user) return
+  if (!prefs.categoryEnabled('bienestar')) return
 
-  // usamos la fecha (YYYY-MM-DD) como “marca” de que hoy ya se generaron
   const today = new Date().toISOString().slice(0, 10)
   const localKey = `nura_daily_notifs_last_${auth.user.id}`
   const lastGenerated = localStorage.getItem(localKey)
-
-  // si ya generamos para este usuario hoy, no hacemos nada (aunque refresque)
   if (lastGenerated === today) return
 
-  // extra: chequeo en Supabase por si está en otro dispositivo o borró cache
   const start = new Date(`${today}T00:00:00.000Z`)
   const end = new Date(start.getTime())
   end.setUTCDate(end.getUTCDate() + 1)
@@ -72,48 +110,22 @@ async function ensureDailyNotificationsForToday() {
   if (!error) {
     const already = data?.length ?? 0
     if (already >= 3) {
-      // ya existen las 3 de hoy en la base → marcamos en localStorage y salimos
       localStorage.setItem(localKey, today)
       return
     }
   }
 
   const templates = [
-    {
-      title: 'Micro logros',
-      body: 'Elegí una sola cosa chiquita para hacer hoy.',
-      type: 'daily'
-    },
-    {
-      title: 'Chequeo de sueño',
-      body: 'Dormir bien cambia el ánimo. Intentá descansar mejor hoy.',
-      type: 'daily'
-    },
-    {
-      title: 'Respirá profundo',
-      body: 'Tomate 1 minuto para inhalar y exhalar profundo.',
-      type: 'daily'
-    }
+    { title: 'Micro logros', body: 'Elegí una sola cosa chiquita para hacer hoy.', type: 'daily' },
+    { title: 'Chequeo de sueño', body: 'Dormir bien cambia el ánimo. Intentá descansar mejor hoy.', type: 'daily' },
+    { title: 'Respirá profundo', body: 'Tomate 1 minuto para inhalar y exhalar profundo.', type: 'daily' }
   ]
 
-  const toInsert = templates.map((t) => ({
-    ...t,
-    user_id: auth.user!.id
-  }))
-
-  const { error: insertError } = await supabase
-    .from('notifications')
-    .insert(toInsert)
-
-  if (!insertError) {
-    // solo si se insertaron bien, marcamos que hoy ya se mandaron
-    localStorage.setItem(localKey, today)
-  }
+  const toInsert = templates.map((t) => ({ ...t, user_id: auth.user!.id }))
+  const { error: insertError } = await supabase.from('notifications').insert(toInsert)
+  if (!insertError) localStorage.setItem(localKey, today)
 }
 
-/* ===========================
- *   LOAD + REALTIME
- * =========================== */
 async function load() {
   if (!auth.user) {
     loading.value = false
@@ -131,10 +143,11 @@ async function load() {
 }
 
 function setupRealtime() {
-  if (!auth.user || channel.value) return
+  if (!auth.user) return
+  if (channel.value) return
 
-  const ch = supabase
-    .channel('notifications-feed-' + auth.user.id)
+  channel.value = supabase
+    .channel(`notifications-feed-${auth.user.id}`)
     .on(
       'postgres_changes',
       {
@@ -143,21 +156,16 @@ function setupRealtime() {
         table: 'notifications',
         filter: `user_id=eq.${auth.user.id}`
       },
-      (payload) => {
-        const newRow = payload.new
-        const oldRow = payload.old
+      (payload: any) => {
+        const newRow = payload.new as NotificationRow | null
+        const oldRow = payload.old as NotificationRow | null
 
         if (payload.eventType === 'INSERT' && newRow) {
-          if (!items.value.some((n) => n.id === newRow.id))
-            items.value.unshift(newRow)
+          if (!items.value.some((n) => n.id === newRow.id)) items.value.unshift(newRow)
         }
-
         if (payload.eventType === 'UPDATE' && newRow) {
-          items.value = items.value.map((n) =>
-            n.id === newRow.id ? newRow : n
-          )
+          items.value = items.value.map((n) => (n.id === newRow.id ? newRow : n))
         }
-
         if (payload.eventType === 'DELETE' && oldRow) {
           items.value = items.value.filter((n) => n.id !== oldRow.id)
         }
@@ -166,53 +174,23 @@ function setupRealtime() {
       }
     )
     .subscribe()
-
-  channel.value = ch
 }
 
 async function handleMarkAsRead(id: string) {
   await notifStore.markAsRead(id)
-
   items.value = items.value.map((n) =>
     n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
   )
 }
 
-async function handleMarkAllAsRead() {
-  if (!auth.user || !unread.value.length) return
-
-  const nowIso = new Date().toISOString()
-
-  await supabase
-    .from('notifications')
-    .update({ is_read: true, read_at: nowIso })
-    .eq('user_id', auth.user.id)
-    .eq('is_read', false)
-
-  items.value = items.value.map((n) =>
-    n.is_read ? n : { ...n, is_read: true, read_at: nowIso }
-  )
-
-  notifStore.refreshTodayCount()
-}
-
 async function handleDeleteOne(id: string) {
-  await supabase
-    .from('notifications')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', auth.user?.id ?? '---')
-
+  await supabase.from('notifications').delete().eq('id', id).eq('user_id', auth.user?.id ?? '---')
   items.value = items.value.filter((n) => n.id !== id)
   notifStore.refreshTodayCount()
 }
 
 async function handleDeleteAll() {
-  await supabase
-    .from('notifications')
-    .delete()
-    .eq('user_id', auth.user?.id ?? '---')
-
+  await supabase.from('notifications').delete().eq('user_id', auth.user?.id ?? '---')
   items.value = []
   notifStore.refreshTodayCount()
 }
@@ -222,42 +200,38 @@ function goBack() {
 }
 
 onMounted(async () => {
+  prefs.loadFromLocal()
+  await prefs.loadFromSupabase()
+
   await ensureDailyNotificationsForToday()
   await load()
   setupRealtime()
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   if (channel.value) {
-    supabase.removeChannel(channel.value)
+    await channel.value.unsubscribe()
     channel.value = null
   }
 })
 </script>
 
-
 <template>
   <main class="notifications-page">
-
     <header class="page-head">
       <h2>Notificaciones</h2>
     </header>
 
     <p v-if="loading" class="state">Cargando...</p>
 
-    <!-- Sin nada -->
     <div v-else-if="!items.length" class="empty-wrapper">
       <p class="empty-text">Aún no tenés notificaciones.</p>
     </div>
 
-    <!-- Contenido -->
     <div v-else :class="['columns-wrapper', { 'single-column': !read.length }]">
-
-      <!-- NUEVAS -->
       <section class="column">
         <header class="column-head">
           <h3>Nuevas</h3>
-          
         </header>
 
         <p v-if="!unread.length" class="state small">No hay nuevas.</p>
@@ -265,7 +239,7 @@ onUnmounted(() => {
         <ul v-else class="list">
           <li v-for="n in unread" :key="n.id" class="card card-unread">
             <div class="card-avatar">
-              <img :src="avatarFor()" class="avatar-img" />
+              <img :src="avatarFor(n)" class="avatar-img" :alt="isWellbeing(n) ? 'Nuri' : 'Nura'" />
             </div>
 
             <div class="card-main">
@@ -276,13 +250,12 @@ onUnmounted(() => {
 
             <div class="card-actions">
               <button class="icon-btn check" @click="handleMarkAsRead(n.id)">✓</button>
-              <button class="icon-btn close" @click="handleDeleteOne(n.id)">×</button>
+              <button class="icon-btn close" @click="handleDeleteOne(n.id)">x</button>
             </div>
           </li>
         </ul>
       </section>
 
-      <!-- VISTAS -->
       <section v-if="read.length" class="column">
         <header class="column-head">
           <h3>Vistas</h3>
@@ -291,7 +264,7 @@ onUnmounted(() => {
         <ul class="list">
           <li v-for="n in read" :key="n.id" class="card card-read">
             <div class="card-avatar avatar-muted">
-              <img :src="avatarFor()" class="avatar-img" />
+              <img :src="avatarFor(n)" class="avatar-img" :alt="isWellbeing(n) ? 'Nuri' : 'Nura'" />
             </div>
 
             <div class="card-main">
@@ -308,15 +281,11 @@ onUnmounted(() => {
           </li>
         </ul>
       </section>
-
     </div>
 
     <footer v-if="items.length" class="page-actions">
-      <button class="danger-btn" @click="handleDeleteAll">
-        Borrar todas
-      </button>
+      <button class="danger-btn" @click="handleDeleteAll">Borrar todas</button>
     </footer>
-
   </main>
 </template>
 
@@ -339,7 +308,6 @@ onUnmounted(() => {
   margin: 0;
   padding: 10px;
 }
-
 
 .state {
   font-size: 0.95rem;
@@ -368,7 +336,6 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
-/* 2 columnas solo cuando hay vistas */
 @media (min-width: 768px) {
   .columns-wrapper:not(.single-column) {
     grid-template-columns: 1fr 1fr;
@@ -395,16 +362,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.link-btn {
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 0.85rem;
-  color: #50bdbd;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .list {
   list-style: none;
   padding: 0;
@@ -417,13 +374,12 @@ onUnmounted(() => {
 .card {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  align-items: center;          
+  align-items: center;
   gap: 12px;
   padding: 12px 12px;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
 }
-
 
 .card-read {
   background: #f1fbfb;
@@ -437,12 +393,14 @@ onUnmounted(() => {
 .card-avatar {
   width: 52px;
   height: 52px;
-  border-radius: 50%;
-  object-fit: contain;
+  border-radius: 999px;
+  overflow: hidden;
   background: #ffffff;
   padding: 9px;
   margin: 0 0 14px;
   border: 2px solid #b9e6e6;
+  display: grid;
+  place-items: center;
 }
 
 .avatar-muted {
@@ -453,6 +411,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 999px;
 }
 
 .card-main {
@@ -497,8 +456,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .icon-btn.check {
@@ -515,7 +473,7 @@ onUnmounted(() => {
 .icon-btn.close {
   background: #ef4444;
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
 }
 
 .icon-btn.close:hover {

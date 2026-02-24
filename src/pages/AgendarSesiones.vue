@@ -19,6 +19,8 @@ type SesionDb = {
   registered: number | null
   description: string | null
   image_path: string | null
+  disponible?: boolean | null
+  meet_url?: string | null
 }
 
 type Sesion = {
@@ -27,38 +29,70 @@ type Sesion = {
   profesional: string
   rol: string
   fecha: string
+  fechaISO: string
   hora: string
   modalidad: string
-  capacidad: number
-  registrados: number
   descripcion: string
   imagen: string
+  capacidad: number
+  registrados: number
+  disponible: boolean
+  meetUrl?: string
 }
 
 const sesiones = ref<Sesion[]>([])
 const loading = ref(true)
 
-/* ===== Notificaciones ===== */
-async function createNotification(
-  title: string,
-  body: string,
-  type: string | null = null
-) {
-  if (!auth.user) return
+const myRegs = ref<Set<string>>(new Set())
+const busyId = ref<string | null>(null)
 
-  const { error } = await supabase.from('notifications').insert({
+const showInfo = ref(false)
+const infoTitle = ref('')
+const infoText = ref('')
+
+function openInfo(title: string, text: string) {
+  infoTitle.value = title
+  infoText.value = text
+  showInfo.value = true
+}
+
+const showConfirm = ref(false)
+const confirmTitle = ref('')
+const confirmText = ref('')
+const confirmBusy = ref(false)
+const pendingSession = ref<Sesion | null>(null)
+
+function openConfirmCancel(s: Sesion) {
+  pendingSession.value = s
+  confirmTitle.value = '¿Seguro que querés cancelar tu lugar?'
+  confirmText.value =
+    'Si cancelás, liberás tu cupo para otra persona. Si más adelante hay lugar, vas a poder anotarte de nuevo.'
+  showConfirm.value = true
+}
+
+function closeConfirm() {
+  if (!confirmBusy.value) {
+    showConfirm.value = false
+    pendingSession.value = null
+  }
+}
+
+function goBackToAgendar() {
+  router.push('/app/agendar')
+}
+function goEventos() {
+  router.push('/app/agendar/eventos')
+}
+
+async function createNotification(title: string, body: string, type: string | null = null) {
+  if (!auth.user) return
+  await supabase.from('notifications').insert({
     user_id: auth.user.id,
     title,
     body,
     type
   })
-
-  if (error) {
-    console.error('Error creando notificación:', error)
-  }
 }
-
-/* ================== HELPERS ================== */
 
 function formatFecha(dateStr: string) {
   if (!dateStr) return ''
@@ -71,21 +105,35 @@ function formatFecha(dateStr: string) {
   })
 }
 
-/* ================== CARGAR SESIONES ================== */
+async function loadMySessionRegistrations() {
+  if (!auth.user) {
+    myRegs.value = new Set()
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('session_registrations')
+    .select('session_id')
+    .eq('user_id', auth.user.id)
+
+  if (error) {
+    myRegs.value = new Set()
+    return
+  }
+
+  myRegs.value = new Set((data || []).map((r: any) => r.session_id))
+}
 
 async function loadSesiones() {
   loading.value = true
 
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      'id, title, professional, role, date, hour, modality, capacity, registered, description, image_path'
-    )
+    .select('id, title, professional, role, date, hour, modality, capacity, registered, description, image_path, disponible, meet_url')
     .order('date', { ascending: true })
     .order('hour', { ascending: true })
 
   if (error) {
-    console.error('Error cargando sesiones:', error)
     sesiones.value = []
     loading.value = false
     return
@@ -98,237 +146,261 @@ async function loadSesiones() {
     titulo: r.title,
     profesional: r.professional,
     rol: r.role,
+    fechaISO: r.date,
     fecha: formatFecha(r.date),
     hora: r.hour,
     modalidad: r.modality,
+    descripcion: r.description ?? '',
+    imagen: r.image_path || '/covers/placeholder-session.jpg',
     capacidad: r.capacity,
     registrados: r.registered ?? 0,
-    descripcion: r.description ?? '',
-    imagen: r.image_path || '/covers/placeholder-session.jpg'
+    disponible: !!r.disponible,
+    meetUrl: r.meet_url || undefined
   }))
 
   loading.value = false
 }
 
-onMounted(() => {
-  loadSesiones()
-})
+async function loadSessionCounts() {
+  const ids = sesiones.value.map((s) => s.id)
+  if (!ids.length) return
 
-/* ================== NAV ================== */
+  const { data, error } = await supabase
+    .from('session_registrations')
+    .select('session_id')
+    .in('session_id', ids)
 
-function goBackToAgendar() {
-  router.push('/app/agendar')
-}
-function goEventos() {
-  router.push('/app/agendar/eventos')
-}
+  if (error) return
 
-/* ================== MODAL ================== */
+  const counts = new Map<string, number>()
+  for (const row of data || []) {
+    const id = (row as any).session_id as string
+    counts.set(id, (counts.get(id) || 0) + 1)
+  }
 
-const showModal = ref(false)
-const modalTitle = ref('')
-const modalText = ref('')
-
-function openModal(title: string, text: string) {
-  modalTitle.value = title
-  modalText.value = text
-  showModal.value = true
+  sesiones.value = sesiones.value.map((s) => ({
+    ...s,
+    registrados: counts.get(s.id) || 0
+  }))
 }
 
-/* ================== CUPOS ================== */
+function isRegistered(s: Sesion) {
+  return myRegs.value.has(s.id)
+}
 
 function estaLlena(s: Sesion) {
   return s.registrados >= s.capacidad
 }
 
 function cuposTexto(s: Sesion) {
-  if (estaLlena(s)) {
-    return 'Cupos completos'
-  }
-  return `Cupos: ${s.registrados}/${s.capacidad} personas`
+  if (estaLlena(s)) return 'Cupos completos'
+  return `Cupos: ${s.registrados}/${s.capacidad}`
 }
 
-/* ========== REGISTRARSE EN UNA SESIÓN ========== */
+function canRegister(s: Sesion) {
+  if (!auth.user) return true
+  if (isRegistered(s)) return false
+  if (estaLlena(s)) return false
+  if (busyId.value) return false
+  return true
+}
 
-async function registrarEnSesion(s: Sesion) {
+async function registrarmeSesion(s: Sesion) {
   if (!auth.user) {
-    openModal(
-      'Iniciá sesión',
-      'Necesitás iniciar sesión para reservar un lugar en la sesión grupal.'
-    )
+    openInfo('Necesitás iniciar sesión', 'Iniciá sesión para poder anotarte en una sesión.')
+    return
+  }
+  if (isRegistered(s)) {
+    openInfo('Ya tenés un lugar', 'Tu lugar ya está reservado para esta sesión.')
+    return
+  }
+  if (estaLlena(s)) {
+    openInfo('Sesión completa', 'Esta sesión ya no tiene cupos disponibles.')
     return
   }
 
-  // 1) ¿Ya está registrada esta usuaria en esta sesión?
-  const { data: existingReg, error: regError } = await supabase
+  busyId.value = s.id
+
+  const { error } = await supabase
+    .from('session_registrations')
+    .upsert(
+      { user_id: auth.user.id, session_id: s.id },
+      { onConflict: 'user_id,session_id', ignoreDuplicates: true }
+    )
+
+  if (error) {
+    busyId.value = null
+    openInfo('No pudimos registrarte', 'Hubo un problema al reservar tu lugar. Probá nuevamente.')
+    return
+  }
+
+  myRegs.value = new Set([...myRegs.value, s.id])
+  await loadSessionCounts()
+
+  await createNotification(
+    'Sesión reservada',
+    `Tu lugar quedó reservado para "${s.titulo}" (${s.fecha} a las ${s.hora}).`,
+    'session'
+  )
+
+  busyId.value = null
+  openInfo('¡Listo!', 'Tu lugar quedó reservado. Te vamos a avisar cuando se acerque la sesión.')
+}
+
+async function desregistrarmeSesion(s: Sesion) {
+  if (!auth.user) return
+  if (!isRegistered(s)) return
+
+  busyId.value = s.id
+
+  const { data: row } = await supabase
     .from('session_registrations')
     .select('id')
     .eq('user_id', auth.user.id)
     .eq('session_id', s.id)
     .maybeSingle()
 
-  if (!regError && existingReg) {
-    openModal(
-      'Ya estás registrada',
-      'Ya tenés un lugar reservado en esta sesión grupal.'
-    )
+  if (!row?.id) {
+    await loadMySessionRegistrations()
+    busyId.value = null
     return
   }
 
-  // 2) Traer capacidad real desde la base
-  const { data: sessionRow, error: sessionError } = await supabase
-    .from('sessions')
-    .select('capacity, registered')
-    .eq('id', s.id)
-    .maybeSingle()
+  const { error } = await supabase.from('session_registrations').delete().eq('id', row.id)
 
-  if (sessionError || !sessionRow) {
-    console.error('Error consultando cupos:', sessionError)
-    openModal(
-      'Error',
-      'No pudimos verificar los cupos en este momento. Probá de nuevo más tarde.'
-    )
+  if (error) {
+    busyId.value = null
+    openInfo('No pudimos cancelar', 'Hubo un problema al cancelar tu lugar. Probá de nuevo.')
     return
   }
 
-  const capacidadActual = sessionRow.capacity
-  const registradosActuales = sessionRow.registered ?? 0
+  const next = new Set(myRegs.value)
+  next.delete(s.id)
+  myRegs.value = next
+  await loadSessionCounts()
 
-  // 3) Si ya se llenó, actualizar el front y avisar
-  if (registradosActuales >= capacidadActual) {
-    s.registrados = registradosActuales
-    openModal(
-      'Sesión completa',
-      'Esta sesión ya alcanzó el máximo de personas. Podés sumarte a otra fecha.'
-    )
-    return
-  }
+  await createNotification('Lugar cancelado', `Cancelaste tu lugar en "${s.titulo}".`, 'session')
 
-  // 4) Guardar inscripción en session_registrations
-  const { error: insertError } = await supabase
-    .from('session_registrations')
-    .insert({
-      user_id: auth.user.id,
-      session_id: s.id
-    })
-
-  if (insertError) {
-    if ((insertError as any).code === '23505') {
-      openModal(
-        'Ya estás registrada',
-        'Ya tenés un lugar reservado en esta sesión grupal.'
-      )
-    } else {
-      console.error('Error registrando en sesión:', insertError)
-      openModal(
-        'Error',
-        'No pudimos registrar tu lugar en esta sesión. Probá de nuevo.'
-      )
-    }
-    return
-  }
-
-  // 5) Actualizar contador de registrados en sessions
-  const nuevoValor = registradosActuales + 1
-
-  const { error: updError } = await supabase
-    .from('sessions')
-    .update({ registered: nuevoValor })
-    .eq('id', s.id)
-
-  if (updError) {
-    console.error('Error actualizando cupos:', updError)
-    await loadSesiones()
-    openModal(
-      'Registrada',
-      'Tu inscripción se guardó, pero hubo un problema actualizando los cupos en pantalla.'
-    )
-    return
-  }
-
-  s.registrados = nuevoValor
-
-  // 6) Notificación real
-  await createNotification(
-    'Te registraste en una sesión grupal',
-    `Ya estás registrada en "${s.titulo}" el ${s.fecha} a las ${s.hora} (${s.modalidad}).`,
-    'session'
-  )
-
-  openModal(
-    'Te registraste en la sesión',
-    'Tu lugar quedó reservado en esta sesión grupal. Te vamos a recordar el día del encuentro.'
-  )
+  busyId.value = null
+  openInfo('Listo', 'Tu lugar fue cancelado. Si querés, podés anotarte de nuevo si hay cupos.')
 }
+
+async function confirmCancel() {
+  if (!pendingSession.value) return
+  confirmBusy.value = true
+  await desregistrarmeSesion(pendingSession.value)
+  confirmBusy.value = false
+  showConfirm.value = false
+  pendingSession.value = null
+}
+
+function unirmeSesion(s: Sesion) {
+  if (!s.disponible || !s.meetUrl) {
+    openInfo(
+      'Todavía no está habilitado',
+      'Esta sesión se va a habilitar el día y horario indicados. Cuando esté disponible, vas a poder unirte desde acá.'
+    )
+    return
+  }
+  window.open(s.meetUrl, '_blank')
+}
+
+onMounted(async () => {
+  await Promise.all([loadSesiones(), loadMySessionRegistrations()])
+  await loadSessionCounts()
+})
 </script>
 
-
 <template>
-  <h1 class="visually-hidden">Agendar sesiones grupales</h1>
+  <h1 class="visually-hidden">Agendar sesiones</h1>
+
   <main class="agendar-sub">
-    <div class="inner">
-      <!-- Header -->
-      <header class="sub-header">
-        <button class="back-link" type="button" @click="goBackToAgendar">
-          <span class="arrow">←</span>
-        </button>
-        <h1>Sesiones</h1>
-      </header>
+    <header class="sub-header">
+      <button class="back-link" type="button" @click="goBackToAgendar">
+        <span class="arrow">←</span>
+      </button>
+      <h1>Sesiones</h1>
+    </header>
 
-      <!-- Tabs -->
-      <div class="tabs-row">
-        <button class="tab-pill" type="button" @click="goEventos">
-          Eventos
-        </button>
-        <button class="tab-pill tab-pill--active" type="button">
-          Sesiones
-        </button>
-      </div>
+    <div class="tabs-row">
+      <button class="tab-pill" type="button" @click="goEventos">Eventos</button>
+      <button class="tab-pill tab-pill--active" type="button">Sesiones</button>
+    </div>
 
-      <p v-if="loading" class="state">Cargando sesiones…</p>
+    <p v-if="loading" class="state">Cargando sesiones…</p>
 
-      <!-- Lista de sesiones -->
-      <section v-else class="lista">
-        <article v-for="s in sesiones" :key="s.id" class="ses-card">
-          <div class="ses-img">
-            <img :src="s.imagen" :alt="s.titulo" />
-          </div>
+    <section v-else class="lista">
+      <article v-for="s in sesiones" :key="s.id" class="card">
+        <div class="card-img">
+          <img :src="s.imagen" :alt="s.titulo" />
+        </div>
 
-          <div class="ses-body">
-            <h2 class="title">{{ s.titulo }}</h2>
-            <p class="meta">
-              Con: {{ s.profesional }} — {{ s.rol }}<br />
-              {{ s.fecha }} · {{ s.hora }} hs · {{ s.modalidad }}
-            </p>
+        <div class="card-body">
+          <h2 class="title">{{ s.titulo }}</h2>
 
-            <!-- Fila de cupos clickeable -->
+          <p class="meta">
+            Con: {{ s.profesional }} — {{ s.rol }}<br />
+            {{ s.fecha }} · {{ s.hora }} hs · {{ s.modalidad }}
+          </p>
+
+          <p class="desc">{{ s.descripcion }}</p>
+
+          <div class="actions">
             <button
-              class="cupos-btn"
+              v-if="!isRegistered(s)"
+              class="action-btn action-btn--primary"
               type="button"
-              :class="{ full: estaLlena(s) }"
-              @click="registrarEnSesion(s)"
+              :disabled="!canRegister(s)"
+              @click="registrarmeSesion(s)"
             >
               {{ cuposTexto(s) }}
             </button>
 
-            <p class="desc">
-              {{ s.descripcion }}
-            </p>
-          </div>
-        </article>
-      </section>
-    </div>
+            <button
+              v-else
+              class="action-btn action-btn--danger"
+              type="button"
+              :disabled="busyId === s.id"
+              @click="openConfirmCancel(s)"
+            >
+              Cancelar
+            </button>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="modal" @click.self="showModal = false">
+            <button
+              class="action-btn action-btn--primary"
+              :class="{ 'action-btn--soft-disabled': !s.disponible }"
+              type="button"
+              @click="unirmeSesion(s)"
+            >
+              {{ s.disponible ? 'Unirme ahora' : 'Próximamente' }}
+            </button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <div v-if="showInfo" class="modal" @click.self="showInfo = false">
       <div class="modal-box">
-        <h3 class="modal-title">{{ modalTitle }}</h3>
-        <p class="modal-text">
-          {{ modalText }}
-        </p>
-        <button class="btn-close" type="button" @click="showModal = false">
+        <h3 class="modal-title">{{ infoTitle }}</h3>
+        <p class="modal-text">{{ infoText }}</p>
+        <button class="action-btn action-btn--primary" type="button" @click="showInfo = false">
           Entendido
         </button>
+      </div>
+    </div>
+
+    <div v-if="showConfirm" class="modal" @click.self="closeConfirm">
+      <div class="modal-box">
+        <h3 class="modal-title">{{ confirmTitle }}</h3>
+        <p class="modal-text">{{ confirmText }}</p>
+        <div class="modal-actions">
+          <button class="action-btn action-btn--ghost" type="button" :disabled="confirmBusy" @click="closeConfirm">
+            No, volver
+          </button>
+          <button class="action-btn action-btn--danger" type="button" :disabled="confirmBusy" @click="confirmCancel">
+            {{ confirmBusy ? 'Cancelando…' : 'Sí, cancelar' }}
+          </button>
+        </div>
       </div>
     </div>
   </main>
@@ -340,12 +412,6 @@ async function registrarEnSesion(s: Sesion) {
   padding: 20px 18px 40px;
 }
 
-.inner {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-/* Header */
 .sub-header {
   display: flex;
   align-items: center;
@@ -364,7 +430,6 @@ async function registrarEnSesion(s: Sesion) {
   background: transparent;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   cursor: pointer;
   padding: 0;
 }
@@ -373,9 +438,9 @@ async function registrarEnSesion(s: Sesion) {
   color: #46bdbd;
 }
 
-/* Tabs */
 .tabs-row {
-  margin: 4px 0 18px;
+  max-width: 1100px;
+  margin: 4px auto 18px;
   display: flex;
   justify-content: flex-start;
   gap: 24px;
@@ -405,40 +470,76 @@ async function registrarEnSesion(s: Sesion) {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
 }
 
-/* Lista / cards */
+.state {
+  font-size: 0.9rem;
+  color: #4b5563;
+  margin-bottom: 12px;
+}
+
 .lista {
   display: grid;
-  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  max-width: 1050px;
+  margin: 0 auto;
 }
-@media (min-width: 900px) {
+@media (max-width: 900px) {
   .lista {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
-.ses-card {
+.card {
   display: flex;
-  gap: 12px;
-  background: #ffffff;
-  border-radius: 18px;
-  border: 1px solid #e5edf6;
-  padding: 12px 14px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  width: 92%;
+  margin: 0 auto;
+  min-height: 200px;
+  padding: 18px 18px;
+  border-radius: 20px;
+  border: 1px solid #e2edf7;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+.card:hover {
+  transform: translateY(-1px);
+  border-color: #b6ebe5;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
 }
 
-.ses-img {
-  flex: 0 0 110px;
+.card-img {
+  flex: 0 0 130px;
 }
-.ses-img img {
-  width: 110px;
-  height: 110px;
+.card-img img {
+  width: 130px;
+  height: 130px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: 18px;
+  display: block;
 }
 
-.ses-body {
-  display: grid;
-  gap: 6px;
+.card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+@media (max-width: 700px) {
+  .card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .card-img {
+    flex: none;
+    width: 100%;
+  }
+  .card-img img {
+    width: 100%;
+    height: auto;
+  }
 }
 
 .title {
@@ -453,46 +554,79 @@ async function registrarEnSesion(s: Sesion) {
   color: #6b7280;
 }
 .desc {
-  margin: 0;
+  margin: 2px 0 0;
   font-size: 0.9rem;
   color: #374151;
 }
 
-/* Cupos clickeable */
-.cupos-btn {
-  margin-top: 4px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: none;
-  background: #e0f7f7;
-  color: #047777;
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  width: fit-content;
-  box-shadow: 0 4px 10px rgba(80, 189, 189, 0.25);
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.cupos-btn:hover {
-  background: #c6f0f0;
+
+.action-btn {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.86rem;
+  border: none;
+  background: var(--nura-green);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.28);
+  width: 40%;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.24);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.action-btn--soft-disabled {
+  opacity: 0.75;
+}
+.action-btn--soft-disabled:hover:not(:disabled) {
+  transform: none;
+}
+
+.action-btn--danger {
+  background: #ef5350;
+  box-shadow: 0 8px 18px rgba(239, 83, 80, 0.2);
+}
+.action-btn--danger:hover:not(:disabled) {
+  box-shadow: 0 10px 22px rgba(239, 83, 80, 0.18);
+}
+
+.action-btn--ghost {
+  background: #eef6ff;
+  color: #1f2937;
+  box-shadow: none;
+}
+.action-btn--ghost:hover:not(:disabled) {
+  background: #e3f0ff;
   transform: translateY(-1px);
 }
-.cupos-btn.full {
-  background: #e5e7eb;
-  color: #6b7280;
-  box-shadow: none;
-  cursor: default;
+
+@media (max-width: 520px) {
+  .action-btn {
+    width: 100%;
+  }
 }
 
-/* Estado */
-.state {
-  font-size: 0.9rem;
-  color: #4b5563;
-  margin-bottom: 12px;
-}
-
-/* Modal */
 .modal {
   position: fixed;
   inset: 0;
@@ -507,7 +641,7 @@ async function registrarEnSesion(s: Sesion) {
   background: #ffffff;
   border-radius: 18px;
   padding: 18px 18px 16px;
-  max-width: 420px;
+  max-width: 440px;
   width: 100%;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
   text-align: center;
@@ -515,7 +649,7 @@ async function registrarEnSesion(s: Sesion) {
 .modal-title {
   margin: 0 0 8px;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #111827;
 }
 .modal-text {
@@ -523,14 +657,14 @@ async function registrarEnSesion(s: Sesion) {
   font-size: 0.92rem;
   color: #4b5563;
 }
-.btn-close {
-  margin-top: 4px;
-  border: none;
-  border-radius: 999px;
-  padding: 8px 18px;
-  background: #50bdbd;
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+@media (max-width: 520px) {
+  .modal-actions {
+    flex-direction: column;
+  }
 }
 </style>

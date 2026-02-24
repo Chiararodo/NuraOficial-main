@@ -1,19 +1,18 @@
-// src/composables/useNuraApi.ts
 import { ref } from 'vue'
 
 function normalizeBase(base: string) {
   return base.replace(/\/+$/, '')
 }
 
-const API_BASE = normalizeBase(
-  import.meta.env.VITE_NURA_API_URL || '/api'
-)
+const API_BASE = normalizeBase(import.meta.env.VITE_NURA_API_URL || '/api')
 
 export function useNuraApi() {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchEspecialistas(params: Record<string, string | undefined> = {}) {
+  async function fetchEspecialistas(
+    params: Record<string, string | undefined> = {}
+  ) {
     loading.value = true
     error.value = null
 

@@ -1,39 +1,34 @@
+<script setup lang="ts">
+import NuraHeader from '@/components/NuraHeader.vue'
+import TabBar from '@/components/TabBar.vue'
+</script>
+
 <template>
-    <div class="app-shell">
-      <NuraHeader />
-  
-      <main>
-        <RouterView />
-      </main>
-  
-      <!-- Mobile only -->
-      <TabBar />
-  
-      <!-- Desktop only -->
-      
-    </div>
-  </template>
-  
-  <script setup lang="ts">
-  import NuraHeader from '@/components/NuraHeader.vue'
-  import TabBar from '@/components/TabBar.vue'
-  import Footer from '@/components/Footer.vue'
-  </script>
-  
-  <style scoped>
-  /* Altura de header para calcular el espacio del contenido */
-  :root, :host{ --hdr: 64px; --tabbar: 82px; }
-  
-  /* En mobile deja espacio para el TabBar.
-     El header es sticky */
-  main{
-    min-height: calc(100dvh - var(--hdr));
-    padding-bottom: var(--tabbar);
+  <div class="app-shell">
+    <NuraHeader />
+
+    <main class="app-main">
+      <RouterView />
+    </main>
+
+    <!-- Mobile only -->
+    <TabBar class="tabbar-only-mobile" />
+  </div>
+</template>
+
+
+<style scoped>
+.app-main {
+  min-height: calc(100dvh - 64px);
+  padding-bottom: 82px;
+}
+
+@media (min-width: 900px) {
+  .app-main {
+    padding-bottom: 0;
   }
-  
-  /* En desktop no hay tabbar */
-  @media (min-width: 900px){
-    main{ padding-bottom: 0; }
+  .tabbar-only-mobile {
+    display: none;
   }
-  </style>
-  
+}
+</style>

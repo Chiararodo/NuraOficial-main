@@ -102,7 +102,7 @@ async function finalizarOnboarding() {
     })
     if (updErr) throw updErr
 
-    // Reflejar también en profiles (si querés usarlo desde ahí)
+    // Reflejar también en profiles 
     await supabase.from('profiles').upsert(
       {
         id: uid,

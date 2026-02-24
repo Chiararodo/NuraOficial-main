@@ -106,10 +106,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .install-btn {
-  background: #633266; /* violeta Nura */
+  background: #633266; 
   color: #ffffff;
   border: none;
-  border-radius: 999px; /* súper redondo */
+  border-radius: 999px;
   padding: 10px 24px;
   font-weight: 700;
   font-size: 0.9rem;
@@ -122,9 +122,8 @@ onBeforeUnmount(() => {
     box-shadow 0.18s ease;
 }
 
-/* hover verde */
 .install-btn:hover {
-  background: #50bdbd; /* verde Nura */
+  background: #50bdbd; 
   transform: translateY(-2px);
   box-shadow: 0 14px 30px rgba(80, 189, 189, 0.45);
 }

@@ -6,9 +6,14 @@ import flatpickr from 'flatpickr'
 import { Spanish } from 'flatpickr/dist/l10n/es.js'
 import 'flatpickr/dist/flatpickr.css'
 import { useRoute, useRouter } from 'vue-router'
+import { useNuraApi } from '@/composables/useNuraApi'
+import { useNotificationSettings } from '@/composables/useNotificationSettings'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
+const prefs = useNotificationSettings()
 
 type Contact = {
   email?: string
@@ -43,8 +48,6 @@ type AppointmentRow = {
   professional?: string | null
 }
 
-const auth = useAuthStore()
-
 const profesionales = ref<Profesional[]>([])
 const loading = ref(true)
 const errorMsg = ref('')
@@ -55,20 +58,17 @@ const filterCity = ref('')
 const filterModality = ref('')
 const filterInsurance = ref('')
 
+const { fetchEspecialistas } = useNuraApi()
 
-const API_URL = 'https://nura-backend-vvuv.onrender.com/api/especialistas'
 const IMAGE_BASE_URL = 'https://nura-backend-vvuv.onrender.com'
 
-/** Rango horario (dejé tu viejo 09–18) */
 const START_HOUR = 9
 const END_HOUR = 18
 const TIME_STEP_MINUTES = 15
 const CANCEL_LIMIT_HOURS = 48
 
 const normalize = (val: unknown): string => {
-  if (Array.isArray(val)) {
-    return val.map((v) => String(v ?? '')).join(' ').toLowerCase()
-  }
+  if (Array.isArray(val)) return val.map((v) => String(v ?? '')).join(' ').toLowerCase()
   return String(val ?? '').toLowerCase()
 }
 
@@ -79,9 +79,7 @@ const getAvatarUrl = (p: Profesional): string => {
   return IMAGE_BASE_URL + (avatar.startsWith('/') ? avatar : `/${avatar}`)
 }
 
-const getEmail = (p: Profesional): string => {
-  return (p.contact?.email || '').trim()
-}
+const getEmail = (p: Profesional): string => (p.contact?.email || '').trim()
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -101,7 +99,10 @@ function makeApptDateTime(on_date: string, at_time: string | null): Date | null 
   const [y, m, d] = on_date.split('-').map((n) => Number(n))
   if (!y || !m || !d) return null
 
-  const timeStr = normalizeTimeToHHMMSS((at_time || `${pad2(START_HOUR)}:00`).slice(0, 8)) || `${pad2(START_HOUR)}:00:00`
+  const timeStr =
+    normalizeTimeToHHMMSS((at_time || `${pad2(START_HOUR)}:00`).slice(0, 8)) ||
+    `${pad2(START_HOUR)}:00:00`
+
   const [hh, mm] = timeStr.slice(0, 5).split(':').map((n) => Number(n))
 
   const dt = new Date(y, m - 1, d, hh || 0, mm || 0, 0, 0)
@@ -143,31 +144,27 @@ function nextValidDefaultSlot(): { date: string; time: string } {
   return { date: tomorrow.toISOString().slice(0, 10), time: `${pad2(START_HOUR)}:00` }
 }
 
-/* ================= CARGA CARTILLA (MEJORADA) ================= */
+/* ================= CARGA CARTILLA (FIX CORS) ================= */
 
 async function loadProfesionales() {
   loading.value = true
   errorMsg.value = ''
 
-  // 1) Intento API (si existe). Si da 404 en Netlify → fallback.
   try {
-    const res = await fetch(API_URL, { cache: 'no-store' })
-    if (!res.ok) throw new Error(`API no disponible (${res.status})`)
-    const json = await res.json()
-    const arr = Array.isArray(json) ? json : (json?.data ?? [])
+    const arr = await fetchEspecialistas()
     if (Array.isArray(arr) && arr.length) {
       profesionales.value = arr
-      loading.value = false
       return
     }
-    // si API responde pero vacío, igual probamos Supabase por las dudas
   } catch {
-    // seguimos al fallback
+    // fallback
+  } finally {
+    loading.value = false
   }
 
-  // 2) Fallback Supabase (esto te salva en Netlify)
+  // Fallback Supabase
+  loading.value = true
   try {
-    // OJO: si tu tabla se llama distinto, cambiá 'professionals' por tu nombre real
     const { data, error } = await supabase
       .from('professionals')
       .select('*')
@@ -192,7 +189,7 @@ async function loadProfesionales() {
         r.modality ||
         (typeof r.is_virtual === 'boolean' ? (r.is_virtual ? 'Virtual' : 'Presencial') : '')
     }))
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
     errorMsg.value = 'No se pudo cargar la cartilla.'
   } finally {
@@ -257,20 +254,12 @@ const filteredProfesionales = computed(() => {
     const insurance = normalize(p.insurance)
 
     const matchSearch =
-      !term ||
-      name.includes(term) ||
-      specialty.includes(term) ||
-      city.includes(term) ||
-      bio.includes(term)
+      !term || name.includes(term) || specialty.includes(term) || city.includes(term) || bio.includes(term)
 
-    const matchSpecialty =
-      !filterSpecialty.value || specialty === filterSpecialty.value.toLowerCase()
-    const matchCity =
-      !filterCity.value || city === filterCity.value.toLowerCase()
-    const matchModality =
-      !filterModality.value || modality === filterModality.value.toLowerCase()
-    const matchInsurance =
-      !filterInsurance.value || insurance.includes(filterInsurance.value.toLowerCase())
+    const matchSpecialty = !filterSpecialty.value || specialty === filterSpecialty.value.toLowerCase()
+    const matchCity = !filterCity.value || city === filterCity.value.toLowerCase()
+    const matchModality = !filterModality.value || modality === filterModality.value.toLowerCase()
+    const matchInsurance = !filterInsurance.value || insurance.includes(filterInsurance.value.toLowerCase())
 
     return matchSearch && matchSpecialty && matchCity && matchModality && matchInsurance
   })
@@ -289,7 +278,7 @@ function resetFilters() {
 const showBookingModal = ref(false)
 const selectedPro = ref<Profesional | null>(null)
 const bookingDate = ref('')
-const bookingTime = ref('') // HH:MM
+const bookingTime = ref('')
 const bookingMode = ref<'Presencial' | 'Virtual'>('Presencial')
 const bookingHasSingleMode = ref(false)
 const bookingEmail = ref('')
@@ -306,23 +295,15 @@ const editingAppointmentId = ref<string | null>(null)
 
 const confirmDeleteAppt = ref<{ id: string; professional: string } | null>(null)
 
-/* ===== Modal de política de turnos ===== */
-
 const showPolicyModal = ref(false)
 const pendingProForPolicy = ref<Profesional | null>(null)
-
-/* ===== Cancelación tardía ===== */
 
 const tooLateCancelModalVisible = ref(false)
 const lateCancelMessage = ref('')
 const lateCancelProfessionalName = ref('')
 
-/* ====== Choque de turno ====== */
-
 const clashModalVisible = ref(false)
 const clashMessage = ref('')
-
-/* ====== Flatpickr ====== */
 
 let fp: any = null
 
@@ -340,10 +321,21 @@ function initDatepicker() {
   })
 }
 
-/* ========== NOTIFICACIONES  ========== */
+/* ========== NOTIFICACIONES (RESPETA SETTINGS) ========== */
+
+function categoryFromType(type?: string | null): 'bienestar' | 'profesional' | 'app_updates' {
+  const t = String(type || '').toLowerCase()
+  if (t === 'daily' || t.includes('bienestar') || t.includes('wellbeing') || t.includes('reminder')) return 'bienestar'
+  if (t.includes('appointment') || t.includes('turno') || t.includes('professional') || t.includes('profesional'))
+    return 'profesional'
+  return 'app_updates'
+}
 
 async function createNotification(opts: { title: string; body?: string; type?: string }) {
   if (!auth.user) return
+
+  const cat = categoryFromType(opts.type ?? null)
+  if (!prefs.categoryEnabled(cat)) return
 
   const { error } = await supabase.from('notifications').insert({
     user_id: auth.user.id,
@@ -378,8 +370,6 @@ function acceptPolicyAndContinue() {
   openBookingModal(pro)
 }
 
-/* ====== Modal de turno ====== */
-
 function inferBookingModeFromProfessional(p: Profesional) {
   const modRaw = String(p.modality || '').toLowerCase()
   const isMixta = modRaw.includes('mixta')
@@ -387,11 +377,8 @@ function inferBookingModeFromProfessional(p: Profesional) {
 
   bookingHasSingleMode.value = !!modRaw && !multi && !isMixta
 
-  if (bookingHasSingleMode.value) {
-    bookingMode.value = modRaw.includes('virtual') ? 'Virtual' : 'Presencial'
-  } else {
-    bookingMode.value = 'Presencial'
-  }
+  if (bookingHasSingleMode.value) bookingMode.value = modRaw.includes('virtual') ? 'Virtual' : 'Presencial'
+  else bookingMode.value = 'Presencial'
 
   if (!modRaw && typeof p.is_virtual === 'boolean') {
     bookingHasSingleMode.value = true
@@ -461,8 +448,7 @@ async function saveAppointment() {
   }
 
   if (selectedDateTime.getTime() <= Date.now()) {
-    bookingError.value =
-      'No podés agendar turnos en el pasado. Elegí una fecha u horario posterior.'
+    bookingError.value = 'No podés agendar turnos en el pasado. Elegí una fecha u horario posterior.'
     return
   }
 
@@ -474,23 +460,17 @@ async function saveAppointment() {
   bookingSaving.value = true
   bookingError.value = ''
 
-  const professionalField = `${selectedPro.value.name ?? ''} – ${
-    selectedPro.value.specialty ?? selectedPro.value.type ?? ''
-  }`.trim()
-
+  const professionalField = `${selectedPro.value.name ?? ''} – ${selectedPro.value.specialty ?? selectedPro.value.type ?? ''}`.trim()
   const modalityField = selectedPro.value.modality ?? bookingMode.value
 
   const locationExtra =
     selectedPro.value.city || selectedPro.value.province
-      ? `Ubicación: ${selectedPro.value.city ?? ''}${
-          selectedPro.value.city && selectedPro.value.province ? ', ' : ''
-        }${selectedPro.value.province ?? ''}`
+      ? `Ubicación: ${selectedPro.value.city ?? ''}${selectedPro.value.city && selectedPro.value.province ? ', ' : ''}${
+          selectedPro.value.province ?? ''
+        }`
       : ''
 
-  const detailsParts = [
-    `Modalidad: ${bookingMode.value}`,
-    `Email: ${bookingEmail.value}`
-  ]
+  const detailsParts = [`Modalidad: ${bookingMode.value}`, `Email: ${bookingEmail.value}`]
   if (locationExtra) detailsParts.push(locationExtra)
   const detailsField = detailsParts.join(' · ')
 
@@ -514,25 +494,16 @@ async function saveAppointment() {
 
     if (clashError) throw clashError
 
-    const yaOcupado = (existing ?? []).some(
-      (row: any) => row.id !== editingAppointmentId.value
-    )
-
+    const yaOcupado = (existing ?? []).some((row: any) => row.id !== editingAppointmentId.value)
     if (yaOcupado) {
-      clashMessage.value =
-        'Ya hay un turno reservado con este profesional en ese horario. Elegí otro horario por favor.'
+      clashMessage.value = 'Ya hay un turno reservado con este profesional en ese horario. Elegí otro horario por favor.'
       clashModalVisible.value = true
       bookingSaving.value = false
       return
     }
 
     if (editingAppointmentId.value) {
-      const { error } = await supabase
-        .from('appointments')
-        .update(payload)
-        .eq('id', editingAppointmentId.value)
-        .eq('user_id', auth.user.id)
-
+      const { error } = await supabase.from('appointments').update(payload).eq('id', editingAppointmentId.value).eq('user_id', auth.user.id)
       if (error) throw error
     } else {
       const { error } = await supabase.from('appointments').insert(payload)
@@ -542,7 +513,6 @@ async function saveAppointment() {
     await loadAppointments()
 
     const esEdicion = !!editingAppointmentId.value
-
     await createNotification({
       title: esEdicion ? 'Turno actualizado' : 'Turno agendado',
       body: esEdicion
@@ -579,7 +549,6 @@ async function loadAppointments() {
     if (error) throw error
 
     const now = Date.now()
-
     appointments.value = (data || []).filter((a: any) => {
       const dt = makeApptDateTime(a.on_date, a.at_time)
       if (!dt) return false
@@ -605,16 +574,10 @@ function closeAppointmentsModal() {
   showAppointmentsModal.value = false
 }
 
-/* ====== Helpers de fecha/hora ====== */
-
 function formatDate(d: string) {
   if (!d) return ''
   const date = new Date(d + 'T00:00:00')
-  return date.toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit'
-  })
+  return date.toLocaleDateString('es-AR', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
 function formatTime(t: string | null) {
@@ -622,16 +585,13 @@ function formatTime(t: string | null) {
   return t.slice(0, 5)
 }
 
-/* ====== Editar / cancelar ====== */
-
 function startEditAppointment(a: AppointmentRow) {
   editingAppointmentId.value = a.id
   bookingDate.value = a.on_date
   bookingTime.value = (a.at_time ?? `${pad2(START_HOUR)}:00`).slice(0, 5)
 
   const professionalName =
-    (a.professional || '').split('–')[0]?.replace(/^Turno con\s*/i, '').trim() ||
-    a.title.replace(/^Turno con\s*/i, '').trim()
+    (a.professional || '').split('–')[0]?.replace(/^Turno con\s*/i, '').trim() || a.title.replace(/^Turno con\s*/i, '').trim()
 
   selectedPro.value = { name: professionalName } as Profesional
 
@@ -648,7 +608,6 @@ function startEditAppointment(a: AppointmentRow) {
 
 function askDeleteAppointment(a: AppointmentRow) {
   const professional = a.title.replace(/^Turno con\s*/i, '').trim()
-
   const apptDateTime = makeApptDateTime(a.on_date, a.at_time)
   if (!apptDateTime) return
 
@@ -658,8 +617,7 @@ function askDeleteAppointment(a: AppointmentRow) {
   if (diffHours < CANCEL_LIMIT_HOURS) {
     lateCancelProfessionalName.value = professional
     lateCancelMessage.value =
-      'Este turno está dentro de las 48 horas previas, por lo que no puede cancelarse desde la app. ' +
-      'La seña no es reembolsable, pero podés reprogramarlo sacando un nuevo turno con el profesional.'
+      'Este turno está dentro de las 48 horas previas, por lo que no puede cancelarse desde la app. La seña no es reembolsable, pero podés reprogramarlo sacando un nuevo turno con el profesional.'
     tooLateCancelModalVisible.value = true
     return
   }
@@ -670,11 +628,7 @@ function askDeleteAppointment(a: AppointmentRow) {
 async function confirmDeleteAppointment() {
   if (!auth.user || !confirmDeleteAppt.value) return
 
-  await supabase
-    .from('appointments')
-    .delete()
-    .eq('id', confirmDeleteAppt.value.id)
-    .eq('user_id', auth.user.id)
+  await supabase.from('appointments').delete().eq('id', confirmDeleteAppt.value.id).eq('user_id', auth.user.id)
 
   await loadAppointments()
 
@@ -708,23 +662,16 @@ function goToProfessionalForRebook() {
   closeTooLateCancelModal()
   showAppointmentsModal.value = false
 
-  if (pro) {
-    openPolicyModal(pro)
-  } else {
-    search.value = name
-  }
+  if (pro) openPolicyModal(pro)
+  else search.value = name
 }
-
-/* ===== Pago: seña con MP ===== */
 
 function startPayment() {
   paymentError.value = ''
-
   const mpUrl = import.meta.env.VITE_MP_TURNO_URL
 
   if (!mpUrl) {
-    paymentError.value =
-      'No se encontró el link de pago. Verificá la configuración de Mercado Pago.'
+    paymentError.value = 'No se encontró el link de pago. Verificá la configuración de Mercado Pago.'
     return
   }
 
@@ -737,6 +684,10 @@ function startPayment() {
 }
 
 onMounted(async () => {
+  // IMPORTANTE: cargar prefs acá, no arriba del archivo
+  prefs.loadFromLocal()
+  await prefs.loadFromSupabase()
+
   await loadProfesionales()
   await loadAppointments()
 
@@ -748,8 +699,6 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- TU TEMPLATE VIEJO, SOLO TOQUÉ EL INPUT TIME PARA MIN/MAX/STEP -->
-  <!-- (el resto lo dejé igual) -->
   <h1 class="visually-hidden">Cartilla</h1>
   <main class="contenido">
     <header class="page-head">
@@ -774,11 +723,7 @@ onMounted(async () => {
         <div class="field field--search">
           <label>Buscar</label>
           <div class="search-input">
-            <input
-              v-model="search"
-              type="search"
-              placeholder="Nombre, ciudad etc"
-            />
+            <input v-model="search" type="search" placeholder="Nombre, ciudad etc" />
             <button
               v-if="search"
               type="button"
@@ -836,11 +781,7 @@ onMounted(async () => {
           {{ filteredProfesionales.length }} de {{ profesionales.length }}
           profesionales
         </span>
-        <button
-          type="button"
-          class="pill pill--ghost-limpiar"
-          @click="resetFilters"
-        >
+        <button type="button" class="pill pill--ghost-limpiar" @click="resetFilters">
           Limpiar filtros
         </button>
       </div>
@@ -889,20 +830,14 @@ onMounted(async () => {
         </div>
 
         <div class="prof-actions">
-          <button
-            type="button"
-            class="pill pill--primary"
-            @click="openPolicyModal(p)"
-          >
+          <button type="button" class="pill pill--primary" @click="openPolicyModal(p)">
             Agendar turno
           </button>
 
           <a
             v-if="getEmail(p)"
             class="content-btn"
-            :href="`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-              getEmail(p)
-            )}`"
+            :href="`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(getEmail(p))}`"
             target="_blank"
           >
             <i class="fa-solid fa-envelope"></i>
@@ -911,12 +846,7 @@ onMounted(async () => {
       </article>
     </section>
 
-    <!-- MODAL POLÍTICA DE TURNOS -->
-    <div
-      v-if="showPolicyModal"
-      class="modal-backdrop"
-      @click.self="closePolicyModal"
-    >
+    <div v-if="showPolicyModal" class="modal-backdrop" @click.self="closePolicyModal">
       <div class="modal-card modal-policy animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Política de turnos</h3>
@@ -935,8 +865,8 @@ onMounted(async () => {
               <strong>{{ String(END_HOUR).padStart(2, '0') }}:00</strong> hs.
             </li>
             <li>
-              Si cancelás con al menos <strong>48 horas</strong> de
-              anticipación, la seña se devuelve.
+              Si cancelás con al menos <strong>48 horas</strong> de anticipación,
+              la seña se devuelve.
             </li>
             <li>
               Si querés cancelar dentro de las 48&nbsp;hs previas, la seña no es
@@ -959,24 +889,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- MODAL AGENDAR / EDITAR -->
-    <div
-      v-if="showBookingModal"
-      class="modal-backdrop"
-      @click.self="closeBookingModal"
-    >
+    <div v-if="showBookingModal" class="modal-backdrop" @click.self="closeBookingModal">
       <div class="modal-card modal-appointment animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">
             {{ editingAppointmentId ? 'Editar turno' : 'Agendar turno' }}
           </h3>
-          <button
-            type="button"
-            class="modal-close"
-            @click="closeBookingModal"
-          >
-            ×
-          </button>
+          <button type="button" class="modal-close" @click="closeBookingModal">×</button>
         </header>
 
         <section class="modal-body">
@@ -1006,7 +925,8 @@ onMounted(async () => {
 
           <div class="modal-field">
             <label for="booking-time">
-              Horario ({{ String(START_HOUR).padStart(2, '0') }}:00 - {{ String(END_HOUR).padStart(2, '0') }}:00)
+              Horario ({{ String(START_HOUR).padStart(2, '0') }}:00 -
+              {{ String(END_HOUR).padStart(2, '0') }}:00)
             </label>
             <input
               id="booking-time"
@@ -1021,11 +941,7 @@ onMounted(async () => {
 
           <div v-if="!bookingHasSingleMode" class="modal-field">
             <label for="booking-mode">Modalidad</label>
-            <select
-              id="booking-mode"
-              v-model="bookingMode"
-              aria-label="Modalidad del turno"
-            >
+            <select id="booking-mode" v-model="bookingMode" aria-label="Modalidad del turno">
               <option value="Presencial">Presencial</option>
               <option value="Virtual">Virtual</option>
             </select>
@@ -1055,11 +971,7 @@ onMounted(async () => {
               48&nbsp;horas de anticipación, se te reintegra la seña. El día del
               turno abonás el resto directamente al profesional.
             </p>
-            <button
-              type="button"
-              class="pill pill--primary mp-button"
-              @click="startPayment"
-            >
+            <button type="button" class="pill pill--primary mp-button" @click="startPayment">
               Pagar reserva con Mercado Pago
             </button>
             <p v-if="paymentError" class="modal-error">
@@ -1073,61 +985,36 @@ onMounted(async () => {
         </section>
 
         <footer class="modal-footer">
-          <button
-            class="pill pill--danger"
-            @click="closeBookingModal"
-            :disabled="bookingSaving"
-          >
+          <button class="pill pill--danger" @click="closeBookingModal" :disabled="bookingSaving">
             Cancelar
           </button>
-          <button
-            class="pill pill--primary"
-            @click="saveAppointment"
-            :disabled="bookingSaving"
-          >
+          <button class="pill pill--primary" @click="saveAppointment" :disabled="bookingSaving">
             {{ bookingSaving ? 'Guardando…' : 'Confirmar turno' }}
           </button>
         </footer>
       </div>
     </div>
 
-    <!-- TOAST TURNO CONFIRMADO -->
     <div v-if="turnoConfirmado" class="turno-confirmado">
       <span class="check">✔</span>
       <div class="turno-text">
         <p>Tu turno fue confirmado</p>
-        <button
-          class="pill pill--sm pill--light"
-          type="button"
-          @click="openAppointmentsFromToast"
-        >
+        <button class="pill pill--sm pill--light" type="button" @click="openAppointmentsFromToast">
           Ver mis turnos
         </button>
       </div>
     </div>
 
-    <!-- MODAL VER TURNOS -->
-    <div
-      v-if="showAppointmentsModal"
-      class="modal-backdrop"
-      @click.self="closeAppointmentsModal"
-    >
+    <div v-if="showAppointmentsModal" class="modal-backdrop" @click.self="closeAppointmentsModal">
       <div class="modal-card modal-appointments-list animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Mis turnos</h3>
-          <button class="modal-close" @click="closeAppointmentsModal">
-            ×
-          </button>
+          <button class="modal-close" @click="closeAppointmentsModal">×</button>
         </header>
 
         <section class="modal-body modal-body-scroll">
-          <p v-if="loadingAppointments" class="modal-note">
-            Cargando turnos…
-          </p>
-
-          <p v-else-if="!appointments.length" class="modal-note">
-            Todavía no tenés turnos agendados.
-          </p>
+          <p v-if="loadingAppointments" class="modal-note">Cargando turnos…</p>
+          <p v-else-if="!appointments.length" class="modal-note">Todavía no tenés turnos agendados.</p>
 
           <ul v-else class="appt-list">
             <li v-for="a in appointments" :key="a.id" class="appt-item">
@@ -1140,15 +1027,8 @@ onMounted(async () => {
               </div>
 
               <div class="appt-actions">
-                <button class="link-btn" @click="startEditAppointment(a)">
-                  Editar
-                </button>
-                <button
-                  class="link-btn danger"
-                  @click="askDeleteAppointment(a)"
-                >
-                  Cancelar
-                </button>
+                <button class="link-btn" @click="startEditAppointment(a)">Editar</button>
+                <button class="link-btn danger" @click="askDeleteAppointment(a)">Cancelar</button>
               </div>
             </li>
           </ul>
@@ -1162,12 +1042,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- MODAL HORARIO OCUPADO -->
-    <div
-      v-if="clashModalVisible"
-      class="modal-backdrop"
-      @click.self="clashModalVisible = false"
-    >
+    <div v-if="clashModalVisible" class="modal-backdrop" @click.self="clashModalVisible = false">
       <div class="modal-card modal-clash animate-fade-in">
         <header class="modal-header modal-header--clash">
           <div class="modal-header-left">
@@ -1186,29 +1061,18 @@ onMounted(async () => {
         </section>
 
         <footer class="modal-footer modal-footer--clash">
-          <button
-            class="pill pill--primary pill--clash"
-            type="button"
-            @click="clashModalVisible = false"
-          >
+          <button class="pill pill--primary pill--clash" type="button" @click="clashModalVisible = false">
             Entendido
           </button>
         </footer>
       </div>
     </div>
 
-    <!-- MODAL CANCELACIÓN TARDÍA -->
-    <div
-      v-if="tooLateCancelModalVisible"
-      class="modal-backdrop"
-      @click.self="closeTooLateCancelModal"
-    >
+    <div v-if="tooLateCancelModalVisible" class="modal-backdrop" @click.self="closeTooLateCancelModal">
       <div class="modal-card modal-late-cancel animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">No es posible cancelar</h3>
-          <button class="modal-close" @click="closeTooLateCancelModal">
-            ×
-          </button>
+          <button class="modal-close" @click="closeTooLateCancelModal">×</button>
         </header>
         <section class="modal-body">
           <p class="modal-note">
@@ -1220,32 +1084,19 @@ onMounted(async () => {
           </p>
         </section>
         <footer class="modal-footer">
-          <button class="pill pill--ghost" @click="closeTooLateCancelModal">
-            Cerrar
-          </button>
-          <button
-            v-if="lateCancelProfessionalName"
-            class="pill pill--primary"
-            @click="goToProfessionalForRebook"
-          >
+          <button class="pill pill--ghost" @click="closeTooLateCancelModal">Cerrar</button>
+          <button v-if="lateCancelProfessionalName" class="pill pill--primary" @click="goToProfessionalForRebook">
             Reprogramar turno
           </button>
         </footer>
       </div>
     </div>
 
-    <!-- MODAL CONFIRMAR CANCELACIÓN -->
-    <div
-      v-if="confirmDeleteAppt"
-      class="modal-backdrop"
-      @click.self="cancelDeleteAppointment"
-    >
+    <div v-if="confirmDeleteAppt" class="modal-backdrop" @click.self="cancelDeleteAppointment">
       <div class="modal-card modal-confirm-cancel animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">Cancelar turno</h3>
-          <button class="modal-close" @click="cancelDeleteAppointment">
-            ×
-          </button>
+          <button class="modal-close" @click="cancelDeleteAppointment">×</button>
         </header>
 
         <section class="modal-body">
@@ -1269,7 +1120,6 @@ onMounted(async () => {
   </main>
 </template>
 
-
 <style scoped>
 * { box-sizing: border-box; }
 
@@ -1289,7 +1139,6 @@ onMounted(async () => {
   white-space: nowrap; border: 0;
 }
 
-/* HEADER */
 .page-head {
   display: flex;
   justify-content: space-between;
@@ -1307,7 +1156,6 @@ onMounted(async () => {
 }
 .page-sub { margin: 4px 0 0; font-size: 0.9rem; color: #4b5563; }
 
-/* CARD base */
 .card {
   background: #ffffff;
   border-radius: 18px;
@@ -1316,7 +1164,6 @@ onMounted(async () => {
 }
 .filters { margin-bottom: 22px; background: #d9f5f5; }
 
-/* filtros */
 .filters-row {
   display: grid;
   gap: 12px;
@@ -1352,7 +1199,6 @@ onMounted(async () => {
   padding-right: 50px;
 }
 
-/* buscador */
 .field--search .search-input {
   display: flex;
   gap: 8px;
@@ -1375,7 +1221,6 @@ onMounted(async () => {
 .field--search input { border: none; background: transparent; padding-left: 24px; width: 100%; }
 .field--search input:focus { outline: none; }
 
-/* footer filtros */
 .filters-footer {
   margin-top: 12px;
   padding-top: 10px;
@@ -1398,7 +1243,6 @@ onMounted(async () => {
   border: 1px solid #c0eaea;
 }
 
-/* botones */
 .pill {
   border-radius: 999px;
   padding: 7px 16px;
@@ -1424,14 +1268,17 @@ onMounted(async () => {
 .pill--ghost-limpiar { padding: 10px 18px; }
 .pill--danger { background: #ef4444; box-shadow: 0 8px 18px rgba(239,68,68,0.4); }
 .pill--outline { background: #e0faf7; color: var(--nura-green); border: 1px solid #b6ebe5; box-shadow: none; }
+
+.pill--outline:hover { background: #ffffff;}
+
 .pill--sm { padding: 5px 12px; font-size: 0.78rem; box-shadow: none; }
 .pill--light { background: #fff; color: var(--nura-green); border: 1px solid #b6ebe5; box-shadow: none; }
+.pill--light:hover { background: #e0faf7;}
 
-/* estados */
+
 .state { font-size: 0.9rem; color: #6b7280; padding: 18px 2px; }
 .state--error { color: #b91c1c; }
 
-/* lista profesionales */
 .list {
   display: grid;
   grid-template-columns: 1fr;
@@ -1459,19 +1306,21 @@ onMounted(async () => {
 .prof-bio { margin: 0; font-size: 0.85rem; color: #4b5563; }
 .prof-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
 
-/* icono mail */
 .content-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 40px; height: 40px;
   border-radius: 999px;
-  background: #81c8d9;
+  background: #50bdbd;
   color: #fff;
   border: none;
 }
 
-/* MODALES */
+.content-btn:hover {
+background: #3ea9a9; transform: translateY(-1px); 
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1504,13 +1353,8 @@ onMounted(async () => {
   gap: 10px;
 }
 .modal-title { font-size: 1.15rem; font-weight: 650; margin: 0; color: #0f172a; }
-.modal-close {
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  background: #f0f4f8;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
+.modal-close { width: 34px; height: 34px; border-radius: 50%; background: #f0f4f8; border: none; font-size: 1.1rem; font-weight: 500; line-height: 1; display: flex; align-items: center; justify-content: center; color: #000000ff; cursor: pointer; transition: all 0.15s ease; } .mood-modal-close:hover { background: #e2e8f0; transform: scale(1.05); 
+
 }
 
 .modal-body { padding: 16px; width: 100%; }
@@ -1553,7 +1397,6 @@ onMounted(async () => {
 .prof-summary-name { margin: 0; font-weight: 800; }
 .prof-summary-type { margin: 2px 0 0; color: #64748b; }
 
-/* Mis turnos list */
 .appt-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .appt-item {
   width: 100%;
@@ -1581,9 +1424,21 @@ onMounted(async () => {
   font-weight: 650;
   cursor: pointer;
 }
+
+.link-btn:hover {
+  background: #85b5e046;
+  border-color: #85b6e0;
+  transform: translateY(-2px);
+}
+
+
 .link-btn.danger { color: #ef4444; border-color: #ef4444; }
 
-/* toast */
+.link-btn.danger:hover {
+  background: #ff1c1c20;
+  border-color: #c20808;
+  transform: translateY(-2px);
+}
 .turno-confirmado {
   position: fixed;
   left: 12px;
@@ -1603,12 +1458,10 @@ onMounted(async () => {
   .turno-confirmado { left: auto; right: 18px; width: 360px; }
 }
 
-/* policy list */
 .policy-list { margin: 8px 0 0; padding-left: 18px; color: #4b5563; }
 .policy-list li { margin-bottom: 6px; }
 .policy-list li::marker { content: '✓ '; color: #50bdbd; font-weight: 900; }
 
-/* clash */
 .modal-clash { border: 1px solid #c4f1ee; }
 .modal-header--clash { background: #f6fffe; }
 .modal-badge-alert {
@@ -1622,6 +1475,5 @@ onMounted(async () => {
   font-weight: 900;
 }
 
-/* flatpickr arriba de backdrop */
 :global(.flatpickr-calendar) { z-index: 2001 !important; }
 </style>

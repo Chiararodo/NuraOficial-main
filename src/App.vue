@@ -14,7 +14,7 @@ watch(
       notif.initRealtime()
       notif.refreshTodayCount()
     } else {
-      // opcional: limpiar cuando se desloguea
+      
       notif.refreshTodayCount()
     }
   },

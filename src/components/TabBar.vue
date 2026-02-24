@@ -1,3 +1,10 @@
+<script setup>
+import { useRoute } from 'vue-router'
+const route = useRoute()
+
+// Marca activo por inicio de ruta (home cuenta como /app/home y /app/home/loquesea)
+const isActive = (path) => route.path.startsWith(path)
+</script>
 <template>
   <footer class="tabbar">
     <!-- HOME -->
@@ -27,13 +34,6 @@
   </footer>
 </template>
 
-<script setup>
-import { useRoute } from 'vue-router'
-const route = useRoute()
-
-// Marca activo por inicio de ruta (home cuenta como /app/home y /app/home/loquesea)
-const isActive = (path) => route.path.startsWith(path)
-</script>
 
 <style scoped>
 .tabbar {

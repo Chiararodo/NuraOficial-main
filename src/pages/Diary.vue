@@ -222,7 +222,7 @@ async function saveEntry() {
 
   const isCreate = !existingEntry.value
 
-  // ✅ SOLO bloquea si es NUEVA entrada
+  // SOLO bloquea si es NUEVA entrada
   if (isCreate && !canCreateThisMonth.value) {
     showLimitModal.value = true
     return
@@ -247,7 +247,7 @@ async function saveEntry() {
 
     calendarMap.value[selectedISO.value] = mood.value
 
-    // ✅ si era NUEVO, ahora consume 1
+    // si era NUEVO, ahora consume 1
     if (isCreate) {
       existingEntry.value = true
       gate.consume(1)
@@ -338,7 +338,7 @@ function dayStyle(day: number) {
       <h2>Diario emocional</h2>
       <p class="subtitle">Registrá tu estado día por día.</p>
 
-      <!-- ✅ CTA igual Foro (y NO se duplica con banner) -->
+      <!-- CTA igual Foro (y NO se duplica con banner) -->
       <div v-if="showPremiumCta" class="premium-cta">
         <div class="premium-cta__left">
           <div class="premium-cta__top">

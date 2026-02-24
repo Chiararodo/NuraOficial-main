@@ -214,8 +214,6 @@ function goRegister() {
         </button>
       </form>
 
-      <!-- (Si lo querés usar en login, lo dejé importado) -->
-      <!-- <InstallButton class="w-field" /> -->
     </div>
   </section>
 </template>
