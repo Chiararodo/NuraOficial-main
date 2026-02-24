@@ -6,7 +6,6 @@ import Login from '@/pages/Login.vue'
 import Register from '@/pages/Register.vue'
 import Onboarding from '@/pages/Onboarding.vue'
 import Onboarding2 from '@/pages/Onboarding2.vue'
-import Onboarding3 from '@/pages/Onboarding3.vue'
 import NotificacionesFeed from '@/pages/NotificacionesFeed.vue'
 
 // App (autenticadas)
@@ -36,7 +35,6 @@ const routes: RouteRecordRaw[] = [
   // Onboarding (requiere sesión)
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
   { path: '/onboarding2', name: 'onboarding2', component: Onboarding2 },
-  { path: '/onboarding3', name: 'onboarding3', component: Onboarding3 },
 
   // Área privada /app
   {
@@ -83,7 +81,7 @@ const routes: RouteRecordRaw[] = [
       // Chatbot
       { path: 'chatbot', name: 'chatbot', component: Chatbot },
 
-      // Diario /
+      // Diario
       { path: 'diario', name: 'diario', component: Diary },
       {
         path: 'diario/entradas',
@@ -104,7 +102,6 @@ const routes: RouteRecordRaw[] = [
       },
 
       // Premium
-
       {
         path: 'premium',
         name: 'premium',
@@ -126,6 +123,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/PremiumPage.vue')
       },
 
+      // Términos (privado)
       {
         path: 'terminos',
         name: 'terminos',
@@ -168,12 +166,12 @@ export const router = createRouter({
   }
 })
 
-const ONBOARDING_PATHS = new Set(['/onboarding', '/onboarding2', '/onboarding3'])
+const ONBOARDING_PATHS = new Set(['/onboarding', '/onboarding2'])
 
-// cache simple del perfil para no pedirlo en cada navegación
+// cache simple del perfil
 let profileCache: { id: string; terms_accepted?: boolean } | null = null
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   if (to.name === 'splash') return
 
   // 1) Sesión actual
@@ -193,8 +191,18 @@ router.beforeEach(async (to) => {
 
   // 4) Chequeo de TÉRMINOS solo si está logueado
   if (isAuthed) {
-    // Cargar perfil una sola vez
-    if (!profileCache) {
+    // refrescar cache si:
+    // - nunca se cargó
+    // - venimos desde terminos (acaba de aceptar)
+    // - vamos a home (para asegurar que ya está actualizado)
+    // - vamos a terminos (por seguridad)
+    const mustRefresh =
+      !profileCache ||
+      to.name === 'home' ||
+      to.name === 'terminos' ||
+      from.name === 'terminos'
+
+    if (mustRefresh) {
       const { data: prof } = await supabase
         .from('profiles')
         .select('id, terms_accepted')
@@ -206,13 +214,8 @@ router.beforeEach(async (to) => {
 
     const termsAccepted = profileCache?.terms_accepted === true
 
-    // Si NO aceptó y está tratando de entrar a /app (cualquier sección) que no sea terminos ni onboarding
-    if (
-      !termsAccepted &&
-      to.name !== 'terminos' &&
-      to.path.startsWith('/app') &&
-      !ONBOARDING_PATHS.has(to.path)
-    ) {
+    // Si NO aceptó y está tratando de entrar a /app (cualquier sección) que no sea terminos
+    if (!termsAccepted && to.path.startsWith('/app') && to.name !== 'terminos') {
       return '/app/terminos'
     }
 

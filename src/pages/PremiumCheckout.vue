@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
@@ -16,6 +16,26 @@ const MP_PREMIUM_URL = 'https://mpago.la/2b1Jhzj'
 
 const authEmail = computed(() => auth.user?.email ?? '')
 
+/* ===== Modal Términos ===== */
+const showTermsModal = ref(false)
+
+function openTermsModal() {
+  showTermsModal.value = true
+}
+function closeTermsModal() {
+  showTermsModal.value = false
+}
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && showTermsModal.value) closeTermsModal()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
 function goBack() {
   router.back()
 }
@@ -30,11 +50,7 @@ async function prefillEmail() {
 
   // 2) si hay email guardado en profiles
   if (!auth.user) return
-  const { data } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', auth.user.id)
-    .maybeSingle()
+  const { data } = await supabase.from('profiles').select('email').eq('id', auth.user.id).maybeSingle()
 
   if (data?.email) email.value = data.email
 }
@@ -114,14 +130,20 @@ onMounted(() => {
           </p>
         </div>
 
+        <!-- ✅ checkbox + link que abre modal -->
+        <label class="terms" for="premium-terms">
+          <input id="premium-terms" v-model="terms" type="checkbox" />
+          <span>
+            Acepto los
+            <button type="button" class="terms-link" @click.prevent="openTermsModal">
+              términos y condiciones
+            </button>
+          </span>
+        </label>
+
         <p class="note">
           Te vamos a redirigir a <strong>Mercado Pago</strong> para completar el pago de forma segura.
         </p>
-
-        <label class="terms" for="premium-terms">
-          <input id="premium-terms" v-model="terms" type="checkbox" />
-          <span>Acepto los términos y condiciones</span>
-        </label>
 
         <div class="total">
           <span>Total a pagar</span>
@@ -139,6 +161,50 @@ onMounted(() => {
         </button>
       </section>
     </section>
+
+    <!-- =========================
+         MODAL TÉRMINOS
+         ========================= -->
+    <div
+      v-if="showTermsModal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Términos y condiciones"
+      @click.self="closeTermsModal"
+    >
+      <div class="modal">
+        <div class="modal-head">
+          <h3 class="modal-title">Términos y Condiciones</h3>
+          <button class="icon-btn" type="button" @click="closeTermsModal" aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <p>
+            Te damos la bienvenida a Nura. Antes de usar la app, es importante que leas y aceptes
+            estos términos y la política de privacidad. Nura no reemplaza la atención médica ni
+            psicológica profesional.
+          </p>
+          <p>
+            Al continuar, confirmás que sos mayor de 15 años y que aceptás que tus datos se usarán
+            según se describe en nuestra política de privacidad, solo para mejorar tu experiencia
+            dentro de Nura.
+          </p>
+          <p>
+            Si no estás de acuerdo con alguno de los puntos, por favor no continúes con el uso de la
+            aplicación.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-full" type="button" @click="closeTermsModal">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -298,6 +364,22 @@ onMounted(() => {
   height: 16px;
 }
 
+/* link estilo iOS */
+.terms-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: #50bdbd;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.terms-link:hover {
+  color: #3ea9a9;
+}
+
 .total {
   display: flex;
   align-items: baseline;
@@ -333,7 +415,8 @@ onMounted(() => {
   text-decoration: none;
 }
 .btn-full {
- width: 90%;
+  width: 50%;
+  margin: 0 auto;
 }
 
 .btn-primary {
@@ -366,5 +449,91 @@ onMounted(() => {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+/* =========================
+   Modal
+   ========================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 60;
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(226, 237, 247, 0.9);
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 10px;
+  background: #f6fbfc;
+  border-bottom: 1px solid #e2edf7;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.icon-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #0f172a;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+.icon-btn:hover {
+  background: rgba(80, 189, 189, 0.12);
+}
+
+.modal-body {
+  padding: 12px 14px 0;
+  max-height: 56vh;
+  overflow: auto;
+  color: #334155;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.modal-actions {
+  padding: 14px;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .card {
+    max-width: 100%;
+    padding: 18px 16px;
+  }
+  .btn-full {
+    width: 50%;
+  }
+  .modal {
+    max-width: 360px;
+    border-radius: 16px;
+  }
+  .modal-body {
+    max-height: 52vh;
+    font-size: 0.9rem;
+  }
 }
 </style>

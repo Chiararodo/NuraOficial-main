@@ -56,7 +56,7 @@ function handleClick(id: OpcionId) {
     <header class="page-head">
       <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
 
-      <h2>{{ $t('content.pageTitle') }}</h2>
+      <h2>Agendar</h2>
 
        </header>
 
@@ -85,22 +85,31 @@ function handleClick(id: OpcionId) {
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 24px 18px 48px;
+  padding: 20px 18px 40px;
   max-width: 1100px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
 
-/* Head + Tabs */
+/* Header (lo dejo como lo tenés, pero alineado prolijo) */
 .page-head {
-  display: grid;
-  gap: 15px;
-  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 0 auto 18px;
+  flex-wrap: wrap;
+  max-width: 1100px;
 }
+
 h2 {
   margin: 0;
   padding: 10px;
+  font-size: 1.4rem;
+  color: #46bdbd;
+  font-weight: 700;
 }
+
 .visually-hidden {
   position: absolute !important;
   height: 1px;
@@ -110,69 +119,14 @@ h2 {
   white-space: nowrap;
 }
 
-/* Page */
-.page {
-  background: #f5fbfd;
-  min-height: calc(100dvh - 64px);
-  padding: 28px 16px 44px;
-}
-
-.wrap {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
-  gap: 16px;
-}
-
-/* Head */
-.head {
-  display: grid;
-  gap: 6px;
-  padding: 2px 2px 6px;
-}
-
-.kicker {
-  margin: 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #64748b;
-  font-weight: 800;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.7rem;
-  font-weight: 850;
-  color: #0f172a;
-}
-
-.sub {
-  margin: 2px 0 0;
-  color: #475569;
-  font-size: 1rem;
-  max-width: 80ch;
-}
-
-/* Grid */
-.grid {
-  display: grid;
-  gap: 18px;
-}
-
-@media (min-width: 900px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* Grid  */
+/* ====== LISTA: igual a Eventos/Sesiones ====== */
 .lista {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
   max-width: 1050px;
   margin: 0 auto;
+  padding: 0;
 }
 
 @media (max-width: 900px) {
@@ -181,14 +135,13 @@ h2 {
   }
 }
 
-/* Card  */
+/* ====== CARD: igual a Eventos/Sesiones ====== */
 .card {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 18px;
-  width: 92%;
-  margin: 0 auto;
+  margin: 0;
   min-height: 200px;
   padding: 18px 18px;
   border-radius: 20px;
@@ -203,43 +156,31 @@ h2 {
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
 }
 
+/* ====== IMAGEN: tamaño fijo desktop + recorte perfecto ====== */
 .card-img {
   flex: 0 0 130px;
+  width: 130px;
+  height: 130px;
+  border-radius: 18px;
+  overflow: hidden; /* clave para que todas queden iguales */
 }
 
 .card-img img {
-  width: 130px;
-  height: 130px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 18px;
   display: block;
 }
 
+/* ====== BODY: igual a Eventos/Sesiones ====== */
 .card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 10px;
+  min-width: 0;
 }
-
-@media (max-width: 700px) {
-  .card {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .card-img {
-    flex: none;
-    width: 100%;
-  }
-
-  .card-img img {
-    width: 100%;
-    height: auto;
-  }
-}
-
 
 .title {
   margin: 0;
@@ -254,7 +195,7 @@ h2 {
   color: #374151;
 }
 
-/* Botón */
+/* ====== BOTONES: misma lógica que Eventos/Sesiones ====== */
 .actions {
   display: flex;
   gap: 10px;
@@ -294,6 +235,29 @@ h2 {
 
 .action-btn--primary {
   background: #50bdbd;
+}
+
+/* ====== MOBILE: igual a Eventos/Sesiones pero con imagen “hero” controlada ====== */
+@media (max-width: 700px) {
+  .card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-img {
+    flex: none;
+    width: 100%;
+    height: 170px; /* <- MISMO ALTO siempre, para que todas queden iguales */
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* <- clave: nunca “auto”, siempre recorta igual */
+    display: block;
+  }
 }
 
 @media (max-width: 520px) {

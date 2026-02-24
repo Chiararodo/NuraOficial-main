@@ -41,11 +41,12 @@ async function acceptTerms() {
     if (updProfileError) throw updProfileError
 
     // 4) Ir al Home (nombre de ruta) → y forzar reload como backup
-    router.replace({ name: 'home' })
-    // backup hard redirect por si el guard se pone denso:
-    setTimeout(() => {
-      window.location.replace('/app/home')
-    }, 50)
+   await router.replace({ name: 'home' })
+setTimeout(() => {
+  if (router.currentRoute.value.name !== 'home') {
+    window.location.replace('/app/home')
+  }
+}, 150)
   } catch (e: any) {
     console.error('Error al aceptar términos:', e)
     errorMsg.value =
@@ -179,5 +180,84 @@ h1 {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/* =========================
+   Premium Mobile Layout (Términos)
+   ========================= */
+@media (max-width: 480px) {
+  .terminos-page {
+    padding: 64px 18px 64px; /* más aire y más fondo visible */
+    align-items: center;
+    min-height: 100dvh; /* mejor en mobile que 100vh */
+  }
+
+  .card {
+    max-width: 320px; /* card más chica como onboarding */
+    width: 100%;
+    border-radius: 28px;
+    padding: 22px 18px 22px;
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.22),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin-bottom: 12px;
+  }
+
+  .text {
+    /* menos alto para que no “coma” toda la card */
+    max-height: 34vh;
+    padding: 6px 10px 10px;
+    margin-bottom: 14px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    border-radius: 14px;
+    background: #f6fbfc; /* suave, como el resto */
+  }
+
+  .check-row {
+    padding: 0 6px 8px;
+    gap: 8px;
+    font-size: 0.85rem;
+    line-height: 1.2rem;
+    margin-bottom: 12px;
+  }
+
+  .error {
+    font-size: 0.82rem;
+    margin-bottom: 10px;
+  }
+
+  .primary-btn {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    font-size: 0.92rem;
+    box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
+  }
+}
+
+/* Extra compacto para pantallas muy chicas */
+@media (max-width: 360px) {
+  .terminos-page {
+    padding: 52px 14px 52px;
+  }
+
+  .card {
+    max-width: 300px;
+    padding: 20px 16px 20px;
+    border-radius: 22px;
+  }
+
+  h1 {
+    font-size: 1.28rem;
+  }
+
+  .text {
+    max-height: 32vh;
+    font-size: 0.86rem;
+  }
 }
 </style>

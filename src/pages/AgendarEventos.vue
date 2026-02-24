@@ -407,8 +407,11 @@ onMounted(async () => {
 
 <style scoped>
 .agendar-sub {
-  background: #ffffff;
+    background: #fff;
   padding: 20px 18px 40px;
+  max-width: 1100px;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
 }
 
 .sub-header {
@@ -585,7 +588,6 @@ onMounted(async () => {
   flex-direction: row;
   align-items: center;
   gap: 18px;
-  width: 92%;
   margin: 0 auto;
   min-height: 200px;
   padding: 18px 18px;

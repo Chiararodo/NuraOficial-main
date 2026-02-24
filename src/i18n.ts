@@ -137,7 +137,7 @@ const messages = {
         freeDesc: 'Acceso esencial para empezar a usar Nura.',
         premiumDesc:
           'Tenés acceso ilimitado al Foro, Diario y Chatbot, además de beneficios exclusivos.',
-        seeDetails: 'Ver detalles del plan',
+        seeDetails: 'Ver detalles',
         seePlans: 'Ver planes y beneficios',
         limits: {
           forumTitle: 'Foro:',
@@ -168,7 +168,7 @@ const messages = {
       diary: {
         title: 'Mi Diario',
         emptyPreview: '',
-        viewAll: 'Ver todas mis entradas',
+        viewAll: 'Mis entradas',
         writeToday: 'Escribir hoy'
       },
 

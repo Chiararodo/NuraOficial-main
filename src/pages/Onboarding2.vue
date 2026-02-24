@@ -1,116 +1,221 @@
+<!-- Onboarding2.vue -->
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useNotificationSettings } from '@/composables/useNotificationSettings'
+
+const router = useRouter()
+const gate = useNotificationSettings()
+
+const saving = ref(false)
+const errorMsg = ref<string>('')
+
+/** ON/OFF general (local, NO va a Supabase) */
+const enabled = ref(true)
+
+/* Toggles reales (los de tu tabla) */
+const bienestar = computed({
+  get: () => gate.settings.value.bienestar,
+  set: (v: boolean) => (gate.settings.value.bienestar = v)
+})
+
+const profesional = computed({
+  get: () => gate.settings.value.profesional,
+  set: (v: boolean) => (gate.settings.value.profesional = v)
+})
+
+const appUpdates = computed({
+  get: () => gate.settings.value.app_updates,
+  set: (v: boolean) => (gate.settings.value.app_updates = v)
+})
+
+function applyDisabledDefaults() {
+  bienestar.value = false
+  profesional.value = false
+  appUpdates.value = false
+}
+
+function deriveEnabledFromToggles() {
+  enabled.value = !!(bienestar.value || profesional.value || appUpdates.value)
+}
+
+async function safeUpsert() {
+  try {
+    saving.value = true
+    await gate.upsertToSupabase()
+  } catch {
+    errorMsg.value = 'No pudimos guardar tus preferencias. Probá nuevamente.'
+  } finally {
+    saving.value = false
+  }
+}
+
+/** Switch general */
+async function onToggleEnabled(next: boolean) {
+  errorMsg.value = ''
+  enabled.value = next
+
+  if (!enabled.value) {
+    applyDisabledDefaults()
+    await safeUpsert()
+    return
+  }
+
+  // pedir permiso (si aplica)
+  if ('Notification' in window) {
+    try {
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') {
+        enabled.value = false
+        applyDisabledDefaults()
+        errorMsg.value = 'Para activar notificaciones, necesitás permitirlas en tu navegador.'
+        await safeUpsert()
+        return
+      }
+    } catch {
+      enabled.value = false
+      applyDisabledDefaults()
+      errorMsg.value = 'No pudimos solicitar permisos de notificación.'
+      await safeUpsert()
+      return
+    }
+  }
+
+  // defaults al activar
+  bienestar.value = true
+  profesional.value = true
+  appUpdates.value = false
+
+  await safeUpsert()
+}
+
+onMounted(async () => {
+  gate.loadFromLocal()
+
+  try {
+    await gate.loadFromSupabase()
+  } catch {
+    // seguimos con local/default
+  }
+
+  deriveEnabledFromToggles()
+  if (!enabled.value) applyDisabledDefaults()
+})
+
+/** Auto-guardar cuando cambian toggles si enabled está ON */
+watch(
+  () => [bienestar.value, profesional.value, appUpdates.value],
+  async () => {
+    if (!enabled.value) return
+    await safeUpsert()
+  }
+)
+
+/** Flujo: siempre ir a Términos */
+function goTerms() {
+  router.push('/app/terminos')
+}
+
+async function skip() {
+  // opcional: si querés guardar igual
+  errorMsg.value = ''
+  await safeUpsert()
+  goTerms()
+}
+
+async function goNext() {
+  errorMsg.value = ''
+  await safeUpsert()
+  goTerms()
+}
+</script>
+
 <template>
-  <h1 class="visually-hidden">Onboarding 2 · Recordatorios</h1>
+  <h1 class="visually-hidden">Onboarding 2 · Notificaciones</h1>
 
   <main class="ob-page">
     <section class="ob-card">
-      <h2>Elegí tus recordatorios</h2>
+      <h2>Notificaciones</h2>
 
       <p class="subtitle">
-        Podemos ayudarte a no olvidarte de lo importante.<br />
-        ¿Sobre qué te gustaría que Nura te avise?
+        Configurá qué avisos querés recibir. Podés cambiarlo después desde tu perfil.
       </p>
 
-      <!-- Switch de notificaciones -->
+      <!-- Switch general -->
       <div class="switch-row">
         <div class="switch-text">
-          <span class="switch-label">Recibir notificaciones de Nura</span>
-          <p class="switch-caption">
-            Serán recordatorios suaves, sin spam. Podés cambiarlos cuando quieras.
-          </p>
+          <span class="switch-label">Permitir notificaciones</span>
+          <p class="switch-caption">Usamos avisos suaves para recordatorios y novedades. Sin spam.</p>
         </div>
 
-        <input
-          id="notif"
-          type="checkbox"
-          v-model="notifEnabled"
-          class="switch-input"
-          @change="onToggleNotif"
-        />
-        <label for="notif" class="switch"></label>
+        <label class="switch">
+          <input
+            type="checkbox"
+            :checked="enabled"
+            @change="onToggleEnabled(($event.target as HTMLInputElement).checked)"
+          />
+          <span class="slider" />
+        </label>
       </div>
 
-      <!-- Grupo de opciones -->
+      <!-- Opciones -->
       <div class="options">
-        <label class="option">
-          <span class="opt-left">
-            <span class="circle-icon">🕒</span>
-            <span>Turnos y meditaciones</span>
-          </span>
-          <input type="checkbox" v-model="opts.turno" class="check-input" />
-          <span class="check"></span>
-        </label>
+        <article class="option" :class="{ 'option--disabled': !enabled }">
+          <div class="opt-text">
+            <h3 class="opt-title">Recordatorios de bienestar</h3>
+            <p class="opt-sub">Ejercicios, chequeos emocionales y tips para tu día a día.</p>
+          </div>
 
-        <label class="option">
-          <span class="opt-left">
-            <span class="circle-icon">🧘‍♀️</span>
-            <span>Pausas de respiración y bienestar diario</span>
-          </span>
-          <input type="checkbox" v-model="opts.relax" class="check-input" />
-          <span class="check"></span>
-        </label>
+          <label class="switch">
+            <input v-model="bienestar" type="checkbox" :disabled="!enabled" />
+            <span class="slider" />
+          </label>
+        </article>
 
-        <label class="option">
-          <span class="opt-left">
-            <span class="circle-icon">📅</span>
-            <span>Agenda y cosas importantes del día</span>
-          </span>
-          <input type="checkbox" v-model="opts.agenda" class="check-input" />
-          <span class="check"></span>
-        </label>
+        <article class="option" :class="{ 'option--disabled': !enabled }">
+          <div class="opt-text">
+            <h3 class="opt-title">Novedades de tu profesional</h3>
+            <p class="opt-sub">Material nuevo, cambios de turno y mensajes importantes.</p>
+          </div>
+
+          <label class="switch">
+            <input v-model="profesional" type="checkbox" :disabled="!enabled" />
+            <span class="slider" />
+          </label>
+        </article>
+
+        <article class="option" :class="{ 'option--disabled': !enabled }">
+          <div class="opt-text">
+            <h3 class="opt-title">Actualizaciones de Nura</h3>
+            <p class="opt-sub">Avisos de seguridad, nuevas funciones y mejoras de la app.</p>
+          </div>
+
+          <label class="switch">
+            <input v-model="appUpdates" type="checkbox" :disabled="!enabled" />
+            <span class="slider" />
+          </label>
+        </article>
+      </div>
+
+      <div v-if="errorMsg" class="error" role="status">
+        {{ errorMsg }}
       </div>
 
       <!-- Acciones -->
       <div class="actions">
-        <button class="btn btn-secondary" @click="skip">
+        <button class="btn btn-secondary" type="button" @click="skip">
           Configurarlo más tarde
         </button>
-        <button class="btn btn-primary" @click="goNext">
-          Continuar
+
+        <button class="btn btn-primary" type="button" :disabled="saving" @click="goNext">
+          {{ saving ? 'Guardando…' : 'Continuar' }}
         </button>
       </div>
     </section>
   </main>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
-
-// interruptor de notificaciones
-const notifEnabled = ref(false)
-
-async function onToggleNotif() {
-  // si lo activa, pide permiso del navegador
-  if (notifEnabled.value && 'Notification' in window) {
-    try {
-      const perm = await Notification.requestPermission()
-      if (perm !== 'granted') {
-        // si no concede, apaga el switch
-        notifEnabled.value = false
-      }
-    } catch {
-      notifEnabled.value = false
-    }
-  }
-}
-
-// opciones de recordatorios
-const opts = ref({
-  turno: true,
-  relax: false,
-  agenda: false
-})
-
-function skip() {
-  router.push('/onboarding3')
-}
-
-function goNext() {
-  router.push('/onboarding3')
-}
-</script>
 
 <style scoped>
 /* ===== Fondo igual al splash ===== */
@@ -134,7 +239,6 @@ function goNext() {
   text-align: center;
 }
 
-/* Título / subtítulo en paleta Nura */
 h2 {
   color: #50bdbd;
   font-weight: 800;
@@ -142,6 +246,7 @@ h2 {
   font-size: 1.9rem;
   margin: 8px 0 6px;
 }
+
 .subtitle {
   color: #2c2c2c;
   opacity: 0.9;
@@ -149,7 +254,16 @@ h2 {
   line-height: 1.5;
 }
 
-/* ===== Switch de notificaciones ===== */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}
+
+/* ===== Switch row ===== */
 .switch-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -159,7 +273,7 @@ h2 {
   border-radius: 16px;
   padding: 12px 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .switch-text {
@@ -169,6 +283,7 @@ h2 {
   display: block;
   font-weight: 700;
   margin-bottom: 4px;
+  color: #0f172a;
 }
 .switch-caption {
   font-size: 0.85rem;
@@ -176,107 +291,111 @@ h2 {
   margin: 0;
 }
 
-/* input escondido, label es el interruptor */
-.switch-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.switch {
-  width: 82px;
-  height: 40px;
-  border-radius: 999px;
-  background: #50bdbd7a;
-  display: inline-block;
-  position: relative;
-  transition: 0.25s ease;
-}
-.switch::after {
-  content: '';
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 28px;
-  height: 28px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  transition: 0.25s ease;
-}
-.switch-input:checked + .switch {
-  background: #50bdbd;
-}
-.switch-input:checked + .switch::after {
-  transform: translateX(42px);
-}
-
-/* ===== Caja de opciones ===== */
+/* ===== Opciones ===== */
 .options {
   background: #dbeff1;
   border-radius: 18px;
-  padding: 16px 12px;
+  padding: 12px 12px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-bottom: 22px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .option {
-   background: #50bdbd;
-  font-size:1.1rem ;
-  font-weight: 530;
-  color: #fff;
-  border-radius: 999px;
-  padding: 10px 14px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-}
-
-.opt-left {
-  display: inline-flex;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
-  text-align: left;
-}
-.circle-icon {
-  width: 36px;
-  height: 36px;
-  display: inline-grid;
-  place-items: center;
-  background: #ffffffff;
-  border-radius: 50%;
-  font-size: 18px;
-}
-
-/* checkbox custom a la derecha */
-.check-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.check {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 2px solid #e6f2f7;
-  background: #ffffff20;
-  display: inline-block;
-  box-shadow: inset 0 0 0 3px transparent;
-  transition: 0.2s ease;
-}
-.option:has(.check-input:checked) .check {
+  padding: 12px 12px;
+  border-radius: 14px;
   background: #ffffff;
-  box-shadow: inset 0 0 0 3px #50bdbd;
+  border: 1px solid #e2edf7;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
 
-.check:hover{
-  background: #9be2e2ff;
-  box-shadow: inset 0 0 0 3px #50bdbd;
+.option--disabled {
+  opacity: 0.55;
+}
+
+.opt-text {
+  text-align: left;
+  min-width: 0;
+}
+
+.opt-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.opt-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.3rem;
+}
+
+/* ===== Switch ===== */
+.switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #e5e7eb;
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.slider::before {
+  position: absolute;
+  content: '';
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  top: 4px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.4);
+}
+
+.switch input:checked + .slider {
+  background-color: #50bdbd;
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(18px);
+}
+
+.switch input:disabled + .slider {
+  cursor: not-allowed;
+}
+
+/* ===== Error ===== */
+.error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  margin: 0 0 14px;
+  text-align: left;
 }
 
 /* ===== Botones ===== */
@@ -297,35 +416,124 @@ h2 {
   font-size: 0.98rem;
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
-  transition: background 0.15s ease, transform 0.08s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
 }
 
-.btn:hover{
+.btn:hover:not(:disabled) {
   background: #3ea9a9;
   transform: translateY(-1px);
   box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+}
+
 .btn-primary {
   background: #50bdbd;
   color: #fff;
 }
-.btn-primary:hover {
-  background: #3ea9a9;
-}
+
 .btn-secondary {
   background: #48b1b1ad;
   color: #fff;
 }
-.btn-secondary:hover {
-  filter: brightness(0.96);
+
+.btn-secondary:hover:not(:disabled) {
   background: #50bdbd;
 }
 
-/* Responsive pequeño */
 @media (min-width: 900px) {
   .ob-card {
     padding: 32px 26px 38px;
   }
+}
+
+/* =========================
+   Premium Mobile Layout
+   ========================= */
+@media (max-width: 480px) {
+
+  .ob-page {
+    padding: 60px 18px 60px; /* mucho más aire */
+    align-items: center;
+  }
+
+  .ob-card {
+    max-width: 320px;       /* más angosta */
+    width: 100%;
+    border-radius: 28px;
+    padding: 22px 18px 24px;
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.22),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  h2 {
+    font-size: 1.35rem;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+  }
+
+  .switch-row {
+    padding: 10px 12px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+  }
+
+  .options {
+    padding: 10px;
+    gap: 10px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+  }
+
+  .option {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .opt-title {
+    font-size: 0.88rem;
+  }
+
+  .opt-sub {
+    font-size: 0.75rem;
+    line-height: 1.05rem;
+  }
+
+  /* Switch un poco más fino */
+  .switch {
+    width: 40px;
+    height: 22px;
+  }
+
+  .slider::before {
+    width: 15px;
+    height: 15px;
+    top: 3.5px;
+  }
+
+  .switch input:checked + .slider::before {
+    transform: translateX(16px);
+  }
+
+  .actions {
+    gap: 10px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
+  }
+
 }
 </style>
