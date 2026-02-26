@@ -156,9 +156,6 @@ onBeforeUnmount(() => {
           <li>Abrí el menú ⋮ del navegador.</li>
           <li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla de inicio”</b>.</li>
         </ol>
-        <p class="install-modal-tip">
-          Si sigue sin aparecer, suele ser porque falta algún requisito PWA (manifest, service worker, HTTPS, etc.).
-        </p>
       </div>
 
       <div class="install-modal-actions">
