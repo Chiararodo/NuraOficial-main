@@ -137,6 +137,7 @@ onBeforeUnmount(() => {
           Seguí estos pasos:
         </p>
         <ol>
+          <li>Tocá el menú de 3 puntitos en la esquina inferior derecha del navegador <b>(...)</b> .</li>
           <li>Tocá el botón <b>Compartir</b> (el cuadradito con flecha).</li>
           <li>Elegí <b>“Agregar a pantalla de inicio”</b>.</li>
           <li>Confirmá con <b>Agregar</b>.</li>
