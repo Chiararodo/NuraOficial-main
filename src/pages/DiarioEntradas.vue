@@ -374,16 +374,17 @@ function goWriteNew() {
 <style scoped>
 .page {
   background: #fff;
-  padding: 24px 18px 48px;
-  max-width: 1100px;
+  padding: 20px 18px 48px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
 .top-bar {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  margin-bottom: 20px;
+ display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1400px;
+  margin: 0 auto 14px;
 }
 
 .head-text {
@@ -402,11 +403,9 @@ function goWriteNew() {
   background: transparent;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   cursor: pointer;
   padding: 0;
 }
-
 .arrow {
   font-size: 1.5rem;
   color: #46bdbd;
@@ -499,14 +498,24 @@ function goWriteNew() {
 }
 
 .btn-main {
-  border-radius: 999px;
-  padding: 8px 18px;
-  border: none;
+  border: 2px solid #50bdbd;
+  padding: 11px 28px;
   background: #50bdbd;
-  color: #fff;
-  font-weight: 600;
+  color: white;
+  border-radius: 12px;
+  width: max-content;
+  font-size: medium;
+  font-weight: 550;
   cursor: pointer;
-  width: fit-content;
+  transition: 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-main:hover {
+   background: #50bdbd7e;
+  transform: translateY(-2px);
 }
 
 .entries {
@@ -588,10 +597,10 @@ function goWriteNew() {
 .link-btn {
   border: 2px solid #50bdbd;
   border-radius: 20px;
-  padding: 6px 12px;
+  padding: 9px 20px;
   background: transparent;
   color: #50bdbd;
-  font-size: 13px;
+  font-size: medium;
   font-weight: 550;
   cursor: pointer;
   transition: 0.2s ease;
@@ -601,7 +610,7 @@ function goWriteNew() {
 }
 
 .link-btn:hover {
-  background: #85b5e046;
+  background: #50bdbd41;
   border-color: #85b6e0;
   transform: translateY(-2px);
 }
@@ -622,7 +631,7 @@ function goWriteNew() {
 }
 
 .link-btn.share:hover {
-  background: #688ac417;
+  background: #688ac44d;
   border-color: #b7cff7ff;
 }
 

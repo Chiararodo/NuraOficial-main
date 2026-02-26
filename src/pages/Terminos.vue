@@ -40,7 +40,7 @@ async function acceptTerms() {
 
     if (updProfileError) throw updProfileError
 
-    // 4) Ir al Home (nombre de ruta) → y forzar reload como backup
+    // 4) Ir al Home → y forzar reload como backup
    await router.replace({ name: 'home' })
 setTimeout(() => {
   if (router.currentRoute.value.name !== 'home') {
@@ -187,13 +187,13 @@ h1 {
    ========================= */
 @media (max-width: 480px) {
   .terminos-page {
-    padding: 46px 18px 44px;  /* menos padding arriba */
-    align-items: flex-start;  /* en vez de center */
+    padding: 46px 18px 44px;  
+    align-items: flex-start; 
     min-height: 100dvh;
   }
 
   .card {
-    margin-top: 8px;          /* la sube un toque más */
+    margin-top: 8px;          
   }
 
 
@@ -203,14 +203,13 @@ h1 {
   }
 
   .text {
-    /* menos alto para que no “coma” toda la card */
     max-height: 34vh;
     padding: 6px 10px 10px;
     margin-bottom: 14px;
     font-size: 0.88rem;
     line-height: 1.4;
     border-radius: 14px;
-    background: #f6fbfc; /* suave, como el resto */
+    background: #f6fbfc; 
   }
 
   .check-row {

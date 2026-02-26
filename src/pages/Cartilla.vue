@@ -310,14 +310,23 @@ let fp: any = null
 function initDatepicker() {
   nextTick(() => {
     if (fp) fp.destroy()
+
     const input = document.querySelector('#nura-datepicker') as HTMLInputElement
     if (!input) return
-    fp = flatpickr(input, {
-      locale: Spanish,
-      dateFormat: 'Y-m-d',
-      minDate: 'today',
-      allowInput: true
-    })
+
+fp = flatpickr(input, {
+  locale: Spanish,
+  dateFormat: 'Y-m-d',
+  altInput: true,
+  altFormat: 'd/m/Y',
+  altInputClass: 'nura-date-input',
+  minDate: 'today',
+  allowInput: false,
+  defaultDate: bookingDate.value || undefined,
+  onChange: (_selectedDates: Date[], dateStr: string) => {
+    bookingDate.value = dateStr
+  }
+})
   })
 }
 
@@ -898,7 +907,7 @@ onMounted(async () => {
           <button type="button" class="modal-close" @click="closeBookingModal">×</button>
         </header>
 
-        <section class="modal-body">
+        <section class="modal-body modal-body-scroll">
           <div class="prof-summary">
             <img
               v-if="selectedPro && getAvatarUrl(selectedPro)"
@@ -941,7 +950,8 @@ onMounted(async () => {
 
           <div v-if="!bookingHasSingleMode" class="modal-field">
             <label for="booking-mode">Modalidad</label>
-            <select id="booking-mode" v-model="bookingMode" aria-label="Modalidad del turno">
+            <select id="booking-mode" v-model="bookingMode" 
+            aria-label="Modalidad del turno">
               <option value="Presencial">Presencial</option>
               <option value="Virtual">Virtual</option>
             </select>
@@ -1126,7 +1136,7 @@ onMounted(async () => {
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
@@ -1266,7 +1276,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .pill--ghost-limpiar { padding: 10px 18px; }
-.pill--danger { background: #ef4444; box-shadow: 0 8px 18px rgba(239,68,68,0.4); }
+.pill--danger { background: #ef4444; box-shadow: 0 8px 18px rgba(239,68,68,0.4); font-size: 0.9rem; font-weight: 600;}
 .pill--outline { background: #e0faf7; color: var(--nura-green); border: 1px solid #b6ebe5; box-shadow: none; }
 
 .pill--outline:hover { background: #ffffff;}
@@ -1297,13 +1307,13 @@ onMounted(async () => {
   box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 .prof-main { flex: 1; min-width: 0; }
-.prof-name { margin: 0; font-size: 1.05rem; font-weight: 700; color: #111827; }
-.prof-specialty { margin: 4px 0; font-size: 0.9rem; color: #4b5563; }
-.prof-location { font-size: 0.8rem; color: #6b7280; margin: 0; }
+.prof-name { margin: 0; font-size: 1.5rem; font-weight: 700; color: #111827; }
+.prof-specialty { margin: 4px 0; font-size: 1rem; color: #4b5563; }
+.prof-location { font-size: 0.9rem; color: #6b7280; margin: 0; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.tag { font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; background: #f3f4f6; color: #4b5563; }
+.tag { font-size: 0.92rem; padding: 4px 10px; border-radius: 999px; background: #f3f4f6; color: #4b5563; }
 .tag--primary { background: rgba(80,189,189,0.18); color: var(--nura-green); }
-.prof-bio { margin: 0; font-size: 0.85rem; color: #4b5563; }
+.prof-bio { margin: 1; font-size: 1rem; color: #4b5563; }
 .prof-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
 
 .content-btn {
@@ -1336,8 +1346,8 @@ background: #3ea9a9; transform: translateY(-1px);
 .modal-card {
   background: #fff;
   border-radius: 22px;
-  width: min(520px, 96vw);
-  max-height: 90vh;
+  width: 45%;
+  max-height: fit-content;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 36px rgba(30, 41, 59, 0.22);
@@ -1383,6 +1393,22 @@ background: #3ea9a9; transform: translateY(-1px);
   font-size: 0.95rem;
   color: #0f172a;
 }
+
+.modal-field input[type='time'] {
+  padding-right: 24px;
+}
+
+.modal-field input[type='mode'] {
+  padding-right: 4px;
+}
+
+.modal-field input[type='text'],
+.modal-field input[type='email'],
+.modal-field input[type='time'],
+.modal-field select {
+  height: 44px;
+  line-height: 44px;
+}
 .modal-readonly-pill {
   width: 100%;
   padding: 10px 12px;
@@ -1390,7 +1416,7 @@ background: #3ea9a9; transform: translateY(-1px);
   background: #d0f5f5ff;
   color: #0f172a;
 }
-.mp-button { width: 100%; justify-content: center; }
+.mp-button { width: 100%; justify-content: center; font-weight: 550; }
 
 .prof-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .prof-summary-avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
@@ -1432,7 +1458,7 @@ background: #3ea9a9; transform: translateY(-1px);
 }
 
 
-.link-btn.danger { color: #ef4444; border-color: #ef4444; }
+.link-btn.danger { color: #ef4444; border-color: #ef4444; font-size: medium;}
 
 .link-btn.danger:hover {
   background: #ff1c1c20;
@@ -1456,6 +1482,8 @@ background: #3ea9a9; transform: translateY(-1px);
 }
 @media (min-width: 768px) {
   .turno-confirmado { left: auto; right: 18px; width: 360px; }
+
+  .modal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 }
 
 .policy-list { margin: 8px 0 0; padding-left: 18px; color: #4b5563; }
@@ -1475,5 +1503,51 @@ background: #3ea9a9; transform: translateY(-1px);
   font-weight: 900;
 }
 
-:global(.flatpickr-calendar) { z-index: 2001 !important; }
+
+
+
+:global(.modal-field .nura-date-input),
+:global(.modal-field input.nura-date-input),
+:global(.modal-field input.flatpickr-input.nura-date-input),
+:global(.modal-field input.nura-date-input[readonly]) {
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  padding: 13px 12px;
+  background: #d0f5f5ff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em; 
+}
+
+
+
+
+.modal-field select#booking-mode {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  width: 100%;
+  height: 44px;
+
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+
+  padding: 0 44px 0 12px; /* sin padding vertical */
+  background-color: #d0f5f5ff;
+
+  font-size: 0.95rem;
+  color: #0f172a;
+
+  background-image: url("data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 10L12 14L16 10' stroke='%23000000' stroke-opacity='0.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 20px center;
+  background-size: 28px;
+
+  cursor: pointer;
+}
+
+.modal-field select#booking-mode::-ms-expand {
+  display: none;
+}
 </style>

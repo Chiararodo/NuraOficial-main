@@ -327,6 +327,7 @@ onMounted(async () => {
       <button class="tab-pill tab-pill--active" type="button">Eventos</button>
       <button class="tab-pill" type="button" @click="goSesiones">Sesiones</button>
     </div>
+    
 
     <section class="lista">
       <article v-for="e in eventos" :key="e.id" class="card">
@@ -409,7 +410,7 @@ onMounted(async () => {
 .agendar-sub {
     background: #fff;
   padding: 20px 18px 40px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
@@ -454,13 +455,13 @@ onMounted(async () => {
   }
 }
 .tab-pill {
-  padding: 7px 26px;
+ padding: 10px 20px;
   border-radius: 999px;
   border: none;
   background: #85b6e0;
   color: #fff;
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
@@ -474,18 +475,18 @@ onMounted(async () => {
 
 .title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #111827;
 }
 .meta {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   color: #6b7280;
 }
 .desc {
   margin: 2px 0 0;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: #374151;
 }
 
@@ -501,7 +502,7 @@ onMounted(async () => {
 .btn-close {
   border-radius: 999px;
   padding: 8px 14px;
-  font-size: 0.86rem;
+  font-size: 1rem;
   border: none;
   background: var(--nura-green);
   color: #fff;
@@ -577,7 +578,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
-  max-width: 1050px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -591,6 +592,7 @@ onMounted(async () => {
   margin: 0 auto;
   min-height: 200px;
   padding: 18px 18px;
+  width: 90%;
   border-radius: 20px;
    border: 1px solid #e2edf7;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);

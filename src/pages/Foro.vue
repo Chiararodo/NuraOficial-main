@@ -3,6 +3,12 @@ import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
 import { usePremium } from '@/composables/usePremium'
+import { useAuthStore } from '@/store/auth'
+
+const auth = useAuthStore()
+
+const isAdmin = computed(() => (auth.user as any)?.email === 'admin@nura.app')
+
 
 type ForumRow = {
   id: string
@@ -39,6 +45,27 @@ const showPremiumCta = computed(() => !isPremium.value)
 const ctaTitle = computed(() => 'Solo Premium')
 const ctaText = computed(() => 'Para publicar un foro necesitás el plan Premium. Podés leer y comentar gratis.')
 
+const showPurge = ref(false)
+const purging = ref(false)
+
+function askPurge() {
+  showPurge.value = true
+}
+
+async function confirmPurge() {
+  if (!isAdmin.value) return
+  purging.value = true
+  try {
+    const { error } = await supabase.rpc('admin_purge_forum')
+    if (error) throw error
+    showPurge.value = false
+    await loadForums()
+  } catch (e) {
+    console.error(e)
+  } finally {
+    purging.value = false
+  }
+}
 
 function goPremium() {
   router.push('/app/premium')
@@ -148,6 +175,27 @@ function countFor(id: string) {
       </div>
     </header>
 
+
+    <div v-if="isAdmin" style="display:flex;justify-content:flex-end;margin:10px 0;">
+  <button class="pill" type="button" style="background:#ef4444;color:#fff;border:none;" @click="askPurge">
+    Borrar todo el foro
+  </button>
+</div>
+
+<div v-if="showPurge" class="modal-overlay" @click.self="showPurge = false">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <h3 class="modal-title">¿Borrar TODO?</h3>
+    <p class="modal-text">Se eliminarán todos los foros y comentarios. Esta acción no se puede deshacer.</p>
+    <div class="modal-actions">
+      <button class="modal-btn soft" type="button" @click="showPurge = false">Cancelar</button>
+      <button class="modal-btn" type="button" :disabled="purging" style="background:#ef4444" @click="confirmPurge">
+        {{ purging ? 'Borrando…' : 'Borrar todo' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+
     <div class="search">
       <label for="forum-search" class="visually-hidden">Buscar en el foro</label>
       <span class="loupe">🔍</span>
@@ -215,7 +263,7 @@ function countFor(id: string) {
 
 .foro {
   background: #fff;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 18px 18px 26px;
 }
@@ -228,7 +276,7 @@ function countFor(id: string) {
 
 h2 {
   margin: 0 0 2px;
-  color: #111827;
+  color: #50bdbd;
   font-size: 1.4rem;
 }
 
@@ -438,7 +486,7 @@ h2 {
   background: #ffffff;
   border-radius: 18px;
   max-width: 520px;
-  width: 100%;
+  width: 70%;
   padding: 16px 16px 12px;
   box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
   border: 1px solid #e8eef3;

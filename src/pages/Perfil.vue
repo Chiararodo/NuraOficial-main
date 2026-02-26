@@ -14,27 +14,36 @@ const profile = ref<{
   name?: string | null
   avatar_url?: string | null
   premium?: boolean | null
+  is_admin?: boolean | null
+  plan?: string | null
   created_at?: string
+  plan_expires_at?: string | null
 } | null>(null)
 
 const user = ref<any>(null)
 
+/* =========================
+   NOMBRE / EMAIL
+========================= */
 const profileName = computed(() => {
   const nameFromProfile = profile.value?.name
-  if (nameFromProfile && nameFromProfile.trim()) return nameFromProfile
+  if (nameFromProfile && String(nameFromProfile).trim()) return String(nameFromProfile)
 
   const metaName = (auth.user?.user_metadata as any)?.name
-  if (metaName && metaName.trim()) return metaName
+  if (metaName && String(metaName).trim()) return String(metaName)
 
   return (auth.user?.email || 'Usuario').split('@')[0]
 })
 
 const userEmail = computed(() => auth.user?.email ?? '')
 
+/* =========================
+   AVATAR (path o URL)
+========================= */
 const avatarPath = computed<string | null>(() => {
   const meta = (auth.user?.user_metadata as any) || {}
-  const fromProfile = profile.value?.avatar_url as string | null | undefined
-  const fromMeta = meta.avatar_url as string | null | undefined
+  const fromProfile = (profile.value?.avatar_url as string | null | undefined) ?? null
+  const fromMeta = (meta.avatar_url as string | null | undefined) ?? null
   return fromProfile || fromMeta || null
 })
 
@@ -48,11 +57,19 @@ function buildPlaceholder() {
 
 async function resolveAvatarUrl() {
   const path = avatarPath.value
+
   if (!path) {
     avatarUrl.value = buildPlaceholder()
     return
   }
 
+  // si ya es URL completa, usarla
+  if (/^https?:\/\//i.test(path)) {
+    avatarUrl.value = path
+    return
+  }
+
+  // si es path en bucket
   const { data, error } = await supabase.storage
     .from('avatars')
     .createSignedUrl(path, 60 * 60 * 24 * 7)
@@ -65,49 +82,106 @@ async function resolveAvatarUrl() {
   avatarUrl.value = data.signedUrl
 }
 
+/* =========================
+   FECHA ALTA
+========================= */
 const memberSinceYear = computed(() => {
   const iso = auth.user?.created_at
   if (!iso) return ''
   return String(new Date(iso).getFullYear())
 })
 
-const isPremiumLS = computed(() => localStorage.getItem('nura_is_premium') === 'true')
+/* =========================
+   PREMIUM (DB + cache)
+========================= */
+const premiumDb = ref<boolean>(false)
+const loadingPremium = ref(true)
 
+const isPremium = computed(() => premiumDb.value || localStorage.getItem('nura_is_premium') === 'true')
+
+function syncPremiumCache(value: boolean) {
+  if (value) localStorage.setItem('nura_is_premium', 'true')
+  else localStorage.removeItem('nura_is_premium')
+}
+
+async function loadPremiumStatus() {
+  if (!auth.user) {
+    premiumDb.value = false
+    loadingPremium.value = false
+    syncPremiumCache(false)
+    return
+  }
+
+  loadingPremium.value = true
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('premium')
+    .eq('id', auth.user.id)
+    .maybeSingle()
+
+  if (!error && data) {
+    premiumDb.value = !!data.premium
+    syncPremiumCache(premiumDb.value)
+  }
+
+  loadingPremium.value = false
+}
+
+/* =========================
+   CARGAR PERFIL
+========================= */
 async function loadProfile() {
   if (!auth.user) return
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', auth.user.id)
     .maybeSingle()
 
-  if (!data) {
+  const fallbackName =
+    (auth.user.user_metadata as any)?.name ??
+    auth.user.email?.split('@')[0] ??
+    'Usuario'
+
+  if (error || !data) {
     const fallback = {
       id: auth.user.id as string,
-      name:
-        (auth.user.user_metadata as any)?.name ??
-        auth.user.email?.split('@')[0] ??
-        'Usuario',
+      name: fallbackName,
       avatar_url: null,
       premium: false,
+      is_admin: false,
+      plan: 'free',
+      plan_expires_at: null,
       created_at: auth.user.created_at as string,
     }
     profile.value = fallback
     user.value = fallback
+
+    premiumDb.value = false
+    syncPremiumCache(false)
+    loadingPremium.value = false
     return
   }
 
   profile.value = {
     ...data,
-    name:
-      (auth.user.user_metadata as any)?.name ??
-      auth.user.email?.split('@')[0] ??
-      'Usuario',
+    // NO pisar nombre real: solo usar fallback si viene vacío
+    name: data.name && String(data.name).trim() ? data.name : fallbackName,
   }
+
   user.value = profile.value
+
+  // actualizar premiumDb desde DB
+  premiumDb.value = !!profile.value?.premium
+  syncPremiumCache(premiumDb.value)
+  loadingPremium.value = false
 }
 
+/* =========================
+   MEDS PREVIEW
+========================= */
 const meds = ref<any[]>([])
 const loadingMeds = ref(true)
 
@@ -130,6 +204,9 @@ function goMeds() {
   router.push('/app/medicaciones')
 }
 
+/* =========================
+   MOODS (localStorage)
+========================= */
 const moodsHistory = ref<{ date: string; mood: Mood }[]>([])
 const diaryPreview = ref<{ date: string; mood: Mood; snippet: string }[]>([])
 
@@ -164,6 +241,7 @@ const recentMoods = computed(() => {
 
 function setMood(mood: Mood) {
   const today = new Date().toISOString().slice(0, 10)
+
   if (auth.user) {
     const key = `nura_moods_${auth.user.id}`
     const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, Mood>
@@ -181,7 +259,9 @@ function goDiaryList() {
   router.push('/app/diario/entradas')
 }
 
-
+/* =========================
+   LOGOUT MODAL
+========================= */
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
 
@@ -200,13 +280,84 @@ async function confirmLogout() {
   router.replace('/login')
 }
 
-const isPremium = computed(() => user.value?.premium === true || isPremiumLS.value)
+/* =========================
+   ADMIN PREMIUM (toggle)
+========================= */
+const isAdmin = computed(() => user.value?.is_admin === true)
 
-onMounted(() => {
-  loadProfile()
+const upgrading = ref(false)
+const upgradeError = ref('')
+
+async function activatePremiumAdmin() {
+  upgradeError.value = ''
+  if (!auth.user) return
+  if (!isAdmin.value) return
+
+  upgrading.value = true
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      premium: true,
+      plan: 'premium',
+      plan_expires_at: null,
+    })
+    .eq('id', auth.user.id)
+
+  upgrading.value = false
+
+  if (error) {
+    upgradeError.value = 'No se pudo activar Premium.'
+    return
+  }
+
+  premiumDb.value = true
+  syncPremiumCache(true)
+  await loadProfile()
+}
+
+const downgrading = ref(false)
+const downgradeError = ref('')
+
+async function deactivatePremiumAdmin() {
+  downgradeError.value = ''
+  if (!auth.user) return
+  if (!isAdmin.value) return
+
+  downgrading.value = true
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      premium: false,
+      plan: 'free',
+      plan_expires_at: null,
+    })
+    .eq('id', auth.user.id)
+
+  downgrading.value = false
+
+  if (error) {
+    downgradeError.value = 'No se pudo desactivar Premium.'
+    return
+  }
+
+  premiumDb.value = false
+  syncPremiumCache(false)
+  await loadProfile()
+}
+
+/* =========================
+   MOUNT
+========================= */
+onMounted(async () => {
+  await loadProfile()
+  await loadPremiumStatus()
+
   loadLocalData()
   setTimeout(loadMeds, 150)
-  resolveAvatarUrl()
+
+  await resolveAvatarUrl()
 })
 
 watch(avatarPath, () => {
@@ -423,7 +574,7 @@ watch(avatarPath, () => {
 .contenido {
   background: #fff;
   padding: 20px 14px 44px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -441,7 +592,7 @@ h2 {
 .grid {
   display: grid;
   gap: 22px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -578,6 +729,7 @@ h2 {
 .btn-danger:hover {
   background: #e53935;
 }
+
 
 .btn-secondary {
   background: #e3ecf6;

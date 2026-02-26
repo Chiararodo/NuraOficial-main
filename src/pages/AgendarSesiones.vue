@@ -410,7 +410,7 @@ onMounted(async () => {
 .agendar-sub {
   background: #fff;
   padding: 20px 18px 40px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
@@ -419,7 +419,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto 14px;
 }
 .sub-header h1 {
@@ -455,18 +455,15 @@ onMounted(async () => {
   }
 }
 .tab-pill {
-  padding: 7px 26px;
+ padding: 10px 20px;
   border-radius: 999px;
   border: none;
   background: #85b6e0;
   color: #fff;
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
-}
-.tab-pill--active {
-  background: #50bdbd;
 }
 .tab-pill:hover {
   transform: translateY(-1px);
@@ -483,7 +480,6 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
-  max-width: 1050px;
   margin: 0 auto;
 }
 @media (max-width: 900px) {
@@ -493,16 +489,18 @@ onMounted(async () => {
 }
 
 .card {
-  display: flex;
+ display: flex;
   flex-direction: row;
   align-items: center;
   gap: 18px;
-  margin: 0 auto;
+  margin: 0;
   min-height: 200px;
   padding: 18px 18px;
   border-radius: 20px;
   border: 1px solid #e2edf7;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+
 }
 .card:hover {
   transform: translateY(-1px);
@@ -529,35 +527,46 @@ onMounted(async () => {
   gap: 10px;
 }
 
+
+/* ====== MOBILE ====== */
 @media (max-width: 700px) {
   .card {
     flex-direction: column;
     align-items: flex-start;
   }
+
   .card-img {
     flex: none;
     width: 100%;
+    height: 170px; 
   }
+
   .card-img img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover; 
+    display: block;
+  }
+   .action-btn {
+     padding: 16px 12px 14px;
+     font-size: small;
   }
 }
 
 .title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #111827;
 }
 .meta {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   color: #6b7280;
 }
 .desc {
   margin: 2px 0 0;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: #374151;
 }
 
@@ -570,7 +579,7 @@ onMounted(async () => {
 .action-btn {
   border-radius: 999px;
   padding: 8px 14px;
-  font-size: 0.86rem;
+  font-size: 1rem;
   border: none;
   background: var(--nura-green);
   color: #fff;
@@ -625,7 +634,8 @@ onMounted(async () => {
 
 @media (max-width: 520px) {
   .action-btn {
-    width: 100%;
+     padding: 16px 12px 14px;
+     font-size: small;
   }
 }
 

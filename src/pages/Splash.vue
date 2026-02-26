@@ -1,12 +1,3 @@
-<template>
-  <section class="splash">
-  <h1 class="visually-hidden">S plash Screen </h1>
-
-    <img src="/logos/OFICIALwhite.png" alt="Nura logo" class="logo" />
-    <div class="loader"></div>
-  </section>
-</template>
-
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -42,6 +33,16 @@ onMounted(async () => {
   }
 })
 </script>
+
+<template>
+  <section class="splash">
+  <h1 class="visually-hidden">S plash Screen </h1>
+
+    <img src="/logos/OFICIALwhite.png" alt="Nura logo" class="logo" />
+    <div class="loader"></div>
+  </section>
+</template>
+
 
 <style scoped>
 .splash {

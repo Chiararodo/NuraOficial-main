@@ -54,12 +54,9 @@ const userName = computed(() => {
 })
 
 onMounted(async () => {
-  if (localStorage.getItem('nura_is_premium') === 'true') {
-    isPremium.value = true
-    loading.value = false
-    return
-  }
+  loading.value = true
 
+  // 1) chequear DB siempre (source of truth)
   if (auth.user) {
     const { data, error } = await supabase
       .from('profiles')
@@ -70,9 +67,13 @@ onMounted(async () => {
     if (!error && data?.premium) {
       isPremium.value = true
       localStorage.setItem('nura_is_premium', 'true')
+      loading.value = false
+      return
     }
   }
 
+  // 2) si DB no es premium, fallback a cache (por si hay delay)
+  isPremium.value = localStorage.getItem('nura_is_premium') === 'true'
   loading.value = false
 })
 
@@ -130,7 +131,7 @@ function goChatbot() {
 
       <div class="actions">
         <button class="btn-primary" type="button" @click="goPlans">
-          Ver planes
+          Ver planes y beneficios
         </button>
         <button class="btn-secondary" type="button" @click="router.push('/app/perfil')">
           Volver al perfil

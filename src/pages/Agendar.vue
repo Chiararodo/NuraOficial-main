@@ -86,28 +86,20 @@ function handleClick(id: OpcionId) {
 .contenido {
   background: #fff;
   padding: 20px 18px 40px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
 
-/* Header (lo dejo como lo tenés, pero alineado prolijo) */
+/* Header  */
 .page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
-  margin: 0 auto 18px;
-  flex-wrap: wrap;
-  max-width: 1100px;
+  display: grid;
+  gap: 15px;
+  margin-bottom: 12px;
 }
-
 h2 {
   margin: 0;
   padding: 10px;
-  font-size: 1.4rem;
-  color: #46bdbd;
-  font-weight: 700;
 }
 
 .visually-hidden {
@@ -119,12 +111,12 @@ h2 {
   white-space: nowrap;
 }
 
-/* ====== LISTA: igual a Eventos/Sesiones ====== */
+/* ====== LISTA ====== */
 .lista {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
-  max-width: 1050px;
+  width: 95%;
   margin: 0 auto;
   padding: 0;
 }
@@ -135,7 +127,7 @@ h2 {
   }
 }
 
-/* ====== CARD: igual a Eventos/Sesiones ====== */
+/* ====== CARD====== */
 .card {
   display: flex;
   flex-direction: row;
@@ -156,13 +148,13 @@ h2 {
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
 }
 
-/* ====== IMAGEN: tamaño fijo desktop + recorte perfecto ====== */
+/* ====== IMAGEN ====== */
 .card-img {
   flex: 0 0 130px;
   width: 130px;
   height: 130px;
   border-radius: 18px;
-  overflow: hidden; /* clave para que todas queden iguales */
+  overflow: hidden; 
 }
 
 .card-img img {
@@ -172,30 +164,29 @@ h2 {
   display: block;
 }
 
-/* ====== BODY: igual a Eventos/Sesiones ====== */
+/* ====== BODY ====== */
 .card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 10px;
-  min-width: 0;
 }
 
 .title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #111827;
 }
 
 .desc {
   margin: 2px 0 0;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: #374151;
 }
 
-/* ====== BOTONES: misma lógica que Eventos/Sesiones ====== */
+/* ====== BOTONES====== */
 .actions {
   display: flex;
   gap: 10px;
@@ -205,7 +196,7 @@ h2 {
 .action-btn {
   border-radius: 999px;
   padding: 8px 14px;
-  font-size: 0.86rem;
+  font-size: 1.1rem;
   border: none;
   background: var(--nura-green);
   color: #fff;
@@ -237,7 +228,7 @@ h2 {
   background: #50bdbd;
 }
 
-/* ====== MOBILE: igual a Eventos/Sesiones pero con imagen “hero” controlada ====== */
+/* ====== MOBILE ====== */
 @media (max-width: 700px) {
   .card {
     flex-direction: column;
@@ -247,15 +238,13 @@ h2 {
   .card-img {
     flex: none;
     width: 100%;
-    height: 170px; /* <- MISMO ALTO siempre, para que todas queden iguales */
-    border-radius: 18px;
-    overflow: hidden;
+    height: 170px; 
   }
 
   .card-img img {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* <- clave: nunca “auto”, siempre recorta igual */
+    object-fit: cover; 
     display: block;
   }
 }

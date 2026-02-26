@@ -521,7 +521,7 @@ watch(
 .contenido {
   background: #fff;
   padding: 20px 14px 44px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -644,6 +644,7 @@ watch(
   padding: 8px 12px;
   cursor: pointer;
   white-space: nowrap;
+  width: 15%;
 }
 
 .ghost-btn:hover {

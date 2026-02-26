@@ -22,6 +22,7 @@ import ForoVer from '@/pages/ForoVer.vue'
 import Chatbot from '@/pages/Chatbot.vue'
 import Notificaciones from '@/pages/Notificaciones.vue'
 import Diary from '@/pages/Diary.vue'
+import { refreshPremiumCache } from '@/composables/usePremium'
 
 import { supabase } from '@/composables/useSupabase'
 
@@ -43,6 +44,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     children: [
       { path: 'home', name: 'home', component: Home },
+      // Admin (solo admin)
 
       // Cartilla / turnos
       { path: 'cartilla', name: 'cartilla', component: Cartilla },
@@ -169,59 +171,57 @@ export const router = createRouter({
 const ONBOARDING_PATHS = new Set(['/onboarding', '/onboarding2'])
 
 // cache simple del perfil
-let profileCache: { id: string; terms_accepted?: boolean } | null = null
-
+let profileCache: { id: string; terms_accepted?: boolean; is_admin?: boolean } | null = null
 router.beforeEach(async (to, from) => {
   if (to.name === 'splash') return
 
-  // 1) Sesión actual
   const { data } = await supabase.auth.getSession()
   const session = data.session
   const user = session?.user
   const isAuthed = !!user
 
-  // 2) Rutas que requieren auth
   if (to.meta.requiresAuth && !isAuthed) return '/login'
   if (!isAuthed && ONBOARDING_PATHS.has(to.path)) return '/login'
 
-  // 3) Usuario logueado y yendo a login/register -> mandarlo al home
   if (isAuthed && (to.path === '/login' || to.path === '/register')) {
     return '/app/home'
   }
 
-  // 4) Chequeo de TÉRMINOS solo si está logueado
   if (isAuthed) {
-    // refrescar cache si:
-    // - nunca se cargó
-    // - venimos desde terminos (acaba de aceptar)
-    // - vamos a home (para asegurar que ya está actualizado)
-    // - vamos a terminos (por seguridad)
     const mustRefresh =
       !profileCache ||
       to.name === 'home' ||
       to.name === 'terminos' ||
-      from.name === 'terminos'
+      from.name === 'terminos' ||
+      to.meta.requiresAdmin
 
     if (mustRefresh) {
       const { data: prof } = await supabase
         .from('profiles')
-        .select('id, terms_accepted')
+        .select('id, terms_accepted, is_admin')
         .eq('id', user!.id)
         .maybeSingle()
 
       profileCache = prof ?? null
     }
 
+    // premium cache (para que se refleje sin tocar Perfil.vue)
+    await refreshPremiumCache(user!.id)
+
     const termsAccepted = profileCache?.terms_accepted === true
 
-    // Si NO aceptó y está tratando de entrar a /app (cualquier sección) que no sea terminos
     if (!termsAccepted && to.path.startsWith('/app') && to.name !== 'terminos') {
       return '/app/terminos'
     }
 
-    // Si YA aceptó y viene a terminos, lo mandamos al home
     if (termsAccepted && to.name === 'terminos') {
       return '/app/home'
+    }
+
+    // admin gate
+    if (to.meta.requiresAdmin) {
+      const isAdmin = profileCache?.is_admin === true
+      if (!isAdmin) return '/app/home'
     }
   }
 

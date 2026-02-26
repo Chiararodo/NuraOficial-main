@@ -2,18 +2,22 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
+import { useAuthStore } from '@/store/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
 const uid = route.params.uid as string
 
 const user = ref<any | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
 
-// NUEVO: URL firmada pública del avatar
+/* signed avatar */
 const publicAvatar = ref<string | null>(null)
 
+/* counts + previews */
 const commentCount = ref<number | null>(null)
 const forumCount = ref<number | null>(null)
 
@@ -33,6 +37,30 @@ type ForumPreview = {
 const recentComments = ref<CommentPreview[]>([])
 const recentForums = ref<ForumPreview[]>([])
 
+/* ====== Gate: Admin o Premium ====== */
+const canViewProfile = ref(false)
+
+/* Modal Premium */
+const showPremiumModal = ref(false)
+const premiumTitle = ref('Función Premium')
+const premiumText = ref('Para ver el perfil completo de otros usuarios necesitás el Plan Premium.')
+
+function openPremiumModal() {
+  showPremiumModal.value = true
+}
+function closePremiumModal() {
+  showPremiumModal.value = false
+}
+
+function goPremium() {
+  // ajustá esta ruta a tu pantalla real de planes/premium
+  router.push('/app/premium')
+}
+
+function goBack() {
+  router.back()
+}
+
 function formatDate(iso?: string | null) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('es-AR', {
@@ -44,15 +72,9 @@ function formatDate(iso?: string | null) {
 
 const displayName = computed(() => {
   if (!user.value) return 'Usuario Nura'
-  return (
-    user.value.name ||
-    user.value.full_name ||
-    user.value.username ||
-    'Usuario Nura'
-  )
+  return user.value.name || user.value.full_name || user.value.username || 'Usuario Nura'
 })
 
-// AHORA usamos la URL firmada
 const hasAvatar = computed(() => !!publicAvatar.value)
 
 const initials = computed(() => {
@@ -60,10 +82,6 @@ const initials = computed(() => {
   if (!n) return 'U'
   return n.charAt(0).toUpperCase()
 })
-
-function goBack() {
-  router.back()
-}
 
 function goToForum(id: string) {
   router.push({ path: `/app/foro/${id}` })
@@ -79,7 +97,53 @@ function goToComment(forumId: string, commentId: string) {
 onMounted(async () => {
   loading.value = true
   errorMsg.value = ''
+  publicAvatar.value = null
 
+  // 1) Validar que haya usuario logueado
+  if (!auth.user) {
+    loading.value = false
+    premiumTitle.value = 'Iniciá sesión'
+    premiumText.value = 'Para ver perfiles de otros usuarios, necesitás iniciar sesión.'
+    openPremiumModal()
+    return
+  }
+
+  // 2) Traer MI perfil para chequear permisos (admin o premium)
+  const { data: myProfile, error: myErr } = await supabase
+    .from('profiles')
+    .select('is_admin, premium, plan, plan_expires_at')
+    .eq('id', auth.user.id)
+    .maybeSingle()
+
+  if (myErr || !myProfile) {
+    loading.value = false
+    premiumTitle.value = 'No pudimos validar tu cuenta'
+    premiumText.value = 'Hubo un problema verificando tu plan. Probá de nuevo.'
+    openPremiumModal()
+    return
+  }
+
+  const isAdmin = myProfile.is_admin === true
+
+  // Premium por boolean o por plan, y opcionalmente validando expiración
+  const planIsPremium = myProfile.plan === 'premium'
+  const planIsActive =
+    !myProfile.plan_expires_at || new Date(myProfile.plan_expires_at) > new Date()
+
+  const isPremium = myProfile.premium === true || (planIsPremium && planIsActive)
+
+  canViewProfile.value = isAdmin || isPremium
+
+  // 3) Si no puede ver, mostrar popup premium y NO cargar datos del otro usuario
+  if (!canViewProfile.value) {
+    loading.value = false
+    premiumTitle.value = 'Función Premium'
+    premiumText.value = 'Para ver el perfil completo de otros usuarios necesitás el Plan Premium.'
+    openPremiumModal()
+    return
+  }
+
+  // 4) Cargar perfil del usuario solicitado (uid)
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -96,34 +160,31 @@ onMounted(async () => {
 
   user.value = data
 
-  // NUEVO: si tiene avatar_url (path en bucket avatars) generamos signed URL
+  // 5) Signed URL avatar si existe
   if (data?.avatar_url) {
     const { data: signed, error: signError } = await supabase.storage
       .from('avatars')
-      .createSignedUrl(data.avatar_url as string, 60 * 60 * 24 * 7) // 7 días
+      .createSignedUrl(data.avatar_url as string, 60 * 60 * 24 * 7)
 
     if (!signError && signed?.signedUrl) {
       publicAvatar.value = signed.signedUrl
     }
   }
 
+  // 6) stats + previews
   const { count: cCount, error: cError } = await supabase
     .from('forum_comments')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', uid)
 
-  if (!cError && typeof cCount === 'number') {
-    commentCount.value = cCount
-  }
+  if (!cError && typeof cCount === 'number') commentCount.value = cCount
 
   const { count: fCount, error: fError } = await supabase
     .from('forums')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', uid)
 
-  if (!fError && typeof fCount === 'number') {
-    forumCount.value = fCount
-  }
+  if (!fError && typeof fCount === 'number') forumCount.value = fCount
 
   const { data: cData } = await supabase
     .from('forum_comments')
@@ -148,7 +209,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Perfil </h1>
+  <h1 class="visually-hidden">Perfil</h1>
 
   <main class="perfil-publico">
     <p v-if="loading" class="estado">Cargando perfil...</p>
@@ -158,30 +219,21 @@ onMounted(async () => {
     </p>
 
     <section v-else-if="user" class="perfil-card">
-      <button class="back-btn" @click="goBack">← </button>
+      <button class="back-btn" type="button" @click="goBack">←</button>
 
       <div class="avatar-wrapper">
-        <img
-          v-if="hasAvatar"
-          :src="publicAvatar!"
-          alt="Foto de perfil"
-          class="avatar-img"
-        />
+        <img v-if="hasAvatar" :src="publicAvatar!" alt="Foto de perfil" class="avatar-img" />
         <div v-else class="avatar-placeholder">
           <span>{{ initials }}</span>
         </div>
       </div>
 
-      <h2 class="nombre">
-        {{ displayName }}
-      </h2>
+      <h2 class="nombre">{{ displayName }}</h2>
 
       <p class="miembro" v-if="user.created_at">
         Miembro desde {{ formatDate(user.created_at) }}
       </p>
-      <p class="miembro" v-else>
-        Miembro de la comunidad Nura
-      </p>
+      <p class="miembro" v-else>Miembro de la comunidad Nura</p>
 
       <div class="badges">
         <span class="badge">Comunidad Nura</span>
@@ -190,15 +242,11 @@ onMounted(async () => {
 
       <div class="stats">
         <div class="stat-item">
-          <span class="stat-number">
-            {{ commentCount ?? '—' }}
-          </span>
+          <span class="stat-number">{{ commentCount ?? '—' }}</span>
           <span class="stat-label">Comentarios</span>
         </div>
         <div class="stat-item">
-          <span class="stat-number">
-            {{ forumCount ?? '—' }}
-          </span>
+          <span class="stat-number">{{ forumCount ?? '—' }}</span>
           <span class="stat-label">Foros creados</span>
         </div>
       </div>
@@ -206,12 +254,7 @@ onMounted(async () => {
       <div v-if="recentForums.length" class="section-list">
         <h3>Foros recientes</h3>
         <ul>
-          <li
-            v-for="f in recentForums"
-            :key="f.id"
-            class="clickable"
-            @click="goToForum(f.id)"
-          >
+          <li v-for="f in recentForums" :key="f.id" class="clickable" @click="goToForum(f.id)">
             <span class="item-title">{{ f.title || 'Foro sin título' }}</span>
             <span class="item-date">{{ formatDate(f.created_at) }}</span>
           </li>
@@ -221,12 +264,7 @@ onMounted(async () => {
       <div v-if="recentComments.length" class="section-list">
         <h3>Comentarios recientes</h3>
         <ul>
-          <li
-            v-for="c in recentComments"
-            :key="c.id"
-            class="clickable"
-            @click="goToComment(c.forum_id, c.id)"
-          >
+          <li v-for="c in recentComments" :key="c.id" class="clickable" @click="goToComment(c.forum_id, c.id)">
             <span class="item-body">{{ c.body }}</span>
             <span class="item-date">{{ formatDate(c.created_at) }}</span>
           </li>
@@ -235,6 +273,18 @@ onMounted(async () => {
     </section>
 
     <p v-else class="estado">No encontramos este perfil.</p>
+
+    <!-- Modal Premium -->
+    <div v-if="showPremiumModal" class="modal" @click.self="closePremiumModal">
+      <div class="modal-box">
+        <h3 class="modal-title">{{ premiumTitle }}</h3>
+        <p class="modal-text">{{ premiumText }}</p>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" @click="goBack">Volver</button>
+          <button class="btn primary" type="button" @click="goPremium">Ver planes</button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -269,8 +319,7 @@ onMounted(async () => {
   position: relative;
   text-align: center;
   box-sizing: border-box;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .back-btn {
@@ -435,5 +484,72 @@ onMounted(async () => {
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+/* modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 60;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.modal-text {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  color: #475569;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+@media (max-width: 520px) {
+  .modal-actions {
+    flex-direction: column;
+  }
+}
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #50bdbd;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.22);
+}
+
+.btn.ghost {
+  background: #eef6ff;
+  color: #1f2937;
 }
 </style>

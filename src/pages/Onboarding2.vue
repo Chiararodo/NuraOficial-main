@@ -12,7 +12,7 @@ const errorMsg = ref<string>('')
 /** ON/OFF general (local, NO va a Supabase) */
 const enabled = ref(true)
 
-/* Toggles reales (los de tu tabla) */
+/* Toggles reales */
 const bienestar = computed({
   get: () => gate.settings.value.bienestar,
   set: (v: boolean) => (gate.settings.value.bienestar = v)
@@ -60,7 +60,7 @@ async function onToggleEnabled(next: boolean) {
     return
   }
 
-  // pedir permiso (si aplica)
+  // pedir permiso 
   if ('Notification' in window) {
     try {
       const perm = await Notification.requestPermission()
@@ -116,7 +116,6 @@ function goTerms() {
 }
 
 async function skip() {
-  // opcional: si querés guardar igual
   errorMsg.value = ''
   await safeUpsert()
   goTerms()
@@ -456,8 +455,8 @@ h2 {
 @media (max-width: 480px) {
 
   .ob-page {
-    padding: 46px 18px 44px;  /* menos padding arriba */
-    align-items: flex-start;  /* en vez de center */
+    padding: 46px 18px 44px;  
+    align-items: flex-start;  
     min-height: 100dvh;
   }
 
@@ -501,7 +500,6 @@ h2 {
     line-height: 1.05rem;
   }
 
-  /* Switch un poco más fino */
   .switch {
     width: 40px;
     height: 22px;

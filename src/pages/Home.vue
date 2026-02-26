@@ -537,7 +537,9 @@ onMounted(async () => {
 
 .home-page {
   background: #fff;
-  padding: 24px 18px 48px;
+  padding: 20px 18px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* Grid */
@@ -545,7 +547,7 @@ onMounted(async () => {
   display: grid;
   gap: 24px;
   width: 100%;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -581,12 +583,12 @@ onMounted(async () => {
 /* Títulos */
 h2 {
   margin: 0 0 6px;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   color: #50bdbd;
 }
 h3 {
   margin: 0 0 12px;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   color: #50bdbd;
 }
 

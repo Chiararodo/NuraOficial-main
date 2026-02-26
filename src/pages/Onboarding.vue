@@ -1,3 +1,12 @@
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+const router = useRouter()
+
+function goNext() {
+  router.push('/onboarding2')
+}
+</script>
+
 <template>
   <h1 class="visually-hidden">Onboarding</h1>
 
@@ -24,14 +33,7 @@
   </main>
 </template>
 
-<script setup lang="ts">
-import { useRouter } from 'vue-router'
-const router = useRouter()
 
-function goNext() {
-  router.push('/onboarding2')
-}
-</script>
 
 <style scoped>
 .onboarding {
@@ -42,6 +44,14 @@ function goNext() {
   padding: 28px 20px;
   animation: fadeIn 0.6s ease-in forwards;
 }
+
+@media (max-width: 480px) {
+
+  .onboarding {
+    padding: 1px 18px 44px;  
+    align-items: flex-start;  
+    min-height: 100dvh;
+  }  }
 
 .ob {
   max-width: 520px;
@@ -101,13 +111,14 @@ h2 {
 }
 
 
+
 /* Animación entrada */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Efecto flotando del personaje */
+/* Efecto flotando */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }

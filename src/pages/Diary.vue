@@ -407,9 +407,6 @@ function dayStyle(day: number) {
       <section class="card card-form">
         <h3 class="card-title">
           Escribí tu registro
-          <span class="mode">
-            {{ existingEntry ? '(editando)' : '(nuevo)' }}
-          </span>
         </h3>
 
         <div class="chips">
@@ -504,7 +501,7 @@ function dayStyle(day: number) {
 .contenido {
   background: #fff;
   padding: 24px 18px 48px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -525,7 +522,7 @@ function dayStyle(day: number) {
 .page-head .subtitle {
   margin: 0;
   color: #5c6a75;
-  font-size: 1rem;
+  font-size: 1.2rem;
   line-height: 1.45rem;
 }
 
@@ -614,7 +611,7 @@ function dayStyle(day: number) {
    GRID PRINCIPAL
 ============================ */
 .diary-grid {
-  max-width: 1120px;
+  max-width: 1400px;
   margin: 18px auto 0;
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
@@ -637,6 +634,8 @@ function dayStyle(day: number) {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
   padding: 16px 18px 18px;
   border: 0.3px solid #50bdbd;
+  width: 95%;
+  height: 100%;
 }
 
 /* ===== HEADER CARD ===== */
@@ -650,7 +649,7 @@ function dayStyle(day: number) {
 
 .card-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: #50bdbd;
 }
@@ -664,7 +663,7 @@ function dayStyle(day: number) {
 
 .card-subtitle-small {
   margin: 2px 0 0;
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: #6a7a86;
 }
 
@@ -816,11 +815,11 @@ function dayStyle(day: number) {
 .btn-outline {
   display: inline-block;
   margin-top: 8px;
-  padding: 8px 10px;
+  padding: 11px 28px;
   background: #50bdbd;
   color: white;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   text-align: center;
   text-decoration: none;
@@ -908,11 +907,11 @@ function dayStyle(day: number) {
 .btn-primary {
   display: inline-block;
   margin-top: 8px;
-  padding: 8px 14px;
+  padding: 11px 28px;
   background: #50bdbd;
   color: white;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   transition: background 0.2s;
   border: none;

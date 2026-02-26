@@ -222,18 +222,24 @@ onUnmounted(async () => {
       <h2>Notificaciones</h2>
     </header>
 
+    
+
     <p v-if="loading" class="state">Cargando...</p>
 
     <div v-else-if="!items.length" class="empty-wrapper">
       <p class="empty-text">Aún no tenés notificaciones.</p>
     </div>
 
+    
+
     <div v-else :class="['columns-wrapper', { 'single-column': !read.length }]">
       <section class="column">
         <header class="column-head">
           <h3>Nuevas</h3>
-        </header>
+        
+ <button class="danger-btn" @click="handleDeleteAll">Borrar todas</button>
 
+ </header>
         <p v-if="!unread.length" class="state small">No hay nuevas.</p>
 
         <ul v-else class="list">
@@ -284,7 +290,6 @@ onUnmounted(async () => {
     </div>
 
     <footer v-if="items.length" class="page-actions">
-      <button class="danger-btn" @click="handleDeleteAll">Borrar todas</button>
     </footer>
   </main>
 </template>
@@ -444,11 +449,10 @@ onUnmounted(async () => {
 }
 
 .icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: none;
-  font-size: 1rem;
   font-weight: 600;
   line-height: 1;
   padding: 0;
@@ -462,6 +466,7 @@ onUnmounted(async () => {
 .icon-btn.check {
   background: #50bdbd;
   color: #ffffff;
+  font-size: 1rem;
 }
 
 .icon-btn.check:hover {
@@ -473,7 +478,7 @@ onUnmounted(async () => {
 .icon-btn.close {
   background: #ef4444;
   color: #ffffff;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .icon-btn.close:hover {
@@ -495,7 +500,7 @@ onUnmounted(async () => {
   padding: 8px 20px;
   border-radius: 999px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
 }
 .danger-btn:hover {

@@ -297,7 +297,7 @@ onMounted(() => {
 .perfil-edit {
   background: #fff;
   padding: 20px 16px 40px;
-  max-width: 520px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -338,10 +338,12 @@ onMounted(() => {
 }
 
 .avatar-img img {
-  width: 110px;
-  height: 110px;
+  width: 130px;
+  height: 130px;
   border-radius: 999px;
   object-fit: cover;
+  
+  border: 1.5px solid #50bdbd;
 }
 
 .avatar-generated {
@@ -358,14 +360,19 @@ onMounted(() => {
 }
 
 .upload-btn {
-  background: #f0f7fb;
+  
   padding: 7px 14px;
   border-radius: 12px;
-  border: 1px solid #dbe8f0;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: 600;
   position: relative;
+  background: #ffffff; color: #50bdbd; border: 
+  3px solid #b6ebe5; 
+  box-shadow: 0 6px 12px rgba(148, 163, 184, 0.22);
 }
+
+.upload-btn:hover { background: #e0faf7; transform: translateY(-1px); }
 
 .upload-btn input {
   position: absolute;
@@ -375,8 +382,8 @@ onMounted(() => {
 }
 
 .label {
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 1rem;
   color: #333;
 }
 
@@ -384,7 +391,7 @@ onMounted(() => {
   border-radius: 12px;
   border: 1px solid #ccd7e2;
   padding: 0.55rem 0.9rem;
-  font-size: 0.95rem;
+  font-size: 0.99rem;
   background: #f9fcff;
 }
 
@@ -396,7 +403,7 @@ onMounted(() => {
 
 .msg {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .error {
@@ -408,11 +415,12 @@ onMounted(() => {
 }
 
 .save-btn {
-  width: 100%;
   background: #50bdbd;
   color: #fff;
   font-weight: 600;
+  font-size: 1rem;
   padding: 0.7rem;
+  margin: 0 9 9px;
   border: none;
   border-radius: 14px;
   cursor: pointer;
@@ -449,7 +457,7 @@ onMounted(() => {
 
 .security-text {
   margin: 0 0 14px;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: #4b5563;
   line-height: 1.5;
 }
@@ -457,7 +465,7 @@ onMounted(() => {
 .security-label {
   display: block;
   margin-bottom: 6px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #374151;
 }
@@ -466,13 +474,13 @@ onMounted(() => {
   border-radius: 12px;
   border: 1px solid #ccd7e2;
   padding: 0.55rem 0.9rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
   background: #f9fcff;
 }
 
 .security-msg {
   margin: 6px 0 0;
-  font-size: 0.83rem;
+  font-size: 0.93rem;
   width:100% ;
 }
 
@@ -489,6 +497,7 @@ onMounted(() => {
   background: #50bdbd;
   color: #fff;
   font-weight: 700;
+  font-size: 1rem;
   padding: 0.8rem;
   border: none;
   border-radius: 14px;

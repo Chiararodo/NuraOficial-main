@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { supabase } from '@/composables/useSupabase'
@@ -1114,8 +1113,8 @@ function mmss(total: number) {
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 24px 18px 48px;
-  max-width: 1100px;
+  padding: 20px 30px 40px;
+  max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
@@ -1139,14 +1138,15 @@ h2 {
   flex-wrap: wrap;
 }
 .tab {
-  padding: 10px 18px;
+ padding: 10px 20px;
   border-radius: 999px;
-  background: #85b6e0;
   border: none;
+  background: #85b6e0;
   color: #fff;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 .tab:hover {
   background: #50bdbd;
@@ -1206,7 +1206,7 @@ h2 {
   gap: 12px;
 }
 
-/* ABM una sola columna, compacto */
+/* ABM una sola columna */
 .abm-2col {
   display: grid;
   grid-template-columns: 1fr;
@@ -1347,7 +1347,7 @@ h2 {
 
 .abm-btn {
   border-radius: 999px;
-  padding: 6px 18px;
+  padding: 6px 15px;
   border: 2px solid #50bdbd;
   background: #ffffff;
   font-size: 0.9rem;
@@ -1365,7 +1365,7 @@ h2 {
   border-color: #e53935;
 }
 .abm-btn--delete:hover {
-  background: rgba(229, 57, 53, 0.06);
+  background: rgba(235, 24, 20, 0.274);
 }
 
 /* Videos */
@@ -1759,24 +1759,29 @@ h2 {
 }
 
 /* =========================
-   Mobile: más aire + covers enteras (sin recorte)
+   Mobile
    ========================= */
 @media (max-width: 480px) {
-  /* aire a los costados */
   .contenido {
-    padding: 18px 14px 40px; /* antes 24px 18px 48px */
+    padding: 46px 18px 44px;  
+    align-items: flex-start; 
+    min-height: 100dvh;
   }
 
-  /* cards más compactas, sin ese width:90% que en grid molesta */
-  .grid {
+  .tab {
+ padding: 7px 18px;
+ font-size: 1rem;
+ }
+
+ .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
   .card {
-    width: 100%;
     padding: 10px;
     border-radius: 16px;
+    
   }
 
   .title {
@@ -1784,11 +1789,11 @@ h2 {
     margin: 8px 4px 4px;
   }
 
-  /* ===== LIBROS: thumb más bajito + imagen ENTERA ===== */
+  /* ===== LIBROS===== */
   .book-card .book-thumb {
-    aspect-ratio: 16 / 10;      /* más bajito => card más chica */
+    aspect-ratio: 16 / 10;     
     border-radius: 12px;
-    background: #ffffff;        /* marco prolijo */
+    background: #ffffff;        
     border: 1px solid #e6f3f6;
     display: grid;
     place-items: center;
@@ -1798,14 +1803,14 @@ h2 {
   .book-card img {
     width: 100%;
     height: 100%;
-    object-fit: contain;        /* ✅ NO recorta */
-    padding: 6px;               /* aire dentro del thumb */
+    object-fit: contain;        
+    padding: 6px;               
     background: #ffffff;
   }
 
-  /* ===== GUÍAS: thumb más bajito + imagen ENTERA ===== */
+  /* ===== GUÍAS===== */
   .guide-thumb {
-    aspect-ratio: 16 / 10;      /* más bajito => card más chica */
+    aspect-ratio: 16 / 10;      
     border-radius: 12px;
     background: #ffffff;
     border: 1px solid #e6f3f6;
@@ -1817,7 +1822,7 @@ h2 {
   .guide-thumb img {
     width: 100%;
     height: 100%;
-    object-fit: contain;        /* ✅ NO recorta */
+    object-fit: contain;        
     padding: 6px;
     background: #ffffff;
   }
@@ -1855,8 +1860,17 @@ h2 {
     gap: 10px;
   }
 
+    .tab {
+ padding: 7px 8px;
+ font-size: 0.85rem;
+ }
+
   .title {
     font-size: 0.88rem;
   }
-}
+
+  .abm-btn {
+  padding: 3px 10px;
+  font-size: 0.85rem;
+} }
 </style>

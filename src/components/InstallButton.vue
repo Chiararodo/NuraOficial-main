@@ -20,7 +20,6 @@ function isInstalled() {
 function isIOSDevice() {
   const ua = navigator.userAgent.toLowerCase()
   const isIOS = /iphone|ipad|ipod/.test(ua)
-  // iPadOS a veces se identifica como Mac; este fallback ayuda:
   const isIPadOS =
     navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1
   return isIOS || isIPadOS
@@ -81,7 +80,6 @@ onMounted(() => {
   window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt as any)
   window.addEventListener('appinstalled', onAppInstalled)
 
-  // Por si cambia el display-mode / vuelve desde instalación, etc.
   window.addEventListener('resize', refreshVisibility)
 })
 
@@ -107,7 +105,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .install-btn {
   position: fixed;
-  bottom: 88px; /* altura segura por encima de la bottom nav */
+  bottom: 88px; 
   left: 16px;
   z-index: 40;
 

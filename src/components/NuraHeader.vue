@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, onBeforeUnmount, computed, ref } from 'vue'
 import InstallButton from './InstallButton.vue'
 import { useNotificationsStore } from '@/store/notifications'
 import { useAuthStore } from '@/store/auth'
@@ -38,15 +38,19 @@ function goToPremium() {
   router.push({ name: 'premium-area' })
 }
 
-// -------- Premium flag --------
+// -------- Premium flag (reactivo) --------
 const isPremium = ref(false)
 
-onMounted(async () => {
+async function refreshPremiumHeaderFlag() {
+  // 1) cache (rápido)
   if (localStorage.getItem('nura_is_premium') === 'true') {
     isPremium.value = true
     return
   }
 
+  isPremium.value = false
+
+  // 2) DB (source of truth)
   if (auth.user) {
     const { data, error } = await supabase
       .from('profiles')
@@ -59,6 +63,21 @@ onMounted(async () => {
       localStorage.setItem('nura_is_premium', 'true')
     }
   }
+}
+
+function onPremiumChanged() {
+  refreshPremiumHeaderFlag()
+}
+
+onMounted(async () => {
+  await refreshPremiumHeaderFlag()
+
+  // escucha el evento que dispara Premium.vue
+  window.addEventListener('nura-premium-changed', onPremiumChanged)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('nura-premium-changed', onPremiumChanged)
 })
 </script>
 
@@ -73,25 +92,11 @@ onMounted(async () => {
 
     <!-- Nav (solo desktop) -->
     <nav class="topnav desktop-only">
-      <RouterLink to="/app/home">
-        {{ $t('header.home') }}
-      </RouterLink>
-
-      <RouterLink to="/app/cartilla">
-        {{ $t('header.directory') }}
-      </RouterLink>
-
-      <RouterLink to="/app/agendar">
-        {{ $t('header.schedule') }}
-      </RouterLink>
-
-      <RouterLink to="/app/contenido">
-        {{ $t('header.content') }}
-      </RouterLink>
-
-      <RouterLink to="/app/perfil">
-        {{ $t('header.profile') }}
-      </RouterLink>
+      <RouterLink to="/app/home">{{ $t('header.home') }}</RouterLink>
+      <RouterLink to="/app/cartilla">{{ $t('header.directory') }}</RouterLink>
+      <RouterLink to="/app/agendar">{{ $t('header.schedule') }}</RouterLink>
+      <RouterLink to="/app/contenido">{{ $t('header.content') }}</RouterLink>
+      <RouterLink to="/app/perfil">{{ $t('header.profile') }}</RouterLink>
     </nav>
 
     <!-- Acciones derecha -->
@@ -105,9 +110,7 @@ onMounted(async () => {
         @click="goToNotifications"
       >
         <img src="/icons/notif.png" :alt="$t('header.notifications')" />
-        <span v-if="notifCount > 0" class="notif-badge">
-          {{ notifCount }}
-        </span>
+        <span v-if="notifCount > 0" class="notif-badge">{{ notifCount }}</span>
       </button>
 
       <!-- Chatbot -->
@@ -144,7 +147,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- Install Button (AHORA visible en cualquier dispositivo) -->
+    <!-- Install Button -->
     <div class="install-wrapper">
       <InstallButton />
     </div>
@@ -152,6 +155,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* tu CSS igual */
 .nura-header {
   position: sticky;
   top: 0;
@@ -166,23 +170,10 @@ onMounted(async () => {
   min-height: 64px;
 }
 
-.logo-link {
-  display: flex;
-  align-items: center;
-}
+.logo-link { display: flex; align-items: center; }
+.logo { height: 38px; width: auto; }
 
-.logo {
-  height: 38px;
-  width: auto;
-}
-
-/* Nav desktop */
-.topnav {
-  display: flex;
-  gap: 26px;
-  font-weight: 500;
-}
-
+.topnav { display: flex; gap: 26px; font-weight: 500; }
 .topnav a {
   padding-bottom: 4px;
   border-bottom: 2px solid transparent;
@@ -192,11 +183,7 @@ onMounted(async () => {
   font-weight: 550;
   letter-spacing: 0.3px;
 }
-
-.topnav a:hover {
-  text-decoration: underline;
-}
-
+.topnav a:hover { text-decoration: underline; }
 .topnav a.router-link-active,
 .topnav a.router-link-exact-active {
   color: #633266;
@@ -204,14 +191,8 @@ onMounted(async () => {
   text-decoration: none;
 }
 
-/* Acciones */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
+.header-actions { display: flex; align-items: center; gap: 16px; }
 
-/* Botones de íconos */
 .icon-btn {
   display: flex;
   align-items: center;
@@ -223,14 +204,8 @@ onMounted(async () => {
   transition: transform 0.2s ease;
   position: relative;
 }
+.icon-btn img { width: 26px; height: 26px; filter: brightness(0) invert(1); }
 
-.icon-btn img {
-  width: 26px;
-  height: 26px;
-  filter: brightness(0) invert(1);
-}
-
-/* Badge de notificaciones */
 .notif-badge {
   position: absolute;
   top: -4px;
@@ -249,41 +224,18 @@ onMounted(async () => {
   box-shadow: 0 0 0 1.5px #ffffffd0;
 }
 
-/* Icono activo */
 .icon-active img {
   filter: brightness(0) invert(28%) sepia(14%) saturate(2476%)
     hue-rotate(276deg) brightness(94%) contrast(87%);
 }
+.icon-active { transform: scale(1.12); transition: transform 0.2s ease; }
 
-.icon-active {
-  transform: scale(1.12);
-  transition: transform 0.2s ease;
-}
+.install-wrapper { position: fixed; right: 24px; bottom: 24px; z-index: 9999; }
 
-/* Install button */
-.install-wrapper {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 9999;
-}
+.desktop-only { display: none !important; }
+@media (min-width: 900px) { .desktop-only { display: inline-flex !important; } }
 
-/* desktop-only */
-.desktop-only {
-  display: none !important;
-}
-
-@media (min-width: 900px) {
-  .desktop-only {
-    display: inline-flex !important;
-  }
-}
-
-/* PREMIUM ICON */
-.premium-btn {
-  padding: 0;
-}
-
+.premium-btn { padding: 0; }
 .premium-star {
   width: 29px;
   height: 29px;
@@ -294,14 +246,7 @@ onMounted(async () => {
   justify-content: center;
   box-shadow: 0 6px 16px rgba(80, 189, 189, 0.45);
 }
+.premium-star-svg { width: 30px; height: 30px; }
 
-.premium-star-svg {
-  width: 30px;
-  height: 30px;
-}
 
-/* glow cuando está activo */
-.icon-active .premium-star {
-  box-shadow: 0 0 0 3px #ffffff55, 0 10px 22px rgba(80, 189, 189, 0.6);
-}
 </style>

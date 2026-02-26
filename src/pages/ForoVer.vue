@@ -26,9 +26,7 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const forumId = computed(() => route.params.id as string)
-const highlightId = computed(
-  () => (route.query.highlight as string | undefined) || null
-)
+const highlightId = computed(() => (route.query.highlight as string | undefined) || null)
 
 const forum = ref<ForumRow | null>(null)
 const comments = ref<CommentRow[]>([])
@@ -36,28 +34,18 @@ const errorMsg = ref('')
 const newComment = ref('')
 const sending = ref(false)
 
-const canSend = computed(
-  () => newComment.value.trim().length > 1 && !sending.value
-)
+const isAdmin = computed(() => (auth.user as any)?.email === 'admin@nura.app')
 
-/* =======================
-   Nombres + avatares
-   ======================= */
+const canSend = computed(() => newComment.value.trim().length > 1 && !sending.value)
 
 const userNames = ref<Map<string, string>>(new Map())
 const userAvatars = ref<Map<string, string | null>>(new Map())
 
-// Solo sembramos el nombre del usuario logueado desde user_metadata.
-// El avatar siempre lo tomamos de profiles.avatar_url.
 function seedCurrentUserName() {
   if (!auth.user) return
   const metaName =
-    (auth.user.user_metadata as any)?.name?.trim() ||
-    auth.user.email?.split('@')[0] ||
-    ''
-
+    (auth.user.user_metadata as any)?.name?.trim() || auth.user.email?.split('@')[0] || ''
   if (!metaName) return
-
   const map = new Map(userNames.value)
   map.set(auth.user.id, metaName)
   userNames.value = map
@@ -65,17 +53,13 @@ function seedCurrentUserName() {
 
 function getDisplayName(userId: string | null | undefined) {
   if (!userId) return 'Usuario'
-
   const fromMap = userNames.value.get(userId)
   if (fromMap) return fromMap
-
   if (auth.user && userId === auth.user.id) {
     const metaName =
-      (auth.user.user_metadata as any)?.name?.trim() ||
-      auth.user.email?.split('@')[0]
+      (auth.user.user_metadata as any)?.name?.trim() || auth.user.email?.split('@')[0]
     return metaName || 'Usuario'
   }
-
   return 'Usuario'
 }
 
@@ -89,13 +73,12 @@ async function loadUserNames() {
   const ids = new Set<string>()
   if (forum.value?.user_id) ids.add(forum.value.user_id)
   comments.value.forEach((c) => c.user_id && ids.add(c.user_id))
-
   if (ids.size === 0) return
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, full_name, avatar_url')
-    .in('id', Array.from(ids))
+  const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in(
+    'id',
+    Array.from(ids)
+  )
 
   if (!data) return
 
@@ -105,20 +88,17 @@ async function loadUserNames() {
   const avatarPromises: Promise<void>[] = []
 
   ;(data as any[]).forEach((u) => {
-    // nombre
     const existingName = nameMap.get(u.id)
     const displayName = u.full_name?.trim() || existingName || 'Usuario'
     nameMap.set(u.id, displayName)
 
-    // avatar: u.avatar_url es solo el path en el bucket "avatars"
     if (u.avatar_url) {
       const path = u.avatar_url as string
       avatarPromises.push(
         (async () => {
           const { data: signed, error } = await supabase.storage
             .from('avatars')
-            .createSignedUrl(path, 60 * 60 * 24 * 7) // 7 días
-
+            .createSignedUrl(path, 60 * 60 * 24 * 7)
           if (!error && signed?.signedUrl) {
             avatarMap.set(u.id, signed.signedUrl)
           }
@@ -127,7 +107,6 @@ async function loadUserNames() {
     }
   })
 
-  // esperamos a generar todas las signed URLs
   await Promise.all(avatarPromises)
 
   userNames.value = nameMap
@@ -139,10 +118,6 @@ const authorLabel = computed(() => getDisplayName(forum.value?.user_id ?? null))
 function displayNameForComment(c: CommentRow) {
   return getDisplayName(c.user_id)
 }
-
-/* =======================
-   Navegación
-   ======================= */
 
 function goBack() {
   router.back()
@@ -156,10 +131,6 @@ function goToProfile(userId?: string | null) {
   })
 }
 
-/* =======================
-   Formato de fecha
-   ======================= */
-
 function formatDateTime(iso: string) {
   const d = new Date(iso)
   return d.toLocaleString('es-AR', {
@@ -169,10 +140,6 @@ function formatDateTime(iso: string) {
     minute: '2-digit'
   })
 }
-
-/* =======================
-   Cargar foro y comentarios
-   ======================= */
 
 async function loadForum() {
   const { data, error } = await supabase
@@ -205,15 +172,9 @@ function scrollToHighlighted() {
   if (!highlightId.value) return
   requestAnimationFrame(() => {
     const el = document.getElementById(highlightId.value as string)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   })
 }
-
-/* =======================
-   Enviar comentario
-   ======================= */
 
 async function sendComment() {
   if (!canSend.value) return
@@ -240,7 +201,6 @@ async function sendComment() {
     const c = data as CommentRow
     comments.value.push(c)
     newComment.value = ''
-
     if (c.user_id && !userNames.value.get(c.user_id)) {
       await loadUserNames()
     }
@@ -249,16 +209,13 @@ async function sendComment() {
   sending.value = false
 }
 
-/* =======================
-   Borrar comentario
-   ======================= */
-
 const showConfirmDelete = ref(false)
 const commentToDelete = ref<CommentRow | null>(null)
 const deleting = ref(false)
 
 function askDelete(c: CommentRow) {
-  if (!auth.user || c.user_id !== auth.user.id) return
+  if (!auth.user) return
+  if (!isAdmin.value && c.user_id !== auth.user.id) return
   commentToDelete.value = c
   showConfirmDelete.value = true
 }
@@ -274,19 +231,16 @@ async function confirmDelete() {
   deleting.value = true
   errorMsg.value = ''
 
-  const { error } = await supabase
-    .from('forum_comments')
-    .delete()
-    .eq('id', commentToDelete.value.id)
-    .eq('user_id', auth.user.id)
+  let q = supabase.from('forum_comments').delete().eq('id', commentToDelete.value.id)
+  if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
+
+  const { error } = await q
 
   if (error) {
     console.error(error)
     errorMsg.value = 'No se pudo borrar el comentario.'
   } else {
-    comments.value = comments.value.filter(
-      (c) => c.id !== commentToDelete.value!.id
-    )
+    comments.value = comments.value.filter((c) => c.id !== commentToDelete.value!.id)
   }
 
   deleting.value = false
@@ -294,13 +248,10 @@ async function confirmDelete() {
   commentToDelete.value = null
 }
 
-/* =======================
-   Borrar foro
-   ======================= */
-
-const canDeleteForum = computed(
-  () => auth.user && forum.value && forum.value.user_id === auth.user.id
-)
+const canDeleteForum = computed(() => {
+  if (!auth.user || !forum.value) return false
+  return isAdmin.value || forum.value.user_id === auth.user.id
+})
 
 const showConfirmDeleteForum = ref(false)
 const deletingForum = ref(false)
@@ -320,11 +271,10 @@ async function confirmDeleteForum() {
   deletingForum.value = true
   errorMsg.value = ''
 
-  const { error } = await supabase
-    .from('forums')
-    .delete()
-    .eq('id', forum.value.id)
-    .eq('user_id', auth.user.id)
+  let q = supabase.from('forums').delete().eq('id', forum.value.id)
+  if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
+
+  const { error } = await q
 
   if (error) {
     console.error(error)
@@ -337,10 +287,6 @@ async function confirmDeleteForum() {
   showConfirmDeleteForum.value = false
   router.push({ name: 'foro' })
 }
-
-/* =======================
-   Realtime
-   ======================= */
 
 let channel: any = null
 
@@ -398,23 +344,14 @@ onBeforeUnmount(() => {
       <div class="post-header">
         <h2>{{ forum.title }}</h2>
 
-        <button
-          v-if="canDeleteForum"
-          type="button"
-          class="delete-forum-btn"
-          @click="askDeleteForum"
-        >
+        <button v-if="canDeleteForum" type="button" class="delete-forum-btn" @click="askDeleteForum">
           Borrar foro
         </button>
       </div>
 
       <p class="meta">
         Publicado por
-        <button
-          v-if="forum.user_id"
-          class="author-link"
-          @click="goToProfile(forum.user_id)"
-        >
+        <button v-if="forum.user_id" class="author-link" @click="goToProfile(forum.user_id)">
           {{ authorLabel }}
         </button>
         <span v-else><strong>{{ authorLabel }}</strong></span>
@@ -437,11 +374,7 @@ onBeforeUnmount(() => {
           class="comment"
           :class="{ highlighted: c.id === highlightId }"
         >
-          <div
-            class="avatar"
-            :class="{ clickable: !!c.user_id }"
-            @click="goToProfile(c.user_id)"
-          >
+          <div class="avatar" :class="{ clickable: !!c.user_id }" @click="goToProfile(c.user_id)">
             <div class="avatar-inner">
               <img
                 v-if="displayAvatarFor(c.user_id)"
@@ -457,11 +390,7 @@ onBeforeUnmount(() => {
 
           <div class="comment-body">
             <div class="comment-header">
-              <button
-                v-if="c.user_id"
-                class="user-btn"
-                @click="goToProfile(c.user_id)"
-              >
+              <button v-if="c.user_id" class="user-btn" @click="goToProfile(c.user_id)">
                 {{ displayNameForComment(c) }}
               </button>
               <span v-else class="user">
@@ -473,7 +402,7 @@ onBeforeUnmount(() => {
               </span>
 
               <button
-                v-if="auth.user && c.user_id === auth.user.id"
+                v-if="auth.user && (isAdmin || c.user_id === auth.user.id)"
                 class="delete-comment-btn"
                 @click="askDelete(c)"
               >
@@ -486,60 +415,39 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-else class="empty">
-        Todavía no hay comentarios. ¡Sé la primera en comentar!
-      </div>
+      <div v-else class="empty">Todavía no hay comentarios. ¡Sé la primera en comentar!</div>
     </section>
 
     <section v-if="auth.user" class="new-comment">
-      <textarea
-        v-model="newComment"
-        placeholder="Escribí un comentario..."
-      ></textarea>
+      <textarea v-model="newComment" placeholder="Escribí un comentario..."></textarea>
 
-      <button class="btn" :disabled="!canSend" @click="sendComment">
-        Comentar
-      </button>
+      <button class="btn" :disabled="!canSend" @click="sendComment">Comentar</button>
     </section>
 
     <p v-else class="login-msg">Tenés que iniciar sesión para comentar.</p>
 
-    <!-- Modal borrar comentario -->
     <div v-if="showConfirmDelete" class="modal-backdrop">
       <div class="modal">
         <h4>¿Eliminar comentario?</h4>
         <p>Esta acción no se puede deshacer.</p>
 
         <div class="modal-actions">
-          <button class="modal-cancel" @click="cancelDelete">
-            Cancelar
-          </button>
-          <button
-            class="modal-delete"
-            :disabled="deleting"
-            @click="confirmDelete"
-          >
+          <button class="modal-cancel" @click="cancelDelete">Cancelar</button>
+          <button class="modal-delete" :disabled="deleting" @click="confirmDelete">
             {{ deleting ? 'Borrando…' : 'Eliminar' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Modal borrar foro -->
     <div v-if="showConfirmDeleteForum" class="modal-backdrop">
       <div class="modal">
         <h4>¿Eliminar foro?</h4>
         <p>Se borrará todo el contenido y los comentarios.</p>
 
         <div class="modal-actions">
-          <button class="modal-cancel" @click="cancelDeleteForum">
-            Cancelar
-          </button>
-          <button
-            class="modal-delete"
-            :disabled="deletingForum"
-            @click="confirmDeleteForum"
-          >
+          <button class="modal-cancel" @click="cancelDeleteForum">Cancelar</button>
+          <button class="modal-delete" :disabled="deletingForum" @click="confirmDeleteForum">
             {{ deletingForum ? 'Borrando…' : 'Eliminar foro' }}
           </button>
         </div>
@@ -569,6 +477,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 0;
 }
+
 .arrow {
   font-size: 1.5rem;
   color: #46bdbd;
@@ -579,7 +488,6 @@ onBeforeUnmount(() => {
   color: #b3261e;
 }
 
-/* Post */
 .post-box {
   background: white;
   border-radius: 16px;
@@ -619,7 +527,6 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
 }
 
-/* Comentarios */
 .comments-box {
   margin-top: 20px;
 }
@@ -631,7 +538,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #eee;
 }
 
-/* avatar estilo perfil público */
 .avatar {
   width: 42px;
   height: 42px;
@@ -640,6 +546,7 @@ onBeforeUnmount(() => {
   padding: 3px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
+
 .avatar.clickable {
   cursor: pointer;
 }
@@ -668,7 +575,6 @@ onBeforeUnmount(() => {
   color: #2d9c9c;
 }
 
-/* cuerpo comentario */
 .comment-body {
   flex: 1;
 }
@@ -701,7 +607,6 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 
-/* botones borrar foro / comentario */
 .delete-forum-btn {
   border-radius: 999px;
   border: none;
@@ -712,6 +617,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   cursor: pointer;
 }
+
 .delete-forum-btn:hover {
   background: #dc2626;
 }
@@ -726,11 +632,11 @@ onBeforeUnmount(() => {
   font-weight: 600;
   cursor: pointer;
 }
+
 .delete-comment-btn:hover {
   background: #dc2626;
 }
 
-/* Nuevo comentario */
 .new-comment textarea {
   width: 95%;
   min-height: 80px;
@@ -749,11 +655,13 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   cursor: pointer;
 }
+
 .btn:hover {
   background: #3ea9a9;
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
+
 .btn:disabled {
   opacity: 0.5;
 }
@@ -769,7 +677,6 @@ onBeforeUnmount(() => {
   color: #6b6f76;
 }
 
-/* Modal */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -784,7 +691,7 @@ onBeforeUnmount(() => {
   background: white;
   border-radius: 16px;
   padding: 18px 20px;
-  width: 90%;
+  width: 70%;
   max-width: 360px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
 }
@@ -817,6 +724,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 6px 16px rgba(80, 189, 189, 0.4);
   transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.18s ease;
 }
+
 .modal-cancel:hover {
   background: #3ea9a9;
   transform: translateY(-1px);
@@ -840,6 +748,7 @@ onBeforeUnmount(() => {
   text-decoration: none;
   transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
 }
+
 .modal-delete:hover {
   background: #e53935;
 }
@@ -848,7 +757,6 @@ onBeforeUnmount(() => {
   opacity: 0.6;
 }
 
-/* highlight comentario desde perfil público */
 .highlighted {
   background: #e0f7f7;
   border-radius: 8px;

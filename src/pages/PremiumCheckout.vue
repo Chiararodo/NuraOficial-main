@@ -130,7 +130,7 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- ✅ checkbox + link que abre modal -->
+        <!-- Checkbox + link que abre modal -->
         <label class="terms" for="premium-terms">
           <input id="premium-terms" v-model="terms" type="checkbox" />
           <span>
@@ -523,12 +523,27 @@ onMounted(() => {
 /* Mobile */
 @media (max-width: 480px) {
   .card {
-    max-width: 100%;
+    max-width: 90%;
     padding: 18px 16px;
   }
   .btn-full {
     width: 50%;
   }
+
+   .btn-full {
+    display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  padding: 5px 14px;
+  font-size: 0.98rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+  text-decoration: none;
+  }
+
   .modal {
     max-width: 360px;
     border-radius: 16px;
