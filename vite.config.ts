@@ -8,7 +8,15 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logos/isotipo.png'],
+
+      includeAssets: [
+        'logos/isotipo.png',
+        'logos/apple-touch-icon.png',
+        'logos/pwa-192x192.png',
+        'logos/pwa-512x512.png',
+        'logos/pwa-512x512-maskable.png'
+      ],
+
       manifest: {
         name: 'Nura',
         short_name: 'Nura',
@@ -19,21 +27,20 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         orientation: 'portrait',
+
         icons: [
           {
-            src: '/logos/isotipo.png',
+            src: '/logos/pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any'
+            type: 'image/png'
           },
           {
-            src: '/logos/isotipo.png',
+            src: '/logos/pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any'
+            type: 'image/png'
           },
           {
-            src: '/logos/isotipo.png',
+            src: '/logos/pwa-512x512-maskable.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'

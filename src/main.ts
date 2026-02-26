@@ -5,20 +5,23 @@ import { router } from './router'
 import { useAuthStore } from '@/store/auth'
 import './style.css'
 import { i18n } from './i18n'
+import { registerSW } from 'virtual:pwa-register'
+
+registerSW({ immediate: true })
 
 const bootstrap = async () => {
   const app = createApp(App)
 
-  // Plugins (una sola instancia)
   app.use(createPinia())
   app.use(i18n)
   app.use(router)
 
-  // Init auth antes de montar
   const auth = useAuthStore()
   await auth.initAuth()
 
-  // Mount una sola vez
+  // ✅ registra SW en prod
+  registerSW({ immediate: true })
+
   app.mount('#app')
 }
 
