@@ -134,8 +134,7 @@ onBeforeUnmount(() => {
 
       <div v-if="isIOS" class="install-modal-body">
         <p>
-          En iPhone/iPad no se puede instalar desde el botón.
-          Hacelo así:
+          Seguí estos pasos:
         </p>
         <ol>
           <li>Tocá el botón <b>Compartir</b> (el cuadradito con flecha).</li>
