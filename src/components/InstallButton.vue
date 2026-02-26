@@ -9,9 +9,13 @@ type BeforeInstallPromptEvent = Event & {
 const deferredPrompt = ref<BeforeInstallPromptEvent | null>(null)
 
 // UI state
-const showInstallBtn = ref(false)     // muestra el botón (si NO está instalada)
-const showHelpModal = ref(false)      // modal de instrucciones (iOS o fallback)
+const showInstallBtn = ref(false) // muestra el botón (si NO está instalada y es pantalla chica)
+const showHelpModal = ref(false)  // modal (solo en pantalla chica)
 const isIOS = ref(false)
+
+// ✅ Solo mobile/tablet (ajustá el valor si querés)
+const MAX_WIDTH_FOR_INSTALL_UI = 1024
+let mqSmall: MediaQueryList | null = null
 
 function isInstalled() {
   return (
@@ -28,14 +32,27 @@ function isIOSDevice() {
   return isiOS || isIPadOS
 }
 
+function isSmallScreen() {
+  // matchMedia es mejor que window.innerWidth (responde a cambios reales)
+  return window.matchMedia(`(max-width: ${MAX_WIDTH_FOR_INSTALL_UI}px)`).matches
+}
+
 function refreshVisibility() {
   const installed = isInstalled()
   isIOS.value = isIOSDevice()
+  const small = isSmallScreen()
 
-  // Botón visible SOLO si NO está instalada
-  showInstallBtn.value = !installed
+  // ✅ Botón visible SOLO si:
+  // - NO está instalada
+  // - es pantalla chica
+  showInstallBtn.value = !installed && small
 
-  // Si se instaló, cerramos todo
+  // ✅ Si no es pantalla chica, cerramos UI de instalación
+  if (!small) {
+    showHelpModal.value = false
+  }
+
+  // ✅ Si se instaló, cerramos todo
   if (installed) {
     showHelpModal.value = false
     deferredPrompt.value = null
@@ -46,8 +63,6 @@ function onBeforeInstallPrompt(e: Event) {
   // Chrome/Edge/Android: capturamos el evento y habilitamos instalación
   e.preventDefault()
   deferredPrompt.value = e as BeforeInstallPromptEvent
-
-  // si NO está instalada, mostramos botón (ya lo hace refreshVisibility)
   refreshVisibility()
 }
 
@@ -57,8 +72,10 @@ function onAppInstalled() {
   refreshVisibility()
 }
 
-// Se llama al click del botón
 async function handleInstallClick() {
+  // ✅ Si no es pantalla chica, no hacemos nada
+  if (!isSmallScreen()) return
+
   // iOS: siempre modal
   if (isIOS.value) {
     showHelpModal.value = true
@@ -70,7 +87,6 @@ async function handleInstallClick() {
     await deferredPrompt.value.prompt()
     const { outcome } = await deferredPrompt.value.userChoice
 
-    // Si acepta, ocultamos botón; si no, lo dejamos
     if (outcome === 'accepted') {
       deferredPrompt.value = null
       refreshVisibility()
@@ -78,7 +94,7 @@ async function handleInstallClick() {
     return
   }
 
-  // Fallback: no hay beforeinstallprompt disponible (no cumple criterios o no lo disparó)
+  // Fallback
   showHelpModal.value = true
 }
 
@@ -86,9 +102,14 @@ function closeModal() {
   showHelpModal.value = false
 }
 
-// Mejor que resize: escucha cambios reales del display-mode (cuando se instala/abre standalone)
-let mm: MediaQueryList | null = null
+// listeners
+let mmDisplayMode: MediaQueryList | null = null
+
 function onDisplayModeChange() {
+  refreshVisibility()
+}
+
+function onSmallScreenChange() {
   refreshVisibility()
 }
 
@@ -98,33 +119,57 @@ onMounted(() => {
   window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt as any)
   window.addEventListener('appinstalled', onAppInstalled)
 
-  mm = window.matchMedia('(display-mode: standalone)')
-  // Safari viejo usa addListener/removeListener
-  if ('addEventListener' in mm) mm.addEventListener('change', onDisplayModeChange)
-  else (mm as any).addListener(onDisplayModeChange)
+  // Mejor que resize: escucha cambios reales
+  mmDisplayMode = window.matchMedia('(display-mode: standalone)')
+  if ('addEventListener' in mmDisplayMode) mmDisplayMode.addEventListener('change', onDisplayModeChange)
+  else (mmDisplayMode as any).addListener(onDisplayModeChange)
+
+  // ✅ escucha cambios de tamaño/rotación con media query
+  mqSmall = window.matchMedia(`(max-width: ${MAX_WIDTH_FOR_INSTALL_UI}px)`)
+  if ('addEventListener' in mqSmall) mqSmall.addEventListener('change', onSmallScreenChange)
+  else (mqSmall as any).addListener(onSmallScreenChange)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt as any)
   window.removeEventListener('appinstalled', onAppInstalled)
 
-  if (mm) {
-    if ('removeEventListener' in mm) mm.removeEventListener('change', onDisplayModeChange)
-    else (mm as any).removeListener(onDisplayModeChange)
+  if (mmDisplayMode) {
+    if ('removeEventListener' in mmDisplayMode) mmDisplayMode.removeEventListener('change', onDisplayModeChange)
+    else (mmDisplayMode as any).removeListener(onDisplayModeChange)
+  }
+
+  if (mqSmall) {
+    if ('removeEventListener' in mqSmall) mqSmall.removeEventListener('change', onSmallScreenChange)
+    else (mqSmall as any).removeListener(onSmallScreenChange)
   }
 })
 </script>
 
 <template>
-  <!-- Botón: aparece siempre que NO esté instalada -->
-  <button v-if="showInstallBtn" class="install-btn" type="button" @click="handleInstallClick">
+  <!-- Botón: solo pantalla chica + NO instalada -->
+  <button
+    v-if="showInstallBtn"
+    class="install-btn"
+    type="button"
+    @click="handleInstallClick"
+  >
     {{ isIOS ? 'Agregar a inicio' : 'Instalar' }}
   </button>
 
-  <!-- Modal instrucciones -->
-  <div v-if="showHelpModal" class="install-modal-backdrop" @click.self="closeModal">
+  <!-- Modal instrucciones (solo si está abierto; en desktop se fuerza cerrado por refreshVisibility) -->
+  <div
+    v-if="showHelpModal"
+    class="install-modal-backdrop"
+    @click.self="closeModal"
+  >
     <div class="install-modal">
-      <button class="install-modal-close" type="button" @click="closeModal" aria-label="Cerrar">
+      <button
+        class="install-modal-close"
+        type="button"
+        @click="closeModal"
+        aria-label="Cerrar"
+      >
         ✕
       </button>
 
@@ -133,12 +178,9 @@ onBeforeUnmount(() => {
       </h3>
 
       <div v-if="isIOS" class="install-modal-body">
-        <p>
-          Seguí estos pasos:
-        </p>
+        <p>Seguí estos pasos:</p>
         <ol>
-          <li>Tocá el menú de 3 puntitos en la esquina inferior derecha del navegador <b>(...)</b> .</li>
-          <li>Tocá el botón <b>Compartir</b> (el cuadradito con flecha).</li>
+          <li>Tocá el botón <b>Compartir</b> (cuadradito con flecha).</li>
           <li>Elegí <b>“Agregar a pantalla de inicio”</b>.</li>
           <li>Confirmá con <b>Agregar</b>.</li>
         </ol>
@@ -149,8 +191,7 @@ onBeforeUnmount(() => {
 
       <div v-else class="install-modal-body">
         <p>
-          Tu navegador no habilitó el instalador automático.
-          Probá esto:
+          Tu navegador no habilitó el instalador automático. Probá esto:
         </p>
         <ol>
           <li>Abrí el menú ⋮ del navegador.</li>
@@ -159,7 +200,9 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="install-modal-actions">
-        <button class="install-modal-ok" type="button" @click="closeModal">Listo</button>
+        <button class="install-modal-ok" type="button" @click="closeModal">
+          Listo
+        </button>
       </div>
     </div>
   </div>
