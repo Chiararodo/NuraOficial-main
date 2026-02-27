@@ -11,8 +11,8 @@ const email = ref('')
 const terms = ref(false)
 const errorMsg = ref('')
 const loading = ref(false)
-
 const MP_PREMIUM_URL = 'https://mpago.la/2b1Jhzj'
+
 
 const authEmail = computed(() => auth.user?.email ?? '')
 

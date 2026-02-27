@@ -19,7 +19,7 @@ const bootstrap = async () => {
   const auth = useAuthStore()
   await auth.initAuth()
 
-  // ✅ registra SW en prod
+  //  registra SW en prod
   registerSW({ immediate: true })
 
   app.mount('#app')

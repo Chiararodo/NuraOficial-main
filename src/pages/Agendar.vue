@@ -23,6 +23,13 @@ const opciones = computed(() => [
     img: '/covers/sesiongrupal.png',
     boton: t('agendar.options.sessions.button')
   },
+   {
+    id: 'eventos' as OpcionId,
+    titulo: t('agendar.options.events.title'),
+    descripcion: t('agendar.options.events.description'),
+    img: '/covers/eventosgrupales.jpg',
+    boton: t('agendar.options.events.button')
+  },
   {
     id: 'turno' as OpcionId,
     titulo: t('agendar.options.appointment.title'),
@@ -30,13 +37,7 @@ const opciones = computed(() => [
     img: '/covers/turnos.jpeg',
     boton: t('agendar.options.appointment.button')
   },
-  {
-    id: 'eventos' as OpcionId,
-    titulo: t('agendar.options.events.title'),
-    descripcion: t('agendar.options.events.description'),
-    img: '/covers/eventosgrupales.jpg',
-    boton: t('agendar.options.events.button')
-  },
+
   {
     id: 'foro' as OpcionId,
     titulo: t('agendar.options.forum.title'),

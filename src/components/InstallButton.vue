@@ -13,7 +13,7 @@ const showInstallBtn = ref(false) // muestra el botón (si NO está instalada y 
 const showHelpModal = ref(false)  // modal (solo en pantalla chica)
 const isIOS = ref(false)
 
-// ✅ Solo mobile/tablet (ajustá el valor si querés)
+//  Solo mobile/tablet (ajustá el valor si querés)
 const MAX_WIDTH_FOR_INSTALL_UI = 1024
 let mqSmall: MediaQueryList | null = null
 
@@ -42,17 +42,17 @@ function refreshVisibility() {
   isIOS.value = isIOSDevice()
   const small = isSmallScreen()
 
-  // ✅ Botón visible SOLO si:
+  //  Botón visible SOLO si:
   // - NO está instalada
   // - es pantalla chica
   showInstallBtn.value = !installed && small
 
-  // ✅ Si no es pantalla chica, cerramos UI de instalación
+  //  Si no es pantalla chica, cerramos UI de instalación
   if (!small) {
     showHelpModal.value = false
   }
 
-  // ✅ Si se instaló, cerramos todo
+  //  Si se instaló, cerramos todo
   if (installed) {
     showHelpModal.value = false
     deferredPrompt.value = null
@@ -73,7 +73,7 @@ function onAppInstalled() {
 }
 
 async function handleInstallClick() {
-  // ✅ Si no es pantalla chica, no hacemos nada
+  //  Si no es pantalla chica, no hacemos nada
   if (!isSmallScreen()) return
 
   // iOS: siempre modal
@@ -124,7 +124,7 @@ onMounted(() => {
   if ('addEventListener' in mmDisplayMode) mmDisplayMode.addEventListener('change', onDisplayModeChange)
   else (mmDisplayMode as any).addListener(onDisplayModeChange)
 
-  // ✅ escucha cambios de tamaño/rotación con media query
+  //  escucha cambios de tamaño/rotación con media query
   mqSmall = window.matchMedia(`(max-width: ${MAX_WIDTH_FOR_INSTALL_UI}px)`)
   if ('addEventListener' in mqSmall) mqSmall.addEventListener('change', onSmallScreenChange)
   else (mqSmall as any).addListener(onSmallScreenChange)

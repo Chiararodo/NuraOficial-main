@@ -478,6 +478,15 @@ const avatarInitial = computed(() => fallbackInitial())
             </button>
           </div>
         </div>
+          <div class="card">
+          <h3>{{ $t('profile.settings.helpChatTitle') }}</h3>
+          <p class="muted">{{ $t('profile.settings.helpChatDesc') }}</p>
+          <div class="row between">
+            <button class="btn btn-full btn-ghost"type="button" @click="router.push('/app/chatbot')">
+              {{ $t('profile.actions.openChat') }}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section class="col">
@@ -512,16 +521,6 @@ const avatarInitial = computed(() => fallbackInitial())
           <div class="row end">
             <button class="btn btn-full" type="button" @click="router.push('/app/idioma')">
               {{ $t('profile.actions.edit') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>{{ $t('profile.settings.helpChatTitle') }}</h3>
-          <p class="muted">{{ $t('profile.settings.helpChatDesc') }}</p>
-          <div class="row end">
-            <button class="btn btn-full" type="button" @click="router.push('/app/chatbot')">
-              {{ $t('profile.actions.openChat') }}
             </button>
           </div>
         </div>

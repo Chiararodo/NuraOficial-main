@@ -143,7 +143,7 @@ watch(
 }
 
 .card {
-  width: 100%;
+  width: 90%;
   max-width: 720px;
   background: #ffffff;
   border-radius: 20px;
