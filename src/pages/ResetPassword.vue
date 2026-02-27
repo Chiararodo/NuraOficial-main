@@ -72,17 +72,7 @@ function goHome() {
 
 <template>
   <main class="reset-page">
-    <div class="reset-shell">
-      <div class="logo-pill">
-
-        <img
-  src="
-https://dfjdulbonssbzgkkvlep.supabase.co/storage/v1/object/public/nura-content/avatars/logo.png"
-  alt="Nura"
-  width="120"
-  style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 14px;"
-/>
- </div>
+    
 
       <section class="reset-card" v-if="!success">
         <header class="reset-header">
@@ -166,7 +156,6 @@ https://dfjdulbonssbzgkkvlep.supabase.co/storage/v1/object/public/nura-content/a
           </button>
         </div>
       </section>
-    </div>
   </main>
 </template>
 
