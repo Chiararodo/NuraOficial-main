@@ -82,10 +82,7 @@ https://dfjdulbonssbzgkkvlep.supabase.co/storage/v1/object/public/nura-content/a
   width="120"
   style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 14px;"
 />
-
-
-        <img src="/logos/OFICIALwhite.png" alt="Nura" class="logo-img" />
-      </div>
+ </div>
 
       <section class="reset-card" v-if="!success">
         <header class="reset-header">
