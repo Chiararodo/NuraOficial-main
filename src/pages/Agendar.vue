@@ -27,7 +27,7 @@ const opciones = computed(() => [
     id: 'turno' as OpcionId,
     titulo: t('agendar.options.appointment.title'),
     descripcion: t('agendar.options.appointment.description'),
-    img: '/covers/turnos.jpg',
+    img: '/covers/turnos.jpeg',
     boton: t('agendar.options.appointment.button')
   },
   {

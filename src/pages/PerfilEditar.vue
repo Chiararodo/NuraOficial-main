@@ -7,17 +7,23 @@ import { supabase } from '@/composables/useSupabase'
 const router = useRouter()
 const auth = useAuthStore()
 
+const BUCKET = 'nura-content'
+const LEGACY_BUCKET = 'avatars'
+
 const originalName =
   (auth.user?.user_metadata as any)?.name ||
   auth.user?.email?.split('@')[0] ||
   ''
 
 const originalEmail = auth.user?.email ?? ''
-const originalAvatarPath: string | null =
-  (auth.user?.user_metadata as any)?.avatar_url || null
+
+const originalAvatarPath = ref<string | null>(
+  ((auth.user?.user_metadata as any)?.avatar_url as string | null) || null
+)
 
 const name = ref(originalName)
 const email = ref(originalEmail)
+
 const avatarPreview = ref<string | null>(null)
 const avatarFile = ref<File | null>(null)
 
@@ -30,16 +36,65 @@ const pwdSending = ref(false)
 const pwdError = ref('')
 const pwdSuccess = ref('')
 
+function withCacheBust(url: string) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
+}
+
+function normalizeAvatarValue(value: string) {
+  let v = value.trim()
+  if (/^https?:\/\//i.test(v)) return v
+  v = v.replace(/^\/+/, '')
+  v = v.replace(/^nura-content\//i, '')
+  v = v.replace(/^public\/nura-content\//i, '')
+  return v
+}
+
+function publicUrlFrom(bucket: string, path: string): string {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data?.publicUrl ? withCacheBust(data.publicUrl) : ''
+}
+
+async function resolveAvatarAny(value: string | null | undefined): Promise<string | null> {
+  const raw = (value || '').trim()
+  if (!raw) return null
+
+  if (/^https?:\/\//i.test(raw)) return withCacheBust(raw)
+
+  const path = normalizeAvatarValue(raw)
+
+  // intento público (bucket nuevo)
+  const u1 = publicUrlFrom(BUCKET, path)
+  if (u1) return u1
+
+  // fallback legacy: public o signed
+  const u2 = publicUrlFrom(LEGACY_BUCKET, path)
+  if (u2) return u2
+
+  const { data: signed, error } = await supabase.storage
+    .from(LEGACY_BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
+
+  if (!error && signed?.signedUrl) return withCacheBust(signed.signedUrl)
+  return null
+}
+
 async function loadExistingAvatar() {
-  if (!originalAvatarPath) return
+  if (!auth.user) return
 
-  const { data, error } = await supabase.storage
-    .from('avatars')
-    .createSignedUrl(originalAvatarPath, 60 * 60 * 24 * 7)
+  // fuente de verdad: profiles
+  const { data: p } = await supabase
+    .from('profiles')
+    .select('avatar_url, name, full_name')
+    .eq('id', auth.user.id)
+    .maybeSingle()
 
-  if (!error && data?.signedUrl) {
-    avatarPreview.value = data.signedUrl
-  }
+  if (p?.avatar_url) originalAvatarPath.value = String(p.avatar_url)
+
+  // nombre también (si querés)
+  if (p?.name && String(p.name).trim()) name.value = String(p.name)
+
+  const resolved = await resolveAvatarAny(originalAvatarPath.value)
+  avatarPreview.value = resolved
 }
 
 function onFileChange(e: Event) {
@@ -66,82 +121,68 @@ async function saveProfile() {
   errorMsg.value = ''
   successMsg.value = ''
 
-  let savedAvatarPath: string | null = originalAvatarPath
+  let savedAvatarPath: string | null = originalAvatarPath.value
 
+  // 1) upload si hay archivo nuevo
   try {
     if (avatarFile.value) {
       const file = avatarFile.value
       const safeName = file.name.replace(/\s+/g, '-').toLowerCase()
-      const path = `${auth.user.id}/${Date.now()}-${safeName}`
+      const path = `avatars/${auth.user.id}/${Date.now()}-${safeName}`
 
-      const { error: uploadErr } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type || 'image/png'
+      })
 
       if (uploadErr) throw uploadErr
-
       savedAvatarPath = path
     }
   } catch (err) {
-    console.error(err)
+    console.error('UPLOAD avatar error:', err)
     errorMsg.value = 'Error al subir la foto. Intentá de nuevo.'
     saving.value = false
     return
   }
 
+  // 2) auth metadata
   try {
-    const updatePayload: any = {
-      email: email.value,
-      data: {
-        name: name.value,
-        avatar_url: savedAvatarPath
-      }
-    }
-
-    const { error } = await supabase.auth.updateUser(updatePayload)
-    if (error) {
-      if (error.message?.toLowerCase().includes('email')) {
-        throw new Error(
-          'No pudimos actualizar el email. Probá con otro o volvé a iniciar sesión.'
-        )
-      }
-      throw error
-    }
+    const { error } = await supabase.auth.updateUser({
+      data: { name: name.value, avatar_url: savedAvatarPath }
+    })
+    if (error) throw error
 
     const { data: refUser } = await supabase.auth.getUser()
-    if (refUser?.user) {
-      ;(auth as any).user = refUser.user
-    }
+    if (refUser?.user) (auth as any).user = refUser.user
   } catch (err: any) {
-    console.error(err)
-    errorMsg.value =
-      err?.message ||
-      'Error al actualizar tus datos. Probá de nuevo en unos minutos.'
+    console.error('updateUser error:', err)
+    errorMsg.value = err?.message || 'Error al actualizar tus datos.'
     saving.value = false
     return
   }
 
+  // 3) profiles (lo que consume perfil + foro + perfil publico)
   try {
-   const payload: any = {
-  id: auth.user.id,
-  full_name: name.value,
-  name: name.value,          // <─ añadimos esto
-  avatar_url: savedAvatarPath
-}
-
-
+    const payload = {
+      id: auth.user.id,
+      name: name.value,
+      full_name: name.value,
+      avatar_url: savedAvatarPath
+    }
     const { error } = await supabase.from('profiles').upsert(payload)
     if (error) throw error
   } catch (err) {
-    console.error(err)
+    console.error('upsert profiles error:', err)
     errorMsg.value = 'Error al guardar el perfil en Nura.'
     saving.value = false
     return
   }
 
+  // 4) refrescar preview con url real
+  const resolved = await resolveAvatarAny(savedAvatarPath)
+  avatarPreview.value = resolved
+  originalAvatarPath.value = savedAvatarPath
 
   successMsg.value = 'Cambios de perfil guardados correctamente ✔'
   saving.value = false
@@ -157,7 +198,6 @@ async function sendPasswordResetEmail() {
   }
 
   pwdSending.value = true
-
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(pwdEmail.value, {
       redirectTo: `${window.location.origin}/auth/reset-password`
@@ -165,25 +205,15 @@ async function sendPasswordResetEmail() {
 
     if (error) {
       const msg = (error.message || '').toLowerCase()
-
-      if (msg.includes('user not found') || msg.includes('no user')) {
-        pwdError.value =
-          'No encontramos un usuario con ese email. Verificá que coincida con el de tu cuenta.'
-      } else if (msg.includes('rate limit')) {
-        pwdError.value =
-          'Hiciste demasiadas solicitudes seguidas. Esperá unos minutos y volvé a intentar.'
-      } else {
-        pwdError.value =
-          'No pudimos enviar el email de cambio de contraseña. Probá de nuevo en unos minutos.'
-      }
+      if (msg.includes('rate limit')) pwdError.value = 'Hiciste demasiadas solicitudes. Esperá unos minutos.'
+      else pwdError.value = 'No pudimos enviar el email. Probá de nuevo en unos minutos.'
       return
     }
 
-    pwdSuccess.value = `Te enviamos un correo a ${pwdEmail.value} con el enlace para cambiar tu contraseña. Revisá también la carpeta de spam.`
+    pwdSuccess.value = `Te enviamos un correo a ${pwdEmail.value} con el enlace para cambiar tu contraseña. Revisá también spam.`
   } catch (err) {
     console.error(err)
-    pwdError.value =
-      'Ocurrió un error al solicitar el cambio de contraseña. Intentá nuevamente más tarde.'
+    pwdError.value = 'Ocurrió un error al solicitar el cambio de contraseña.'
   } finally {
     pwdSending.value = false
   }
@@ -210,8 +240,12 @@ onMounted(() => {
     <section class="card edit-card">
       <div class="avatar-wrap">
         <div v-if="avatarPreview" class="avatar-img">
-          <img :src="avatarPreview" alt="Avatar" />
-        </div>
+         <img
+  v-if="avatarPreview"
+  :src="avatarPreview"
+  alt="Avatar"
+  @error="avatarPreview = null"
+/> </div>
         <div v-else class="avatar-generated">
           {{ name.charAt(0).toUpperCase() }}
         </div>
@@ -243,17 +277,16 @@ onMounted(() => {
         type="email"
         class="input"
         aria-label="Email del perfil"
+        disabled
       />
+      <p class="security-msg" style="margin-top:-10px;color:#64748b;font-size:.9rem;">
+        (El email se cambia con confirmación; lo dejamos bloqueado acá.)
+      </p>
 
       <p v-if="errorMsg" class="msg error">{{ errorMsg }}</p>
       <p v-if="successMsg" class="msg success">{{ successMsg }}</p>
 
-      <button
-        class="save-btn"
-        type="button"
-        :disabled="saving"
-        @click="saveProfile"
-      >
+      <button class="save-btn" type="button" :disabled="saving" @click="saveProfile">
         {{ saving ? 'Guardando…' : 'Guardar cambios' }}
       </button>
     </section>
@@ -294,6 +327,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 👇 dejo tus estilos tal como estaban, no toqué la estética */
 .perfil-edit {
   background: #fff;
   padding: 20px 16px 40px;
@@ -342,7 +376,6 @@ onMounted(() => {
   height: 130px;
   border-radius: 999px;
   object-fit: cover;
-  
   border: 1.5px solid #50bdbd;
 }
 
@@ -360,19 +393,22 @@ onMounted(() => {
 }
 
 .upload-btn {
-  
   padding: 7px 14px;
   border-radius: 12px;
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
   position: relative;
-  background: #ffffff; color: #50bdbd; border: 
-  3px solid #b6ebe5; 
+  background: #ffffff;
+  color: #50bdbd;
+  border: 3px solid #b6ebe5;
   box-shadow: 0 6px 12px rgba(148, 163, 184, 0.22);
 }
 
-.upload-btn:hover { background: #e0faf7; transform: translateY(-1px); }
+.upload-btn:hover {
+  background: #e0faf7;
+  transform: translateY(-1px);
+}
 
 .upload-btn input {
   position: absolute;
@@ -420,7 +456,6 @@ onMounted(() => {
   font-weight: 600;
   font-size: 1rem;
   padding: 0.7rem;
-  margin: 0 9 9px;
   border: none;
   border-radius: 14px;
   cursor: pointer;
@@ -438,7 +473,6 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* Seguridad / contraseña */
 .security-card {
   margin-top: 18px;
   padding: 22px 22px 20px;
@@ -481,7 +515,7 @@ onMounted(() => {
 .security-msg {
   margin: 6px 0 0;
   font-size: 0.93rem;
-  width:100% ;
+  width: 100%;
 }
 
 .security-msg--error {
@@ -524,9 +558,3 @@ onMounted(() => {
   overflow: hidden;
 }
 </style>
-
-
-
-
-
-

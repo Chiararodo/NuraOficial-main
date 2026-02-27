@@ -394,11 +394,11 @@ onMounted(async () => {
         <h3 class="modal-title">{{ confirmTitle }}</h3>
         <p class="modal-text">{{ confirmText }}</p>
         <div class="modal-actions">
-          <button class="action-btn action-btn--ghost" type="button" :disabled="confirmBusy" @click="closeConfirm">
+          <button class="action-btn1 action-btn--ghost" type="button" :disabled="confirmBusy" @click="closeConfirm">
             No, volver
           </button>
-          <button class="action-btn action-btn--danger" type="button" :disabled="confirmBusy" @click="confirmCancel">
-            {{ confirmBusy ? 'Cancelando…' : 'Sí, cancelar' }}
+          <button class="action-btn1 action-btn--danger" type="button" :disabled="confirmBusy" @click="confirmCancel">
+            {{ confirmBusy ? 'Cancelando…' : 'Cancelar' }}
           </button>
         </div>
       </div>
@@ -445,28 +445,29 @@ onMounted(async () => {
   max-width: 1100px;
   margin: 4px auto 18px;
   display: flex;
-  justify-content: flex-start;
-  gap: 24px;
+  justify-content: space-around; /* igual que contenido */
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-@media (min-width: 800px) {
-  .tabs-row {
-    justify-content: center;
-    gap: 80px;
-  }
-}
+
 .tab-pill {
- padding: 10px 20px;
+  padding: 10px 20px;
   border-radius: 999px;
   border: none;
   background: #85b6e0;
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
 }
 .tab-pill--active {
   background: #50bdbd;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 .tab-pill:hover {
   transform: translateY(-1px);
@@ -497,6 +498,7 @@ onMounted(async () => {
 }
 
 .action-btn,
+.action-btn1,
 .perfil-btn,
 .cupos-btn,
 .btn-close {
@@ -566,7 +568,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 520px) {
-  .action-btn,
   .perfil-btn,
   .cupos-btn,
   .btn-close {
@@ -626,6 +627,40 @@ onMounted(async () => {
   flex-direction: column;
   justify-content: flex-start;
   gap: 10px;
+}
+
+/* =========================
+   Mobile
+   ========================= */
+@media (max-width: 480px) {
+  .tabs-row {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .tab-pill {
+    width: 50%;
+    padding: 7px 18px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .tab-pill {
+    padding: 7px 8px;
+    font-size: 0.85rem;
+  }
+  .modal-actions {
+    gap: 8px;
+  }
+
+  .modal-actions{
+    font-size: 5rem;
+    padding: 9px 10px;
+  }
+   .actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {
@@ -689,9 +724,36 @@ onMounted(async () => {
   gap: 10px;
   justify-content: center;
 }
+
 @media (max-width: 520px) {
   .modal-actions {
-    flex-direction: column;
+    flex-direction: row;     
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-actions {
+    width: 50%;              
+    flex: 1 1 0;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .action-btn {
+    width: 100%;
+    padding: 12px 12px;
+    font-size: 1.1rem;
+  }
+   .action-btn1 {
+    width: 50%; 
+    flex: 1 1 0;
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }
 </style>

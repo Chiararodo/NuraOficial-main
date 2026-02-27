@@ -1763,7 +1763,7 @@ h2 {
    ========================= */
 @media (max-width: 480px) {
   .contenido {
-    padding: 46px 18px 44px;  
+    padding: 46px 18px 54px;  
     align-items: flex-start; 
     min-height: 100dvh;
   }

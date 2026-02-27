@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
 
+const BUCKET = 'nura-content'
+const LEGACY_BUCKET = 'avatars'
+
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -14,30 +17,21 @@ const user = ref<any | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
 
-/* signed avatar */
+/* Avatar */
+const avatarPath = ref<string>('') // lo que viene de DB (path o url)
 const publicAvatar = ref<string | null>(null)
+const triedLegacy = ref(false)
 
-/* counts + previews */
 const commentCount = ref<number | null>(null)
 const forumCount = ref<number | null>(null)
 
-type CommentPreview = {
-  id: string
-  forum_id: string
-  body: string
-  created_at: string
-}
-
-type ForumPreview = {
-  id: string
-  title: string
-  created_at: string
-}
+type CommentPreview = { id: string; forum_id: string; body: string; created_at: string }
+type ForumPreview = { id: string; title: string; created_at: string }
 
 const recentComments = ref<CommentPreview[]>([])
 const recentForums = ref<ForumPreview[]>([])
 
-/* ====== Gate: Admin o Premium ====== */
+/* Gate: Admin o Premium */
 const canViewProfile = ref(false)
 
 /* Modal Premium */
@@ -51,14 +45,15 @@ function openPremiumModal() {
 function closePremiumModal() {
   showPremiumModal.value = false
 }
-
 function goPremium() {
-  // ajustá esta ruta a tu pantalla real de planes/premium
   router.push('/app/premium')
 }
-
 function goBack() {
   router.back()
+}
+
+function withCacheBust(url: string) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
 }
 
 function formatDate(iso?: string | null) {
@@ -94,12 +89,48 @@ function goToComment(forumId: string, commentId: string) {
   })
 }
 
+/* ===== Avatar helpers ===== */
+function publicUrl(bucket: string, path: string) {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data?.publicUrl ? withCacheBust(data.publicUrl) : ''
+}
+
+function buildAvatarPrimary(pathOrUrl: string): string | null {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//i.test(pathOrUrl)) return withCacheBust(pathOrUrl)
+  return publicUrl(BUCKET, pathOrUrl) || null
+}
+
+function buildAvatarLegacy(pathOrUrl: string): string | null {
+  if (!pathOrUrl) return null
+  if (/^https?:\/\//i.test(pathOrUrl)) return withCacheBust(pathOrUrl)
+  return publicUrl(LEGACY_BUCKET, pathOrUrl) || null
+}
+
+function onAvatarError() {
+  // si ya intentamos legacy, fallback a inicial
+  if (!avatarPath.value) {
+    publicAvatar.value = null
+    return
+  }
+
+  if (!triedLegacy.value) {
+    triedLegacy.value = true
+    publicAvatar.value = buildAvatarLegacy(avatarPath.value)
+    return
+  }
+
+  publicAvatar.value = null
+}
+
 onMounted(async () => {
   loading.value = true
   errorMsg.value = ''
   publicAvatar.value = null
+  avatarPath.value = ''
+  triedLegacy.value = false
 
-  // 1) Validar que haya usuario logueado
+  // 1) Validar login
   if (!auth.user) {
     loading.value = false
     premiumTitle.value = 'Iniciá sesión'
@@ -108,7 +139,7 @@ onMounted(async () => {
     return
   }
 
-  // 2) Traer MI perfil para chequear permisos (admin o premium)
+  // 2) Traer MI perfil para permisos
   const { data: myProfile, error: myErr } = await supabase
     .from('profiles')
     .select('is_admin, premium, plan, plan_expires_at')
@@ -124,17 +155,13 @@ onMounted(async () => {
   }
 
   const isAdmin = myProfile.is_admin === true
-
-  // Premium por boolean o por plan, y opcionalmente validando expiración
   const planIsPremium = myProfile.plan === 'premium'
-  const planIsActive =
-    !myProfile.plan_expires_at || new Date(myProfile.plan_expires_at) > new Date()
-
+  const planIsActive = !myProfile.plan_expires_at || new Date(myProfile.plan_expires_at) > new Date()
   const isPremium = myProfile.premium === true || (planIsPremium && planIsActive)
 
   canViewProfile.value = isAdmin || isPremium
 
-  // 3) Si no puede ver, mostrar popup premium y NO cargar datos del otro usuario
+  // 3) Gate premium
   if (!canViewProfile.value) {
     loading.value = false
     premiumTitle.value = 'Función Premium'
@@ -143,7 +170,7 @@ onMounted(async () => {
     return
   }
 
-  // 4) Cargar perfil del usuario solicitado (uid)
+  // 4) Cargar perfil público del UID
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -160,15 +187,10 @@ onMounted(async () => {
 
   user.value = data
 
-  // 5) Signed URL avatar si existe
+  // 5) Avatar (nuevo + fallback por error a legacy)
   if (data?.avatar_url) {
-    const { data: signed, error: signError } = await supabase.storage
-      .from('avatars')
-      .createSignedUrl(data.avatar_url as string, 60 * 60 * 24 * 7)
-
-    if (!signError && signed?.signedUrl) {
-      publicAvatar.value = signed.signedUrl
-    }
+    avatarPath.value = String(data.avatar_url)
+    publicAvatar.value = buildAvatarPrimary(avatarPath.value)
   }
 
   // 6) stats + previews
@@ -176,14 +198,12 @@ onMounted(async () => {
     .from('forum_comments')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', uid)
-
   if (!cError && typeof cCount === 'number') commentCount.value = cCount
 
   const { count: fCount, error: fError } = await supabase
     .from('forums')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', uid)
-
   if (!fError && typeof fCount === 'number') forumCount.value = fCount
 
   const { data: cData } = await supabase
@@ -192,7 +212,6 @@ onMounted(async () => {
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(3)
-
   recentComments.value = (cData || []) as CommentPreview[]
 
   const { data: fData } = await supabase
@@ -201,7 +220,6 @@ onMounted(async () => {
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(3)
-
   recentForums.value = (fData || []) as ForumPreview[]
 
   loading.value = false
@@ -222,7 +240,13 @@ onMounted(async () => {
       <button class="back-btn" type="button" @click="goBack">←</button>
 
       <div class="avatar-wrapper">
-        <img v-if="hasAvatar" :src="publicAvatar!" alt="Foto de perfil" class="avatar-img" />
+        <img
+          v-if="hasAvatar"
+          :src="publicAvatar!"
+          alt="Foto de perfil"
+          class="avatar-img"
+          @error="onAvatarError"
+        />
         <div v-else class="avatar-placeholder">
           <span>{{ initials }}</span>
         </div>
@@ -264,7 +288,12 @@ onMounted(async () => {
       <div v-if="recentComments.length" class="section-list">
         <h3>Comentarios recientes</h3>
         <ul>
-          <li v-for="c in recentComments" :key="c.id" class="clickable" @click="goToComment(c.forum_id, c.id)">
+          <li
+            v-for="c in recentComments"
+            :key="c.id"
+            class="clickable"
+            @click="goToComment(c.forum_id, c.id)"
+          >
             <span class="item-body">{{ c.body }}</span>
             <span class="item-date">{{ formatDate(c.created_at) }}</span>
           </li>
@@ -289,6 +318,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 👇 dejá tu CSS tal cual lo tenías, no cambia nada */
 .perfil-publico {
   min-height: calc(100vh - 64px);
   display: flex;

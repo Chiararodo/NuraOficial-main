@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
 
@@ -9,9 +9,15 @@ type Mood = 'triste' | 'normal' | 'bien' | 'muybien'
 const router = useRouter()
 const auth = useAuthStore()
 
+// Buckets
+const BUCKET_PUBLIC = 'nura-content'
+const BUCKET_LEGACY = 'avatars'
+
+// ---- state
 const profile = ref<{
   id: string
   name?: string | null
+  full_name?: string | null
   avatar_url?: string | null
   premium?: boolean | null
   is_admin?: boolean | null
@@ -22,12 +28,69 @@ const profile = ref<{
 
 const user = ref<any>(null)
 
-/* =========================
-   NOMBRE / EMAIL
-========================= */
+// (si lo vas a usar en el template)
+const diaryPreview = ref<{ date: string; mood: Mood; snippet: string }[]>([])
+
+// ---- helpers
+function cacheBust(url: string) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
+}
+
+// Normaliza lo que tengas guardado en avatar_url
+// (evita casos como "/avatars/..", "nura-content/avatars/..", etc.)
+function normalizeAvatarValue(value: string) {
+  let v = value.trim()
+
+  // si es url completa no tocamos
+  if (/^https?:\/\//i.test(v)) return v
+
+  // sin leading slash
+  v = v.replace(/^\/+/, '')
+
+  // si guardaste "nura-content/avatars/xxx" -> "avatars/xxx"
+  v = v.replace(/^nura-content\//i, '')
+
+  // si guardaste "public/nura-content/avatars/xxx" -> "avatars/xxx"
+  v = v.replace(/^public\/nura-content\//i, '')
+
+  return v
+}
+
+function publicUrl(bucket: string, path: string): string {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data?.publicUrl ? cacheBust(data.publicUrl) : ''
+}
+
+async function resolveAvatarAny(value: string | null | undefined): Promise<string | null> {
+  const raw = (value || '').trim()
+  if (!raw) return null
+
+  // URL completa
+  if (/^https?:\/\//i.test(raw)) return cacheBust(raw)
+
+  const path = normalizeAvatarValue(raw)
+
+  // 1) intento bucket nuevo (PUBLIC)
+  const u1 = publicUrl(BUCKET_PUBLIC, path)
+  if (u1) return u1
+
+  // 2) intento bucket legacy: primero public, sino signed (por si quedó privado)
+  const u2 = publicUrl(BUCKET_LEGACY, path)
+  if (u2) return u2
+
+  const { data: signed, error } = await supabase.storage
+    .from(BUCKET_LEGACY)
+    .createSignedUrl(path, 60 * 60 * 24 * 7)
+
+  if (!error && signed?.signedUrl) return cacheBust(signed.signedUrl)
+  return null
+}
+
+// ---- nombre/email
 const profileName = computed(() => {
-  const nameFromProfile = profile.value?.name
-  if (nameFromProfile && String(nameFromProfile).trim()) return String(nameFromProfile)
+  const p = profile.value
+  const direct = p?.name || p?.full_name
+  if (direct && String(direct).trim()) return String(direct)
 
   const metaName = (auth.user?.user_metadata as any)?.name
   if (metaName && String(metaName).trim()) return String(metaName)
@@ -37,9 +100,13 @@ const profileName = computed(() => {
 
 const userEmail = computed(() => auth.user?.email ?? '')
 
-/* =========================
-   AVATAR (path o URL)
-========================= */
+const memberSinceYear = computed(() => {
+  const iso = auth.user?.created_at
+  if (!iso) return ''
+  return String(new Date(iso).getFullYear())
+})
+
+// ---- avatar
 const avatarPath = computed<string | null>(() => {
   const meta = (auth.user?.user_metadata as any) || {}
   const fromProfile = (profile.value?.avatar_url as string | null | undefined) ?? null
@@ -47,57 +114,32 @@ const avatarPath = computed<string | null>(() => {
   return fromProfile || fromMeta || null
 })
 
-const avatarUrl = ref<string>('')
+const avatarUrl = ref<string>('') // URL final
+const avatarOk = ref(false)       // controla si mostramos img o inicial
 
-function buildPlaceholder() {
+function fallbackInitial() {
   const base = profileName.value || auth.user?.email || 'U'
-  const first = base.trim()[0]?.toUpperCase() || 'U'
-  return `https://placehold.co/120x120/50bdbd/FFFFFF?text=${first}&font=Montserrat`
+  return base.trim()[0]?.toUpperCase() || 'U'
 }
 
-async function resolveAvatarUrl() {
-  const path = avatarPath.value
-
-  if (!path) {
-    avatarUrl.value = buildPlaceholder()
-    return
-  }
-
-  // si ya es URL completa, usarla
-  if (/^https?:\/\//i.test(path)) {
-    avatarUrl.value = path
-    return
-  }
-
-  // si es path en bucket
-  const { data, error } = await supabase.storage
-    .from('avatars')
-    .createSignedUrl(path, 60 * 60 * 24 * 7)
-
-  if (error || !data?.signedUrl) {
-    avatarUrl.value = buildPlaceholder()
-    return
-  }
-
-  avatarUrl.value = data.signedUrl
+async function refreshAvatar() {
+  const resolved = await resolveAvatarAny(avatarPath.value)
+  avatarUrl.value = resolved || ''
+  avatarOk.value = !!resolved
 }
 
-/* =========================
-   FECHA ALTA
-========================= */
-const memberSinceYear = computed(() => {
-  const iso = auth.user?.created_at
-  if (!iso) return ''
-  return String(new Date(iso).getFullYear())
-})
+function onAvatarError() {
+  avatarOk.value = false
+  avatarUrl.value = ''
+}
 
-/* =========================
-   PREMIUM (DB + cache)
-========================= */
-const premiumDb = ref<boolean>(false)
+// ---- premium status (si lo usás)
+const premiumDb = ref(false)
 const loadingPremium = ref(true)
 
-const isPremium = computed(() => premiumDb.value || localStorage.getItem('nura_is_premium') === 'true')
+const isPremium = computed(() => {
+  return premiumDb.value || localStorage.getItem('nura_is_premium') === 'true'
+})
 
 function syncPremiumCache(value: boolean) {
   if (value) localStorage.setItem('nura_is_premium', 'true')
@@ -113,7 +155,6 @@ async function loadPremiumStatus() {
   }
 
   loadingPremium.value = true
-
   const { data, error } = await supabase
     .from('profiles')
     .select('premium')
@@ -124,13 +165,10 @@ async function loadPremiumStatus() {
     premiumDb.value = !!data.premium
     syncPremiumCache(premiumDb.value)
   }
-
   loadingPremium.value = false
 }
 
-/* =========================
-   CARGAR PERFIL
-========================= */
+// ---- load profile
 async function loadProfile() {
   if (!auth.user) return
 
@@ -149,16 +187,16 @@ async function loadProfile() {
     const fallback = {
       id: auth.user.id as string,
       name: fallbackName,
+      full_name: fallbackName,
       avatar_url: null,
       premium: false,
       is_admin: false,
       plan: 'free',
       plan_expires_at: null,
-      created_at: auth.user.created_at as string,
+      created_at: auth.user.created_at as string
     }
     profile.value = fallback
     user.value = fallback
-
     premiumDb.value = false
     syncPremiumCache(false)
     loadingPremium.value = false
@@ -167,21 +205,15 @@ async function loadProfile() {
 
   profile.value = {
     ...data,
-    // NO pisar nombre real: solo usar fallback si viene vacío
-    name: data.name && String(data.name).trim() ? data.name : fallbackName,
+    name: data.name && String(data.name).trim() ? data.name : fallbackName
   }
-
   user.value = profile.value
-
-  // actualizar premiumDb desde DB
   premiumDb.value = !!profile.value?.premium
   syncPremiumCache(premiumDb.value)
   loadingPremium.value = false
 }
 
-/* =========================
-   MEDS PREVIEW
-========================= */
+// ---- meds (si lo usás)
 const meds = ref<any[]>([])
 const loadingMeds = ref(true)
 
@@ -204,11 +236,8 @@ function goMeds() {
   router.push('/app/medicaciones')
 }
 
-/* =========================
-   MOODS (localStorage)
-========================= */
+// ---- moods (si lo usás)
 const moodsHistory = ref<{ date: string; mood: Mood }[]>([])
-const diaryPreview = ref<{ date: string; mood: Mood; snippet: string }[]>([])
 
 function loadLocalData() {
   if (!auth.user) return
@@ -241,38 +270,29 @@ const recentMoods = computed(() => {
 
 function setMood(mood: Mood) {
   const today = new Date().toISOString().slice(0, 10)
-
   if (auth.user) {
     const key = `nura_moods_${auth.user.id}`
     const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, Mood>
     stored[today] = mood
     localStorage.setItem(key, JSON.stringify(stored))
   }
-
-  router.push({
-    name: 'mood-success',
-    query: { mood, date: today },
-  })
+  router.push({ name: 'mood-success', query: { mood, date: today } })
 }
 
 function goDiaryList() {
   router.push('/app/diario/entradas')
 }
 
-/* =========================
-   LOGOUT MODAL
-========================= */
+// ---- logout modal (si lo usás)
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
 
 function openLogoutModal() {
   showLogoutModal.value = true
 }
-
 function closeLogoutModal() {
   if (!loggingOut.value) showLogoutModal.value = false
 }
-
 async function confirmLogout() {
   loggingOut.value = true
   await supabase.auth.signOut()
@@ -280,89 +300,47 @@ async function confirmLogout() {
   router.replace('/login')
 }
 
-/* =========================
-   ADMIN PREMIUM (toggle)
-========================= */
+// ---- admin premium (si lo usás)
 const isAdmin = computed(() => user.value?.is_admin === true)
 
-const upgrading = ref(false)
-const upgradeError = ref('')
-
 async function activatePremiumAdmin() {
-  upgradeError.value = ''
-  if (!auth.user) return
-  if (!isAdmin.value) return
-
-  upgrading.value = true
-
-  const { error } = await supabase
+  if (!auth.user || !isAdmin.value) return
+  await supabase
     .from('profiles')
-    .update({
-      premium: true,
-      plan: 'premium',
-      plan_expires_at: null,
-    })
+    .update({ premium: true, plan: 'premium', plan_expires_at: null })
     .eq('id', auth.user.id)
-
-  upgrading.value = false
-
-  if (error) {
-    upgradeError.value = 'No se pudo activar Premium.'
-    return
-  }
 
   premiumDb.value = true
   syncPremiumCache(true)
   await loadProfile()
 }
 
-const downgrading = ref(false)
-const downgradeError = ref('')
-
 async function deactivatePremiumAdmin() {
-  downgradeError.value = ''
-  if (!auth.user) return
-  if (!isAdmin.value) return
-
-  downgrading.value = true
-
-  const { error } = await supabase
+  if (!auth.user || !isAdmin.value) return
+  await supabase
     .from('profiles')
-    .update({
-      premium: false,
-      plan: 'free',
-      plan_expires_at: null,
-    })
+    .update({ premium: false, plan: 'free', plan_expires_at: null })
     .eq('id', auth.user.id)
-
-  downgrading.value = false
-
-  if (error) {
-    downgradeError.value = 'No se pudo desactivar Premium.'
-    return
-  }
 
   premiumDb.value = false
   syncPremiumCache(false)
   await loadProfile()
 }
 
-/* =========================
-   MOUNT
-========================= */
+// ---- mount
 onMounted(async () => {
   await loadProfile()
   await loadPremiumStatus()
-
   loadLocalData()
   setTimeout(loadMeds, 150)
-
-  await resolveAvatarUrl()
+  await refreshAvatar()
 })
 
-watch(avatarPath, () => {
-  resolveAvatarUrl()
+watch(avatarPath, async () => {
+  await refreshAvatar()
 })
+
+const avatarInitial = computed(() => fallbackInitial())
 </script>
 
 <template>
@@ -377,8 +355,15 @@ watch(avatarPath, () => {
       <section class="col">
         <div class="card profile-head">
           <div class="avatar-container">
-            <img :src="avatarUrl" class="avatar-img" :alt="$t('profile.avatarAlt')" />
-          </div>
+  <img
+    v-if="avatarOk"
+    :src="avatarUrl"
+    class="avatar-img"
+    :alt="$t('profile.avatarAlt')"
+    @error="onAvatarError"
+  />
+  <div v-else class="avatar-fallback">{{ avatarInitial }}</div>
+</div>
 
           <div class="who">
             <h1 class="name">{{ profileName }}</h1>
@@ -904,13 +889,6 @@ h2 {
   margin-top: 14px;
 }
 
-@media (max-width: 520px) {
-  .modal-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -921,5 +899,29 @@ h2 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (max-width: 520px) {
+  .modal-actions {
+    flex-direction: row;     
+    align-items: center;
+  }
+
+  .modal-actions .btn {
+    width: 50%;              
+    flex: 1 1 0;
+    padding: 10px 12px;      
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .modal-actions {
+    gap: 8px;
+  }
+  .modal-actions .btn {
+    font-size: 0.85rem;
+    padding: 9px 10px;
+  }
 }
 </style>

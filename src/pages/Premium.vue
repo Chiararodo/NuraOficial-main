@@ -112,14 +112,13 @@ function closeAdminChoicePopup() {
   if (!adminChoiceLoading.value) showAdminChoicePopup.value = false
 }
 
-// asegura premium ON para admin (toggle + cache + DB opcional)
+// asegura premium ON para admin (toggle + cache + DB)
 async function ensureAdminPremiumOn() {
   if (!isAdmin.value) return
 
   setAdminToggle(true)
   syncPremiumCache(true)
 
-  // opcional pero recomendable: coherencia en DB
   if (auth.user) {
     await supabase
       .from('profiles')
@@ -281,7 +280,7 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- LOADING (opcional) -->
+      <!-- LOADING -->
       <p v-if="loading" class="sub" style="margin-top:8px;">Cargando…</p>
 
       <!-- NO PREMIUM -->

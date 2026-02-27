@@ -1269,7 +1269,7 @@ onMounted(async () => {
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
 }
 .pill:hover { background: #3ea9a9; transform: translateY(-1px); }
-.pill--primary { padding: 10px 22px; font-size: 0.9rem; font-weight: 600; }
+.pill--primary { font-size: 0.9rem; font-weight: 600; }
 .pill--ghost, .pill--ghost-limpiar {
   background: #50bdbd;
   box-shadow: 0 4px 12px rgba(80, 189, 189, 0.3);
@@ -1346,8 +1346,8 @@ background: #3ea9a9; transform: translateY(-1px);
 .modal-card {
   background: #fff;
   border-radius: 22px;
-  width: 45%;
-  max-height: fit-content;
+  width: 70%;
+  max-height: 65%;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 36px rgba(30, 41, 59, 0.22);
@@ -1417,6 +1417,8 @@ background: #3ea9a9; transform: translateY(-1px);
   color: #0f172a;
 }
 .mp-button { width: 100%; justify-content: center; font-weight: 550; }
+
+
 
 .prof-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .prof-summary-avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
@@ -1533,10 +1535,9 @@ background: #3ea9a9; transform: translateY(-1px);
   border-radius: 14px;
   border: 1px solid #e5e7eb;
 
-  padding: 0 44px 0 12px; /* sin padding vertical */
+  padding: 0 44px 0 12px; 
   background-color: #d0f5f5ff;
-
-  font-size: 0.95rem;
+ font-size: 0.95rem;
   color: #0f172a;
 
   background-image: url("data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 10L12 14L16 10' stroke='%23000000' stroke-opacity='0.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");

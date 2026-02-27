@@ -452,7 +452,7 @@ function dayStyle(day: number) {
         </p>
 
         <div class="actions">
-          <button type="button" class="btn-primary" :disabled="!canSave" @click="saveEntry">
+          <button type="button" class="btn-outline" :disabled="!canSave" @click="saveEntry">
             {{ saving ? 'Guardando…' : 'Guardar' }}
           </button>
           <button type="button" class="btn-outline" @click="exportToGoogle">
@@ -503,6 +503,7 @@ function dayStyle(day: number) {
   padding: 24px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .page-head {
@@ -616,26 +617,24 @@ function dayStyle(day: number) {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 24px;
-  align-items: flex-start;
+  align-items: start;
 }
 
-@media (max-width: 900px) {
-  .diary-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 
 /* ============================
    CARD BASE
 ============================ */
 .card {
+   box-sizing: border-box;
+  width: 100%;       
+  min-width: 0;      
+  height: auto;       
   background: #ffffff;
   border-radius: 18px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
   padding: 16px 18px 18px;
   border: 0.3px solid #50bdbd;
-  width: 95%;
-  height: 100%;
 }
 
 /* ===== HEADER CARD ===== */
@@ -645,6 +644,7 @@ function dayStyle(day: number) {
   align-items: center;
   gap: 16px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .card-title {
@@ -976,6 +976,38 @@ function dayStyle(day: number) {
 }
 
 /* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .diary-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .contenido {
+    padding: 16px 14px 72px; 
+  }
+}
+
+@media (max-width: 480px) {
+
+  .btn-primary,
+  .btn-outline {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+}
+
+@media (max-width: 420px) {
+  .contenido {
+    padding: 14px 12px 72px;
+  }
+
+  .card {
+    padding: 14px 14px 16px;
+  }
+}
+
+
 @media (max-width: 768px) {
   .contenido {
     padding: 16px 12px 72px;
@@ -1013,11 +1045,6 @@ function dayStyle(day: number) {
     padding: 14px 14px 16px;
   }
 
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .month-switch {
     align-self: flex-end;
   }
@@ -1028,15 +1055,20 @@ function dayStyle(day: number) {
   }
 
   .actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+   flex-direction: row;        
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .btn-primary,
-  .actions .btn-outline {
-    width: 100%;
-    text-align: center;
+  .btn-outline {
+    width: auto;                
+    margin-top: 0;
+    padding: 9px 14px;          
+    font-size: 0.85rem;
+    border-radius: 12px;        
   }
 
   .toast {
@@ -1048,6 +1080,28 @@ function dayStyle(day: number) {
   .toast-content {
     justify-content: space-between;
     width: fit-content;
+  }
+}
+
+@media (max-width: 520px) {
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    justify-content: initial;
+  }
+
+  .btn-primary,
+  .actions .btn-outline {
+    width: 100%;
+    padding: 9px 10px;          
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .actions {
+    grid-template-columns: 1fr; 
   }
 }
 

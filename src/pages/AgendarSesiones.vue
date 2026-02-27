@@ -445,25 +445,30 @@ onMounted(async () => {
   max-width: 1100px;
   margin: 4px auto 18px;
   display: flex;
-  justify-content: flex-start;
-  gap: 24px;
+  justify-content: space-around; /* igual que contenido */
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-@media (min-width: 800px) {
-  .tabs-row {
-    justify-content: center;
-    gap: 80px;
-  }
-}
+
 .tab-pill {
- padding: 10px 20px;
+padding: 10px 20px;
   border-radius: 999px;
   border: none;
   background: #85b6e0;
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.tab-pill--active {
+  background: #50bdbd;
+  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 .tab-pill:hover {
   transform: translateY(-1px);
@@ -576,13 +581,20 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Base: desktop/tablet */
 .action-btn {
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 1rem;
   border: none;
   background: var(--nura-green);
-  color: #fff;
+  color: #ffffff;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
@@ -592,7 +604,29 @@ onMounted(async () => {
   min-height: 40px;
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, opacity 0.15s ease;
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.28);
-  width: 40%;
+  width: auto;
+  flex: 1 1 220px; 
+}
+
+
+@media (max-width: 520px) {
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .action-btn {
+    width: 100%;
+    padding: 12px 12px;
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .action-btn:hover:not(:disabled) {
@@ -632,13 +666,36 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 
-@media (max-width: 520px) {
-  .action-btn {
-     padding: 16px 12px 14px;
-     font-size: small;
+/* =========================
+   Mobile
+   ========================= */
+@media (max-width: 480px) {
+  .tabs-row {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .tab-pill {
+    width: 50%;
+    padding: 7px 18px;
+    font-size: 1rem;
   }
 }
 
+@media (max-width: 360px) {
+  .tab-pill {
+    padding: 7px 8px;
+    font-size: 0.85rem;
+  }
+    .modal-actions {
+    gap: 8px;
+  }
+
+  .modal-actions .action-btn {
+    font-size: 0.85rem;
+    padding: 9px 10px;
+  }
+}
 .modal {
   position: fixed;
   inset: 0;
@@ -674,9 +731,19 @@ onMounted(async () => {
   gap: 10px;
   justify-content: center;
 }
+
 @media (max-width: 520px) {
   .modal-actions {
-    flex-direction: column;
+    flex-direction: row;     
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-actions .action-btn {
+    width: 50%;              
+    flex: 1 1 0;
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }
 </style>

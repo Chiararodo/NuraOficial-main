@@ -74,6 +74,16 @@ function goHome() {
   <main class="reset-page">
     <div class="reset-shell">
       <div class="logo-pill">
+
+        <img
+  src="
+https://dfjdulbonssbzgkkvlep.supabase.co/storage/v1/object/public/nura-content/avatars/logo.png"
+  alt="Nura"
+  width="120"
+  style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 14px;"
+/>
+
+
         <img src="/logos/OFICIALwhite.png" alt="Nura" class="logo-img" />
       </div>
 
@@ -152,7 +162,7 @@ function goHome() {
 
         <div class="success-actions">
           <button type="button" class="primary-btn" @click="goLogin">
-            Ir a iniciar sesión
+            Iniciar sesión
           </button>
           <button type="button" class="link-btn" @click="goHome">
             Volver al inicio

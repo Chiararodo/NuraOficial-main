@@ -4,6 +4,47 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
 
+/* =========================
+   STORAGE
+========================= */
+const BUCKET = 'nura-content'
+const LEGACY_BUCKET = 'avatars'
+
+function withCacheBust(url: string) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
+}
+
+function publicUrl(bucket: string, path: string) {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data?.publicUrl ? withCacheBust(data.publicUrl) : ''
+}
+
+/**
+ * Si value es URL completa -> la devolvemos.
+ * Si es path -> usamos primero BUCKET (nuevo). Si falla el <img>, probamos legacy.
+ */
+function avatarPrimaryUrl(value: string) {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return withCacheBust(value)
+  return publicUrl(BUCKET, value)
+}
+
+function avatarLegacyUrl(value: string) {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return withCacheBust(value)
+  return publicUrl(LEGACY_BUCKET, value)
+}
+
+/* =========================
+   STATE / TYPES
+========================= */
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+
+const myFlags = ref<{ is_admin: boolean; premium: boolean; plan: string | null } | null>(null)
+const isAdmin = computed(() => !!myFlags.value?.is_admin)
+
 type ForumRow = {
   id: string
   user_id: string | null
@@ -21,10 +62,6 @@ type CommentRow = {
   created_at: string
 }
 
-const route = useRoute()
-const router = useRouter()
-const auth = useAuthStore()
-
 const forumId = computed(() => route.params.id as string)
 const highlightId = computed(() => (route.query.highlight as string | undefined) || null)
 
@@ -34,27 +71,38 @@ const errorMsg = ref('')
 const newComment = ref('')
 const sending = ref(false)
 
-const isAdmin = computed(() => (auth.user as any)?.email === 'admin@nura.app')
-
 const canSend = computed(() => newComment.value.trim().length > 1 && !sending.value)
 
+/**
+ * Maps:
+ * - userNames: id -> nombre
+ * - userAvatarPath: id -> avatar_url (lo que viene de DB)
+ * - userAvatarUrl: id -> url resuelta (la que usa <img>)
+ * - userAvatarTriedLegacy: id -> bool (si ya probamos legacy)
+ */
 const userNames = ref<Map<string, string>>(new Map())
-const userAvatars = ref<Map<string, string | null>>(new Map())
+const userAvatarPath = ref<Map<string, string>>(new Map())
+const userAvatarUrl = ref<Map<string, string | null>>(new Map())
+const userAvatarTriedLegacy = ref<Map<string, boolean>>(new Map())
 
+/* =========================
+   HELPERS (names/avatars)
+========================= */
 function seedCurrentUserName() {
   if (!auth.user) return
   const metaName =
     (auth.user.user_metadata as any)?.name?.trim() || auth.user.email?.split('@')[0] || ''
   if (!metaName) return
-  const map = new Map(userNames.value)
-  map.set(auth.user.id, metaName)
-  userNames.value = map
+  const m = new Map(userNames.value)
+  m.set(auth.user.id, metaName)
+  userNames.value = m
 }
 
 function getDisplayName(userId: string | null | undefined) {
   if (!userId) return 'Usuario'
   const fromMap = userNames.value.get(userId)
   if (fromMap) return fromMap
+
   if (auth.user && userId === auth.user.id) {
     const metaName =
       (auth.user.user_metadata as any)?.name?.trim() || auth.user.email?.split('@')[0]
@@ -65,54 +113,105 @@ function getDisplayName(userId: string | null | undefined) {
 
 function displayAvatarFor(userId: string | null | undefined): string | null {
   if (!userId) return null
-  const fromMap = userAvatars.value.get(userId)
-  return fromMap ?? null
+  return userAvatarUrl.value.get(userId) ?? null
 }
 
+/**
+ * Si el <img> falla:
+ * - si todavía no probamos legacy, intentamos legacy
+ * - si ya probamos legacy, lo limpiamos y cae a inicial
+ */
+function onAvatarError(userId: string | null | undefined) {
+  if (!userId) return
+
+  const tried = userAvatarTriedLegacy.value.get(userId) === true
+  const path = userAvatarPath.value.get(userId) || ''
+
+  if (!path) {
+    // nada que hacer
+    const u = new Map(userAvatarUrl.value)
+    u.set(userId, null)
+    userAvatarUrl.value = u
+    return
+  }
+
+  if (!tried) {
+    // probar legacy UNA vez
+    const legacy = avatarLegacyUrl(path)
+    const u = new Map(userAvatarUrl.value)
+    u.set(userId, legacy || null)
+    userAvatarUrl.value = u
+
+    const t = new Map(userAvatarTriedLegacy.value)
+    t.set(userId, true)
+    userAvatarTriedLegacy.value = t
+    return
+  }
+
+  // ya probamos legacy -> fallback a inicial
+  const u = new Map(userAvatarUrl.value)
+  u.set(userId, null)
+  userAvatarUrl.value = u
+}
+
+/* =========================
+   LOAD user names + avatars
+========================= */
 async function loadUserNames() {
   const ids = new Set<string>()
   if (forum.value?.user_id) ids.add(forum.value.user_id)
   comments.value.forEach((c) => c.user_id && ids.add(c.user_id))
   if (ids.size === 0) return
 
-  const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').in(
-    'id',
-    Array.from(ids)
-  )
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, full_name, avatar_url')
+    .in('id', Array.from(ids))
 
+  if (error) {
+    console.error('loadUserNames profiles error:', error)
+    return
+  }
   if (!data) return
 
   const nameMap = new Map(userNames.value)
-  const avatarMap = new Map(userAvatars.value)
-
-  const avatarPromises: Promise<void>[] = []
+  const pathMap = new Map(userAvatarPath.value)
+  const urlMap = new Map(userAvatarUrl.value)
+  const triedMap = new Map(userAvatarTriedLegacy.value)
 
   ;(data as any[]).forEach((u) => {
     const existingName = nameMap.get(u.id)
-    const displayName = u.full_name?.trim() || existingName || 'Usuario'
+
+    const displayName =
+      (u.name && String(u.name).trim()) ||
+      (u.full_name && String(u.full_name).trim()) ||
+      existingName ||
+      'Usuario'
+
     nameMap.set(u.id, displayName)
 
-    if (u.avatar_url) {
-      const path = u.avatar_url as string
-      avatarPromises.push(
-        (async () => {
-          const { data: signed, error } = await supabase.storage
-            .from('avatars')
-            .createSignedUrl(path, 60 * 60 * 24 * 7)
-          if (!error && signed?.signedUrl) {
-            avatarMap.set(u.id, signed.signedUrl)
-          }
-        })()
-      )
+    const av = u.avatar_url ? String(u.avatar_url) : ''
+
+    if (av) {
+      pathMap.set(u.id, av)
+      // url primaria (bucket nuevo o url completa)
+      urlMap.set(u.id, avatarPrimaryUrl(av) || null)
+      triedMap.set(u.id, false)
+    } else {
+      if (!urlMap.has(u.id)) urlMap.set(u.id, null)
+      if (!triedMap.has(u.id)) triedMap.set(u.id, true)
     }
   })
 
-  await Promise.all(avatarPromises)
-
   userNames.value = nameMap
-  userAvatars.value = avatarMap
+  userAvatarPath.value = pathMap
+  userAvatarUrl.value = urlMap
+  userAvatarTriedLegacy.value = triedMap
 }
 
+/* =========================
+   UI helpers
+========================= */
 const authorLabel = computed(() => getDisplayName(forum.value?.user_id ?? null))
 
 function displayNameForComment(c: CommentRow) {
@@ -125,10 +224,7 @@ function goBack() {
 
 function goToProfile(userId?: string | null) {
   if (!userId) return
-  router.push({
-    name: 'perfil-publico',
-    params: { uid: userId }
-  })
+  router.push({ name: 'perfil-publico', params: { uid: userId } })
 }
 
 function formatDateTime(iso: string) {
@@ -141,6 +237,9 @@ function formatDateTime(iso: string) {
   })
 }
 
+/* =========================
+   LOAD forum + comments
+========================= */
 async function loadForum() {
   const { data, error } = await supabase
     .from('forums')
@@ -163,9 +262,7 @@ async function loadComments() {
     .eq('forum_id', forumId.value)
     .order('created_at', { ascending: true })
 
-  if (!error && data) {
-    comments.value = data as CommentRow[]
-  }
+  if (!error && data) comments.value = data as CommentRow[]
 }
 
 function scrollToHighlighted() {
@@ -176,6 +273,9 @@ function scrollToHighlighted() {
   })
 }
 
+/* =========================
+   SEND comment
+========================= */
 async function sendComment() {
   if (!canSend.value) return
 
@@ -198,17 +298,17 @@ async function sendComment() {
     console.error(error)
     errorMsg.value = 'No se pudo enviar el comentario.'
   } else if (data) {
-    const c = data as CommentRow
-    comments.value.push(c)
+    comments.value.push(data as CommentRow)
     newComment.value = ''
-    if (c.user_id && !userNames.value.get(c.user_id)) {
-      await loadUserNames()
-    }
+    await loadUserNames()
   }
 
   sending.value = false
 }
 
+/* =========================
+   DELETE comment
+========================= */
 const showConfirmDelete = ref(false)
 const commentToDelete = ref<CommentRow | null>(null)
 const deleting = ref(false)
@@ -231,14 +331,16 @@ async function confirmDelete() {
   deleting.value = true
   errorMsg.value = ''
 
-  let q = supabase.from('forum_comments').delete().eq('id', commentToDelete.value.id)
+  let q = supabase.from('forum_comments').delete().eq('id', commentToDelete.value.id).select('id')
   if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
 
-  const { error } = await q
+  const { data, error } = await q
 
   if (error) {
-    console.error(error)
-    errorMsg.value = 'No se pudo borrar el comentario.'
+    console.error('DELETE comment error:', error)
+    errorMsg.value = error.message || 'No se pudo borrar el comentario.'
+  } else if (!data || data.length === 0) {
+    errorMsg.value = 'No se pudo borrar (sin permisos o comentario no encontrado).'
   } else {
     comments.value = comments.value.filter((c) => c.id !== commentToDelete.value!.id)
   }
@@ -248,6 +350,9 @@ async function confirmDelete() {
   commentToDelete.value = null
 }
 
+/* =========================
+   DELETE forum
+========================= */
 const canDeleteForum = computed(() => {
   if (!auth.user || !forum.value) return false
   return isAdmin.value || forum.value.user_id === auth.user.id
@@ -271,14 +376,20 @@ async function confirmDeleteForum() {
   deletingForum.value = true
   errorMsg.value = ''
 
-  let q = supabase.from('forums').delete().eq('id', forum.value.id)
+  let q = supabase.from('forums').delete().eq('id', forum.value.id).select('id')
   if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
 
-  const { error } = await q
+  const { data, error } = await q
 
   if (error) {
-    console.error(error)
-    errorMsg.value = 'No se pudo borrar el foro.'
+    console.error('DELETE forum error:', error)
+    errorMsg.value = error.message || 'No se pudo borrar el foro.'
+    deletingForum.value = false
+    return
+  }
+
+  if (!data || data.length === 0) {
+    errorMsg.value = 'No se pudo borrar (sin permisos o foro no encontrado).'
     deletingForum.value = false
     return
   }
@@ -288,6 +399,9 @@ async function confirmDeleteForum() {
   router.push({ name: 'foro' })
 }
 
+/* =========================
+   REALTIME
+========================= */
 let channel: any = null
 
 function setupRealtime() {
@@ -295,28 +409,43 @@ function setupRealtime() {
     .channel(`forum-comments-${forumId.value}`)
     .on(
       'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'forum_comments',
-        filter: `forum_id=eq.${forumId.value}`
-      },
+      { event: 'INSERT', schema: 'public', table: 'forum_comments', filter: `forum_id=eq.${forumId.value}` },
       async (payload: any) => {
         const c = payload.new as CommentRow
         if (!comments.value.find((x) => x.id === c.id)) {
           comments.value.push(c)
-          if (c.user_id && !userNames.value.get(c.user_id)) {
-            await loadUserNames()
-          }
+          await loadUserNames()
         }
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'forum_comments', filter: `forum_id=eq.${forumId.value}` },
+      (payload: any) => {
+        const deletedId = payload.old?.id as string | undefined
+        if (deletedId) comments.value = comments.value.filter((c) => c.id !== deletedId)
       }
     )
     .subscribe()
 }
 
+/* =========================
+   MOUNT
+========================= */
 onMounted(async () => {
+  if (auth.user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin, premium, plan')
+      .eq('id', auth.user.id)
+      .maybeSingle()
+
+    myFlags.value = data || { is_admin: false, premium: false, plan: 'free' }
+  }
+
   seedCurrentUserName()
   await loadForum()
+
   if (!errorMsg.value) {
     await loadComments()
     await loadUserNames()
@@ -379,8 +508,9 @@ onBeforeUnmount(() => {
               <img
                 v-if="displayAvatarFor(c.user_id)"
                 :src="displayAvatarFor(c.user_id)!"
-                alt="Avatar"
+                alt=""
                 class="avatar-img"
+                @error="onAvatarError(c.user_id)"
               />
               <span v-else class="avatar-initial">
                 {{ displayNameForComment(c).charAt(0).toUpperCase() }}
@@ -420,7 +550,6 @@ onBeforeUnmount(() => {
 
     <section v-if="auth.user" class="new-comment">
       <textarea v-model="newComment" placeholder="Escribí un comentario..."></textarea>
-
       <button class="btn" :disabled="!canSend" @click="sendComment">Comentar</button>
     </section>
 
@@ -607,21 +736,7 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 
-.delete-forum-btn {
-  border-radius: 999px;
-  border: none;
-  padding: 6px 14px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.delete-forum-btn:hover {
-  background: #dc2626;
-}
-
+.delete-forum-btn,
 .delete-comment-btn {
   border-radius: 999px;
   border: none;
@@ -633,6 +748,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.delete-forum-btn:hover,
 .delete-comment-btn:hover {
   background: #dc2626;
 }
@@ -745,7 +861,6 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   padding: 7px 14px;
   cursor: pointer;
-  text-decoration: none;
   transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
 }
 
