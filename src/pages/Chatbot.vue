@@ -2,7 +2,6 @@
 import { ref, nextTick, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import UsageBanner from '@/components/UsageBanner.vue'
 import { useFeatureGate } from '@/composables/useFeatureGate'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
@@ -31,8 +30,7 @@ const auth = useAuthStore()
 const title = 'NuraBot'
 const gate = useFeatureGate('chatbot')
 
-
-const NURI_AVATAR =  '/icons/nuri-bien.png'
+const NURI_AVATAR = '/icons/nuri-bien.png'
 
 /* ====== Límite / Premium ====== */
 const isPremium = computed(() => !!gate.premium.value)
@@ -90,7 +88,7 @@ const scrollToBottom = async () => {
   if (!chatContainer.value) return
   chatContainer.value.scrollTo({
     top: chatContainer.value.scrollHeight,
-    behavior: 'smooth',
+    behavior: 'smooth'
   })
 }
 
@@ -99,11 +97,11 @@ function mapRowToMsg(row: DbChatMsg): ChatMessage {
     id: row.id,
     from: row.role,
     text: row.content ?? '',
-    time: fmtTime(new Date(row.created_at)),
+    time: fmtTime(new Date(row.created_at))
   }
 }
 
-/* ====== “IA local”  ====== */
+/* ====== “IA local” ====== */
 function generateLocalReply(rawText: string): string {
   const text = rawText.toLowerCase()
 
@@ -175,7 +173,7 @@ function generateLocalReply(rawText: string): string {
   return 'Gracias por contarlo. Si querés, contame un poco más qué es lo que más te preocupa ahora y pensamos un próximo paso.'
 }
 
-/* ====== DB helpers (solo texto) ====== */
+/* ====== DB helpers ====== */
 async function saveText(role: Sender, content: string) {
   const uid = auth.user?.id
   if (!uid) return null
@@ -187,7 +185,7 @@ async function saveText(role: Sender, content: string) {
       role,
       message_type: 'text',
       content,
-      audio_url: null, 
+      audio_url: null
     } as any)
     .select('id,user_id,role,message_type,content,created_at')
     .single()
@@ -200,15 +198,14 @@ async function ensureWelcome() {
   if (!auth.user?.id) return
   if (messages.value.length > 0) return
 
-  // Crea welcome en DB y lo muestra
   const created = await saveText('bot', welcomeText).catch(() => null)
   messages.value = [
     {
       id: created?.id ?? `welcome-${Date.now()}`,
       from: 'bot',
       text: welcomeText,
-      time: created?.created_at ? fmtTime(new Date(created.created_at)) : fmtTime(),
-    },
+      time: created?.created_at ? fmtTime(new Date(created.created_at)) : fmtTime()
+    }
   ]
 }
 
@@ -248,10 +245,8 @@ async function sendMessage() {
     return
   }
 
-  // consume SOLO al enviar un mensaje del usuario (no en respuestas)
   if (!isPremium.value) gate.consume(1)
 
-  // UI optimista
   const localUserId = `u-${Date.now()}`
   messages.value.push({ id: localUserId, from: 'user', text, time: fmtTime() })
   userInput.value = ''
@@ -260,14 +255,12 @@ async function sendMessage() {
   try {
     loading.value = true
 
-    // guarda user
     const savedUser = await saveText('user', text)
     if (savedUser) {
       const idx = messages.value.findIndex((m) => m.id === localUserId)
       if (idx !== -1) messages.value[idx] = mapRowToMsg(savedUser)
     }
 
-    // typing fake
     const typingId = `t-${Date.now()}`
     messages.value.push({ id: typingId, from: 'bot', text: 'Escribiendo…', time: '' })
     await scrollToBottom()
@@ -276,14 +269,12 @@ async function sendMessage() {
 
     const reply = generateLocalReply(text)
 
-    // reemplaza typing
     messages.value = messages.value.filter((m) => m.id !== typingId)
 
     const localBotId = `b-${Date.now()}`
     messages.value.push({ id: localBotId, from: 'bot', text: reply, time: fmtTime() })
     await scrollToBottom()
 
-    // guarda bot
     const savedBot = await saveText('bot', reply)
     if (savedBot) {
       const idx = messages.value.findIndex((m) => m.id === localBotId)
@@ -306,7 +297,11 @@ async function clearHistory() {
   if (!auth.user?.id) return
   try {
     clearing.value = true
-    const { error } = await supabase.from('chatbot_messages').delete().eq('user_id', auth.user.id)
+    const { error } = await supabase
+      .from('chatbot_messages')
+      .delete()
+      .eq('user_id', auth.user.id)
+
     if (error) throw error
 
     messages.value = []
@@ -328,7 +323,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   }
 }
 
-/* ===== Realtime   ===== */
+/* ===== Realtime ===== */
 let tick: number | null = null
 let realtimeChannel: any = null
 
@@ -340,7 +335,12 @@ async function setupRealtime() {
     .channel(`chatbot_messages_${uid}`)
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'chatbot_messages', filter: `user_id=eq.${uid}` },
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chatbot_messages',
+        filter: `user_id=eq.${uid}`
+      },
       (payload: any) => {
         const row = payload?.new as DbChatMsg | undefined
         if (!row) return
@@ -396,91 +396,104 @@ watch(
     if (!isPremium.value && canUse === false) showLimitModal.value = true
   }
 )
-
 </script>
 
 <template>
+  <h1 class="visually-hidden">NuraBot</h1>
+
   <main class="contenido">
     <header class="page-head">
-      <h2 class="page-title">{{ title }}</h2>
-      <p class="chat-subtitle">
-        Disponible 24/7 para acompañarte. Recordá que NuraBot no reemplaza la ayuda de un profesional de la salud.
-      </p>
-
-      <!-- CTA  -->
-      <div v-if="showPremiumCta" class="premium-cta">
-        <div class="premium-cta__left">
-          <div class="premium-cta__top">
-            <span class="premium-cta__badge">Gratis</span>
-            <span class="premium-cta__right">{{ ctaRight }}</span>
-          </div>
-          <p class="premium-cta__title">{{ ctaTitle }}</p>
-          <p class="premium-cta__text">{{ ctaText }}</p>
-        </div>
-
-        <button type="button" class="premium-cta__btn" @click="goPremium">
-          Pasar a Premium
-        </button>
+      <div class="head-main">
+        <h2 class="page-title">{{ title }}</h2>
+        <p class="chat-subtitle">
+          Disponible 24/7 para acompañarte. Recordá que NuraBot no reemplaza la ayuda de un profesional de la salud.
+        </p>
       </div>
 
-    
-
-        <button type="button" class="ghost-btn" @click="showClearModal = true" :disabled="clearing">
+      <div class="head-actions">
+        <button
+          type="button"
+          class="ghost-btn"
+          @click="showClearModal = true"
+          :disabled="clearing"
+        >
           Borrar historial
         </button>
-     
+      </div>
     </header>
 
-    <div ref="chatContainer" class="chat-box">
-      <div
-        v-for="msg in messages"
-        :key="msg.id"
-        class="message-row"
-        :class="msg.from === 'user' ? 'message-row--user' : 'message-row--bot'"
-      >
-        <!-- Avatar solo para BOT -->
-        <img
-          v-if="msg.from === 'bot'"
-          class="bot-avatar"
-          :src="NURI_AVATAR"
-          alt="Nuri"
-        />
+    <section v-if="showPremiumCta" class="premium-cta" aria-labelledby="premium-cta-title">
+      <div class="premium-cta__left">
+        <div class="premium-cta__top">
+          <span class="premium-cta__badge">Gratis</span>
+          <span class="premium-cta__right">{{ ctaRight }}</span>
+        </div>
+        <h2 id="premium-cta-title" class="premium-cta__title">{{ ctaTitle }}</h2>
+        <p class="premium-cta__text">{{ ctaText }}</p>
+      </div>
 
-        <div class="bubble" :class="msg.from === 'user' ? 'bubble--user' : 'bubble--bot'">
-          <p class="bubble-text">{{ msg.text }}</p>
-          <span class="bubble-meta">
-            {{ msg.time }} · {{ msg.from === 'user' ? 'Vos' : 'NuraBot' }}
-          </span>
+      <button type="button" class="premium-cta__btn" @click="goPremium">
+        Pasar a Premium
+      </button>
+    </section>
+
+    <section class="chat-card" aria-labelledby="chat-history-title">
+      <h2 id="chat-history-title" class="visually-hidden">Historial del chat</h2>
+
+      <div ref="chatContainer" class="chat-box">
+        <div
+          v-for="msg in messages"
+          :key="msg.id"
+          class="message-row"
+          :class="msg.from === 'user' ? 'message-row--user' : 'message-row--bot'"
+        >
+          <img
+            v-if="msg.from === 'bot'"
+            class="bot-avatar"
+            :src="NURI_AVATAR"
+            alt="Nuri"
+          />
+
+          <div class="bubble" :class="msg.from === 'user' ? 'bubble--user' : 'bubble--bot'">
+            <p class="bubble-text">{{ msg.text }}</p>
+            <span class="bubble-meta">
+              {{ msg.time }} · {{ msg.from === 'user' ? 'Vos' : 'NuraBot' }}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <p v-if="errorMsg" class="chat-error">{{ errorMsg }}</p>
+      <p v-if="errorMsg" class="chat-error" role="alert">{{ errorMsg }}</p>
 
-    <!-- Input + botón SIN superposición -->
-    <form class="input-area" @submit.prevent="sendMessage">
-      <textarea
-        v-model="userInput"
-        rows="1"
-        class="input-field"
-        placeholder="Escribí un mensaje..."
-        @keydown="onKeyDown"
-      />
+      <form class="input-area" @submit.prevent="sendMessage">
+        <label class="visually-hidden" for="chatbot-message">Escribí un mensaje</label>
+        <textarea
+          id="chatbot-message"
+          v-model="userInput"
+          rows="1"
+          class="input-field"
+          placeholder="Escribí un mensaje..."
+          @keydown="onKeyDown"
+        />
 
-      <button type="submit" class="send-btn" :disabled="loading || !userInput.trim() || !canUseToday">
-        {{ loading ? 'Enviando…' : 'Enviar' }}
-      </button>
-    </form>
+        <button
+          type="submit"
+          class="send-btn"
+          :disabled="loading || !userInput.trim() || !canUseToday"
+        >
+          {{ loading ? 'Enviando…' : 'Enviar' }}
+        </button>
+      </form>
+    </section>
 
     <p class="disclaimer">
       NuraBot no reemplaza un tratamiento ni la atención de profesionales de salud.
       Si estás en una situación de emergencia, buscá ayuda inmediata en los servicios de urgencias de tu país.
     </p>
 
-    <!-- Modal límite -->
     <div v-if="showLimitModal" class="modal-overlay" @click.self="showLimitModal = false">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Límite diario alcanzado">
-        <h3 class="modal-title">Límite del plan gratis alcanzado</h3>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="limit-modal-title">
+        <h2 id="limit-modal-title" class="modal-title">Límite del plan gratis alcanzado</h2>
         <p class="modal-text">Hoy alcanzaste el límite diario del plan gratuito.</p>
 
         <div class="modal-highlight">
@@ -492,23 +505,36 @@ watch(
         </div>
 
         <div class="modal-actions">
-          <button class="modal-btn soft" type="button" @click="showLimitModal = false">Entendido</button>
-          <button class="modal-btn" type="button" @click="goPremium">Suscribirme</button>
+          <button class="modal-btn soft" type="button" @click="showLimitModal = false">
+            Entendido
+          </button>
+          <button class="modal-btn" type="button" @click="goPremium">
+            Suscribirme
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Modal borrar historial -->
     <div v-if="showClearModal" class="modal-overlay" @click.self="showClearModal = false">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Borrar historial">
-        <h3 class="modal-title">Borrar historial</h3>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="clear-modal-title">
+        <h2 id="clear-modal-title" class="modal-title">Borrar historial</h2>
         <p class="modal-text">Esto eliminará tu historial del chatbot para este usuario.</p>
 
         <div class="modal-actions">
-          <button class="modal-btn soft" type="button" @click="showClearModal = false" :disabled="clearing">
+          <button
+            class="modal-btn soft"
+            type="button"
+            @click="showClearModal = false"
+            :disabled="clearing"
+          >
             Cancelar
           </button>
-          <button class="modal-btn danger" type="button" @click="clearHistory" :disabled="clearing">
+          <button
+            class="modal-btn danger"
+            type="button"
+            @click="clearHistory"
+            :disabled="clearing"
+          >
             {{ clearing ? 'Borrando…' : 'Borrar' }}
           </button>
         </div>
@@ -520,45 +546,66 @@ watch(
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 20px 14px 44px;
-  max-width: 1400px;
+  padding: 20px 18px 48px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
 .page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.head-main {
   display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 6px;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
 }
 
 .page-title {
   margin: 0;
-  font-size: 1.9rem;
-  font-weight: 800;
+  font-size: 1.7rem;
+  font-weight: 850;
   color: #50bdbd;
-  padding: 4px 0;
 }
 
 .chat-subtitle {
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   color: #667085;
   margin: 0;
+  max-width: 74ch;
 }
 
-/* ============================
-   PREMIUM CTA 
-============================ */
 .premium-cta {
-  margin: 0;
+  margin: 0 0 14px;
   background: #f6fffe;
   border: 1px solid #b6ebe5;
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: 0 10px 18px rgba(80, 189, 189, 0.08);
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 24px rgba(80, 189, 189, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .premium-cta:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 34px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .premium-cta__left {
@@ -597,58 +644,66 @@ watch(
   margin: 0;
   font-weight: 900;
   color: #0f172a;
-  font-size: 0.9rem;
+  font-size: 0.96rem;
   line-height: 1.15;
 }
 
 .premium-cta__text {
   margin: 0;
   color: #475569;
-  font-size: 0.82rem;
-  line-height: 1.25;
+  font-size: 0.84rem;
+  line-height: 1.3;
 }
 
 .premium-cta__btn {
   border: none;
   border-radius: 999px;
-  padding: 7px 10px;
+  padding: 9px 12px;
+  min-height: 42px;
   font-weight: 900;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
   white-space: nowrap;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.premium-cta__btn:hover {
-  background: #3daaaa;
-  transform: translateY(-1px);
-}
-
-/* ===== toolbar ===== */
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+@media (hover: hover) {
+  .premium-cta__btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
 .ghost-btn {
+  
   border: 1px solid #b6ebe5;
   background: #ffffff;
   color: #137b7b;
   font-weight: 900;
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 9px 14px;
   cursor: pointer;
   white-space: nowrap;
-  width: 15%;
+  min-height: 42px;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.ghost-btn:hover {
-  background: #f3fffe;
+@media (hover: hover) {
+  .ghost-btn:hover:not(:disabled) {
+    background: #f3fffe;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .ghost-btn:disabled {
@@ -656,32 +711,40 @@ watch(
   cursor: not-allowed;
 }
 
-/* ===== banner compacto  ===== */
-.usage-wrapper {
-  display: flex;
-  justify-content: flex-start;
+.chat-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2edf7;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-:deep(.usage-banner) {
-  width: auto !important;
-  max-width: 420px;
-  padding: 6px 12px !important;
-  border-radius: 999px !important;
-  font-size: 0.85rem !important;
+@media (hover: hover) {
+  .chat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
 }
 
-/* ===== chat ===== */
 .chat-box {
   background: #ffffff;
-  border-radius: 14px;
-  padding: 1.1rem 1.2rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 1rem 1rem 0.2rem;
+  box-shadow: inset 0 0 0 1px #edf2f7;
   max-height: 520px;
-  min-height: 260px;
+  min-height: 280px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.8rem;
 }
 
 .message-row {
@@ -699,20 +762,21 @@ watch(
 }
 
 .bot-avatar {
-  width: 54px;
-  height: 54px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
   object-fit: cover;
   border: 3px solid rgba(80, 189, 189, 0.25);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
 }
 
 .bubble {
   max-width: 82%;
-  border-radius: 16px;
-  padding: 0.72rem 0.95rem;
+  border-radius: 18px;
+  padding: 0.78rem 0.95rem;
   font-size: 0.94rem;
-  line-height: 1.4;
+  line-height: 1.45;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 
 .bubble--bot {
@@ -729,60 +793,72 @@ watch(
 
 .bubble-text {
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .bubble-meta {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: 0.32rem;
   font-size: 0.7rem;
-  opacity: 0.85;
+  opacity: 0.88;
   text-align: right;
 }
 
-/* ===== input + botón (sin superposición) ===== */
 .input-area {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .input-field {
   flex: 1;
-  width: 95%;
-  border-radius: 999px;
+  width: 100%;
+  border-radius: 18px;
   border: 1px solid #d3d7dd;
-  padding: 0.6rem 1rem;
-  font-size: 0.9rem;
+  padding: 0.78rem 1rem;
+  font-size: 0.92rem;
   color: #0b0f19;
   resize: none;
   outline: none;
-  background: rgba(80, 189, 189, 0.22);
-  min-height: 22px;
+  background: rgba(80, 189, 189, 0.12);
+  min-height: 44px;
+  max-height: 120px;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .input-field:focus {
   border-color: #50bdbd;
-  box-shadow: 0 0 0 2px rgba(55, 179, 179, 0.15);
+  box-shadow: 0 0 0 3px rgba(55, 179, 179, 0.15);
 }
 
 .send-btn {
   flex: 0 0 auto;
   border: none;
   border-radius: 999px;
-  padding: 0.62rem 1.2rem;
-  font-size: 0.9rem;
+  padding: 0.75rem 1.2rem;
+  font-size: 0.92rem;
   font-weight: 900;
   cursor: pointer;
   background: #50bdbd;
   color: #ffffff;
-  transition: background 0.15s ease, transform 0.15s ease;
-  min-height: 42px;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+  min-height: 44px;
 }
 
-.send-btn:hover {
-  background: #3daaaa;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .send-btn:hover:not(:disabled) {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
 .send-btn:disabled {
@@ -791,20 +867,19 @@ watch(
   transform: none;
 }
 
-/* ===== textos ===== */
 .chat-error {
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
+  margin: 10px 0 0;
+  font-size: 0.9rem;
   color: #d03030;
 }
 
 .disclaimer {
-  margin-top: 0.75rem;
-  font-size: 0.75rem;
+  margin-top: 0.85rem;
+  font-size: 0.76rem;
   color: #667085;
+  line-height: 1.4;
 }
 
-/* ===== modales ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -837,6 +912,7 @@ watch(
 .modal-text {
   margin: 0 0 10px;
   color: #475569;
+  line-height: 1.45;
 }
 
 .modal-highlight {
@@ -864,20 +940,31 @@ watch(
   justify-content: flex-end;
   gap: 10px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
 .modal-btn {
   border-radius: 999px;
   border: none;
   padding: 9px 14px;
+  min-height: 42px;
   font-weight: 900;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.modal-btn:hover {
-  background: #3daaaa;
+@media (hover: hover) {
+  .modal-btn:hover:not(:disabled) {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
 .modal-btn.soft {
@@ -886,16 +973,20 @@ watch(
   border: 1px solid #b6ebe5;
 }
 
-.modal-btn.soft:hover {
-  background: #e0faf7;
+@media (hover: hover) {
+  .modal-btn.soft:hover:not(:disabled) {
+    background: #e0faf7;
+  }
 }
 
 .modal-btn.danger {
   background: #d03030;
 }
 
-.modal-btn.danger:hover {
-  background: #b92525;
+@media (hover: hover) {
+  .modal-btn.danger:hover:not(:disabled) {
+    background: #b92525;
+  }
 }
 
 .modal-btn:disabled {
@@ -903,8 +994,33 @@ watch(
   cursor: not-allowed;
 }
 
-/* ===== responsive ===== */
-@media (max-width: 640px) {
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .contenido {
+    padding: 16px 12px 96px;
+  }
+
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .head-actions {
+    justify-content: flex-start;
+  }
+
+  .page-title {
+    font-size: 1.45rem;
+  }
+
   .premium-cta {
     flex-direction: column;
     align-items: stretch;
@@ -924,17 +1040,16 @@ watch(
     text-align: center;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .ghost-btn {
     width: 100%;
   }
 
+  .chat-card {
+    padding: 16px 14px;
+  }
+
   .chat-box {
-    padding: 1rem;
+    padding: 0.9rem 0.9rem 0.2rem;
     max-height: 60vh;
   }
 
@@ -943,11 +1058,22 @@ watch(
   }
 
   .input-area {
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
 
   .send-btn {
-    padding: 0.62rem 0.95rem;
+    width: 100%;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-actions .modal-btn {
+    width: 100%;
   }
 }
 </style>

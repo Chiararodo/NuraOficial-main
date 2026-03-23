@@ -29,33 +29,26 @@ import { supabase } from '@/composables/useSupabase'
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'splash', component: Splash },
 
-  // Públicas
   { path: '/login', name: 'login', component: Login },
   { path: '/register', name: 'register', component: Register },
 
-  // Onboarding (requiere sesión)
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
   { path: '/onboarding2', name: 'onboarding2', component: Onboarding2 },
 
-  // Área privada /app
   {
     path: '/app',
     component: () => import('@/layouts/AppShell.vue'),
     meta: { requiresAuth: true },
     children: [
       { path: 'home', name: 'home', component: Home },
-      // Admin (solo admin)
 
-      // Cartilla / turnos
       { path: 'cartilla', name: 'cartilla', component: Cartilla },
       { path: 'agendar', name: 'agendar', component: Agendar },
       { path: 'agendar/eventos', name: 'agendar-eventos', component: AgendarEventos },
       { path: 'agendar/sesiones', name: 'agendar-sesiones', component: AgendarSesiones },
 
-      // Contenido
       { path: 'contenido', name: 'contenido', component: Contenido },
 
-      // Perfil
       { path: 'perfil', name: 'perfil', component: Perfil },
       {
         path: 'perfil/editar',
@@ -68,22 +61,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/PerfilPublico.vue')
       },
 
-      // Medicaciones
       {
         path: 'medicaciones',
         name: 'Medicaciones',
         component: () => import('@/pages/Medicamentos.vue')
       },
 
-      // Foro
       { path: 'foro', name: 'foro', component: Foro },
       { path: 'foro/new', name: 'foro-new', component: ForoNuevo },
       { path: 'foro/:id', name: 'foro-view', component: ForoVer },
 
-      // Chatbot
       { path: 'chatbot', name: 'chatbot', component: Chatbot },
 
-      // Diario
       { path: 'diario', name: 'diario', component: Diary },
       {
         path: 'diario/entradas',
@@ -91,7 +80,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/DiarioEntradas.vue')
       },
 
-      // Notificaciones
+      {
+        path: 'admin/usuarios',
+        name: 'admin-usuarios',
+        component: () => import('@/pages/AdminUsuarios.vue'),
+        meta: { requiresAdmin: true }
+      },
+
       {
         path: 'notificaciones',
         name: 'notificaciones',
@@ -103,7 +98,6 @@ const routes: RouteRecordRaw[] = [
         component: NotificacionesFeed
       },
 
-      // Premium
       {
         path: 'premium',
         name: 'premium',
@@ -125,14 +119,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/PremiumPage.vue')
       },
 
-      // Términos (privado)
       {
         path: 'terminos',
         name: 'terminos',
         component: () => import('@/pages/Terminos.vue')
       },
 
-      // Privacidad / idioma
       {
         path: 'privacidad',
         name: 'privacidad',
@@ -144,19 +136,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/Idioma.vue')
       },
 
-      // Redirect por defecto dentro de /app
       { path: '', redirect: '/app/home' }
     ]
   },
 
-  // Reset password (fuera de /app, sin auth)
   {
     path: '/auth/reset-password',
     name: 'reset-password',
     component: () => import('@/pages/ResetPassword.vue')
   },
 
-  // Fallback
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
@@ -170,8 +159,13 @@ export const router = createRouter({
 
 const ONBOARDING_PATHS = new Set(['/onboarding', '/onboarding2'])
 
-// cache simple del perfil
-let profileCache: { id: string; terms_accepted?: boolean; is_admin?: boolean } | null = null
+let profileCache: {
+  id: string
+  terms_accepted?: boolean
+  is_admin?: boolean
+  blocked?: boolean | null
+} | null = null
+
 router.beforeEach(async (to, from) => {
   if (to.name === 'splash') return
 
@@ -188,24 +182,43 @@ router.beforeEach(async (to, from) => {
   }
 
   if (isAuthed) {
+    // 🔥 chequeo real de usuario auth
+    const { data: userCheck, error: userCheckError } = await supabase.auth.getUser()
+
+    if (userCheckError || !userCheck?.user) {
+      await supabase.auth.signOut()
+      return '/login?deleted=1'
+    }
+
     const mustRefresh =
       !profileCache ||
+      profileCache.id !== user!.id ||
       to.name === 'home' ||
       to.name === 'terminos' ||
       from.name === 'terminos' ||
       to.meta.requiresAdmin
 
     if (mustRefresh) {
-      const { data: prof } = await supabase
+      const { data: prof, error: profError } = await supabase
         .from('profiles')
-        .select('id, terms_accepted, is_admin')
+        .select('id, terms_accepted, is_admin, blocked')
         .eq('id', user!.id)
         .maybeSingle()
 
-      profileCache = prof ?? null
+      // 🔥 si no existe perfil, cerrá sesión y mandá a login
+      if (profError || !prof) {
+        await supabase.auth.signOut()
+        return '/login?deleted=1'
+      }
+
+      profileCache = prof
     }
 
-    // premium cache (para que se refleje sin tocar Perfil.vue)
+    if (profileCache?.blocked) {
+      await supabase.auth.signOut()
+      return '/login?blocked=1'
+    }
+
     await refreshPremiumCache(user!.id)
 
     const termsAccepted = profileCache?.terms_accepted === true
@@ -218,7 +231,6 @@ router.beforeEach(async (to, from) => {
       return '/app/home'
     }
 
-    // admin gate
     if (to.meta.requiresAdmin) {
       const isAdmin = profileCache?.is_admin === true
       if (!isAdmin) return '/app/home'

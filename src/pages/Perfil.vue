@@ -9,11 +9,9 @@ type Mood = 'triste' | 'normal' | 'bien' | 'muybien'
 const router = useRouter()
 const auth = useAuthStore()
 
-// Buckets
 const BUCKET_PUBLIC = 'nura-content'
 const BUCKET_LEGACY = 'avatars'
 
-// ---- state
 const profile = ref<{
   id: string
   name?: string | null
@@ -27,30 +25,19 @@ const profile = ref<{
 } | null>(null)
 
 const user = ref<any>(null)
-
-// (si lo vas a usar en el template)
 const diaryPreview = ref<{ date: string; mood: Mood; snippet: string }[]>([])
 
-// ---- helpers
 function cacheBust(url: string) {
   return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
 }
 
-// Normaliza lo que tengas guardado en avatar_url
-// (evita casos como "/avatars/..", "nura-content/avatars/..", etc.)
 function normalizeAvatarValue(value: string) {
   let v = value.trim()
 
-  // si es url completa no tocamos
   if (/^https?:\/\//i.test(v)) return v
 
-  // sin leading slash
   v = v.replace(/^\/+/, '')
-
-  // si guardaste "nura-content/avatars/xxx" -> "avatars/xxx"
   v = v.replace(/^nura-content\//i, '')
-
-  // si guardaste "public/nura-content/avatars/xxx" -> "avatars/xxx"
   v = v.replace(/^public\/nura-content\//i, '')
 
   return v
@@ -61,20 +48,19 @@ function publicUrl(bucket: string, path: string): string {
   return data?.publicUrl ? cacheBust(data.publicUrl) : ''
 }
 
-async function resolveAvatarAny(value: string | null | undefined): Promise<string | null> {
+async function resolveAvatarAny(
+  value: string | null | undefined
+): Promise<string | null> {
   const raw = (value || '').trim()
   if (!raw) return null
 
-  // URL completa
   if (/^https?:\/\//i.test(raw)) return cacheBust(raw)
 
   const path = normalizeAvatarValue(raw)
 
-  // 1) intento bucket nuevo (PUBLIC)
   const u1 = publicUrl(BUCKET_PUBLIC, path)
   if (u1) return u1
 
-  // 2) intento bucket legacy: primero public, sino signed (por si quedó privado)
   const u2 = publicUrl(BUCKET_LEGACY, path)
   if (u2) return u2
 
@@ -86,7 +72,6 @@ async function resolveAvatarAny(value: string | null | undefined): Promise<strin
   return null
 }
 
-// ---- nombre/email
 const profileName = computed(() => {
   const p = profile.value
   const direct = p?.name || p?.full_name
@@ -106,7 +91,6 @@ const memberSinceYear = computed(() => {
   return String(new Date(iso).getFullYear())
 })
 
-// ---- avatar
 const avatarPath = computed<string | null>(() => {
   const meta = (auth.user?.user_metadata as any) || {}
   const fromProfile = (profile.value?.avatar_url as string | null | undefined) ?? null
@@ -114,8 +98,8 @@ const avatarPath = computed<string | null>(() => {
   return fromProfile || fromMeta || null
 })
 
-const avatarUrl = ref<string>('') // URL final
-const avatarOk = ref(false)       // controla si mostramos img o inicial
+const avatarUrl = ref<string>('')
+const avatarOk = ref(false)
 
 function fallbackInitial() {
   const base = profileName.value || auth.user?.email || 'U'
@@ -133,7 +117,6 @@ function onAvatarError() {
   avatarUrl.value = ''
 }
 
-// ---- premium status (si lo usás)
 const premiumDb = ref(false)
 const loadingPremium = ref(true)
 
@@ -168,7 +151,6 @@ async function loadPremiumStatus() {
   loadingPremium.value = false
 }
 
-// ---- load profile
 async function loadProfile() {
   if (!auth.user) return
 
@@ -213,7 +195,6 @@ async function loadProfile() {
   loadingPremium.value = false
 }
 
-// ---- meds (si lo usás)
 const meds = ref<any[]>([])
 const loadingMeds = ref(true)
 
@@ -236,7 +217,6 @@ function goMeds() {
   router.push('/app/medicaciones')
 }
 
-// ---- moods (si lo usás)
 const moodsHistory = ref<{ date: string; mood: Mood }[]>([])
 
 function loadLocalData() {
@@ -264,7 +244,9 @@ const recentMoods = computed(() => {
   const key = `nura_moods_${auth.user.id}`
   const stored = JSON.parse(localStorage.getItem(key) || '{}')
   const entries = Object.entries(stored) as [string, Mood][]
-  const sorted = entries.sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+  const sorted = entries.sort(
+    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime()
+  )
   return sorted.slice(0, 3)
 })
 
@@ -283,16 +265,17 @@ function goDiaryList() {
   router.push('/app/diario/entradas')
 }
 
-// ---- logout modal (si lo usás)
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
 
 function openLogoutModal() {
   showLogoutModal.value = true
 }
+
 function closeLogoutModal() {
   if (!loggingOut.value) showLogoutModal.value = false
 }
+
 async function confirmLogout() {
   loggingOut.value = true
   await supabase.auth.signOut()
@@ -300,7 +283,6 @@ async function confirmLogout() {
   router.replace('/login')
 }
 
-// ---- admin premium (si lo usás)
 const isAdmin = computed(() => user.value?.is_admin === true)
 
 async function activatePremiumAdmin() {
@@ -327,7 +309,6 @@ async function deactivatePremiumAdmin() {
   await loadProfile()
 }
 
-// ---- mount
 onMounted(async () => {
   await loadProfile()
   await loadPremiumStatus()
@@ -348,31 +329,35 @@ const avatarInitial = computed(() => fallbackInitial())
 
   <main class="contenido">
     <header class="page-head">
-      <h2>{{ $t('profile.title') }}</h2>
+      <h2 class="page-title">{{ $t('profile.title') }}</h2>
     </header>
 
     <div class="grid">
       <section class="col">
         <div class="card profile-head">
           <div class="avatar-container">
-  <img
-    v-if="avatarOk"
-    :src="avatarUrl"
-    class="avatar-img"
-    :alt="$t('profile.avatarAlt')"
-    @error="onAvatarError"
-  />
-  <div v-else class="avatar-fallback">{{ avatarInitial }}</div>
-</div>
+            <img
+              v-if="avatarOk"
+              :src="avatarUrl"
+              class="avatar-img"
+              :alt="$t('profile.avatarAlt')"
+              @error="onAvatarError"
+            />
+            <div v-else class="avatar-fallback">{{ avatarInitial }}</div>
+          </div>
 
           <div class="who">
-            <h1 class="name">{{ profileName }}</h1>
+            <p class="name">{{ profileName }}</p>
             <p class="email">{{ userEmail }}</p>
             <p class="since" v-if="memberSinceYear">
               {{ $t('profile.memberSince', { year: memberSinceYear }) }}
             </p>
 
-            <button class="btn btn-full" type="button" @click="router.push('/app/perfil/editar')">
+            <button
+              class="btn btn-full"
+              type="button"
+              @click="router.push('/app/perfil/editar')"
+            >
               {{ $t('profile.edit') }}
             </button>
           </div>
@@ -381,9 +366,9 @@ const avatarInitial = computed(() => fallbackInitial())
         <div class="card premium-box">
           <template v-if="user">
             <div class="premium-head-row">
-              <h3>
+              <h2 class="section-title">
                 {{ isPremium ? $t('profile.plan.premiumTitle') : $t('profile.plan.freeTitle') }}
-              </h3>
+              </h2>
 
               <span class="premium-pill" :class="{ 'premium-pill--free': !isPremium }">
                 <span class="premium-dot" :class="{ 'premium-dot--free': !isPremium }"></span>
@@ -425,7 +410,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card">
-          <h3 class="card-title">{{ $t('profile.lastMoodsTitle') }}</h3>
+          <h2 class="section-title">{{ $t('profile.lastMoodsTitle') }}</h2>
 
           <p v-if="recentMoods.length === 0">
             {{ $t('profile.noMoodsThisWeek') }}
@@ -440,7 +425,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card meds-preview">
-          <h3 class="card-title">{{ $t('profile.meds.title') }}</h3>
+          <h2 class="section-title">{{ $t('profile.meds.title') }}</h2>
 
           <p v-if="loadingMeds">{{ $t('profile.meds.loading') }}</p>
 
@@ -460,7 +445,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card">
-          <h3>{{ $t('profile.diary.title') }}</h3>
+          <h2 class="section-title">{{ $t('profile.diary.title') }}</h2>
 
           <ul v-if="diaryPreview.length" class="diary-list">
             <li v-for="d in diaryPreview" :key="d.date">
@@ -478,11 +463,16 @@ const avatarInitial = computed(() => fallbackInitial())
             </button>
           </div>
         </div>
-          <div class="card">
-          <h3>{{ $t('profile.settings.helpChatTitle') }}</h3>
+
+        <div class="card">
+          <h2 class="section-title">{{ $t('profile.settings.helpChatTitle') }}</h2>
           <p class="muted">{{ $t('profile.settings.helpChatDesc') }}</p>
           <div class="row between">
-            <button class="btn btn-full btn-ghost"type="button" @click="router.push('/app/chatbot')">
+            <button
+              class="btn btn-full btn-ghost"
+              type="button"
+              @click="router.push('/app/chatbot')"
+            >
               {{ $t('profile.actions.openChat') }}
             </button>
           </div>
@@ -491,12 +481,12 @@ const avatarInitial = computed(() => fallbackInitial())
 
       <section class="col">
         <div class="card aside-card">
-          <h3 class="aside-title">{{ $t('profile.settings.title') }}</h3>
+          <h2 class="aside-title">{{ $t('profile.settings.title') }}</h2>
           <p class="aside-subtitle">{{ $t('profile.settings.subtitle') }}</p>
         </div>
 
         <div class="card">
-          <h3>{{ $t('profile.settings.notificationsTitle') }}</h3>
+          <h2 class="section-title">{{ $t('profile.settings.notificationsTitle') }}</h2>
           <p class="muted">{{ $t('profile.settings.notificationsDesc') }}</p>
           <div class="row end">
             <button class="btn btn-full" type="button" @click="router.push('/app/notificaciones')">
@@ -506,7 +496,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card">
-          <h3>{{ $t('profile.settings.privacyTitle') }}</h3>
+          <h2 class="section-title">{{ $t('profile.settings.privacyTitle') }}</h2>
           <p class="muted">{{ $t('profile.settings.privacyDesc') }}</p>
           <div class="row end">
             <button class="btn btn-full" type="button" @click="router.push('/app/privacidad')">
@@ -516,7 +506,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card">
-          <h3>{{ $t('profile.settings.languageTitle') }}</h3>
+          <h2 class="section-title">{{ $t('profile.settings.languageTitle') }}</h2>
           <p class="muted">{{ $t('profile.settings.languageDesc') }}</p>
           <div class="row end">
             <button class="btn btn-full" type="button" @click="router.push('/app/idioma')">
@@ -526,7 +516,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
 
         <div class="card">
-          <h3>{{ $t('profile.accountTitle') }}</h3>
+          <h2 class="section-title">{{ $t('profile.accountTitle') }}</h2>
           <div class="row end">
             <button class="btn btn-full btn-danger" type="button" @click="openLogoutModal">
               {{ $t('profile.logout') }}
@@ -537,8 +527,8 @@ const avatarInitial = computed(() => fallbackInitial())
     </div>
 
     <div v-if="showLogoutModal" class="modal-backdrop" @click.self="closeLogoutModal">
-      <div class="modal-card">
-        <h3>{{ $t('profile.logoutModal.title') }}</h3>
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <h2 class="modal-title">{{ $t('profile.logoutModal.title') }}</h2>
         <p>{{ $t('profile.logoutModal.text') }}</p>
 
         <div class="modal-actions">
@@ -557,7 +547,7 @@ const avatarInitial = computed(() => fallbackInitial())
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 20px 14px 44px;
+  padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -568,14 +558,16 @@ const avatarInitial = computed(() => fallbackInitial())
   margin-bottom: 12px;
 }
 
-h2 {
+.page-title {
   margin: 0;
-  padding: 10px;
+  color: #50bdbd;
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .grid {
   display: grid;
-  gap: 22px;
+  gap: 24px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -588,19 +580,30 @@ h2 {
 
 .col {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .card {
+  width: 100%;
+  height: fit-content;
+  box-sizing: border-box;
   background: #ffffff;
   border-radius: 18px;
   padding: 16px 18px;
-  box-shadow: 0 38px 58px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-.card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+    background: #ffffff;
+  }
 }
 
 .profile-head {
@@ -617,18 +620,32 @@ h2 {
 }
 
 .avatar-container {
-  width: 70px;
-  height: 70px;
+  width: 78px;
+  height: 78px;
   border-radius: 999px;
   overflow: hidden;
   background: #d8f0ec;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #127b7b;
+  font-weight: 800;
+  font-size: 1.5rem;
+  background: #d8f0ec;
 }
 
 .who {
@@ -638,8 +655,10 @@ h2 {
 }
 
 .name {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
+  font-weight: 700;
   margin: 0;
+  color: #0f172a;
 }
 
 .email {
@@ -652,6 +671,13 @@ h2 {
   font-size: 0.85rem;
   color: #6b7280;
   margin: 0;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  color: #50bdbd;
+  font-weight: 700;
 }
 
 .row {
@@ -689,31 +715,45 @@ h2 {
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  box-shadow: 0 3px 10px rgba(80, 189, 189, 0.25);
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-  min-height: 18px;
-  width: 45%;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
-.btn:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+@media (hover: hover) {
+  .btn:hover {
+    background: #3daaaa;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+  }
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-full {
-  width: 45%;
+  width: auto;
+  min-width: 160px;
+  max-width: 170px;
 }
 
 .btn-danger {
   background: #ef5350;
-  box-shadow: 0 3px 10px rgba(239, 83, 80, 0.3);
+  box-shadow: 0 8px 18px rgba(239, 83, 80, 0.24);
 }
 
-.btn-danger:hover {
-  background: #e53935;
+@media (hover: hover) {
+  .btn-danger:hover {
+    background: #e53935;
+    box-shadow: 0 14px 28px rgba(239, 83, 80, 0.32);
+  }
 }
-
 
 .btn-secondary {
   background: #e3ecf6;
@@ -721,25 +761,16 @@ h2 {
   box-shadow: none;
 }
 
-.btn-secondary:hover {
-  background: #d7e6f6;
-  transform: none;
+@media (hover: hover) {
+  .btn-secondary:hover {
+    background: #d7e6f6;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 18px rgba(148, 163, 184, 0.18);
+  }
 }
 
 .btn-ghost {
   background: #50bdbd;
-}
-
-.premium-box {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
-}
-
-.premium-box:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
 }
 
 .premium-head-row {
@@ -754,6 +785,10 @@ h2 {
   .premium-head-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .btn-full {
+    width: 35%;
   }
 }
 
@@ -790,6 +825,16 @@ h2 {
   box-shadow: none;
 }
 
+.muted {
+  color: #475569;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.small {
+  font-size: 0.9rem;
+}
+
 .plan-limits {
   margin: 10px 0 14px;
   padding-left: 18px;
@@ -807,6 +852,13 @@ h2 {
   gap: 10px;
 }
 
+.moods-list,
+.diary-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #1f2937;
+}
+
 .mood-history {
   display: grid;
   gap: 8px;
@@ -819,14 +871,16 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.mood-history .date {
-  font-weight: 450;
+.date {
+  font-weight: 500;
   color: #222;
 }
 
-.tag--mood {
+.tag--mood,
+.mood-pill {
   background: #50bdbd;
   color: white;
   padding: 4px 10px;
@@ -835,17 +889,12 @@ h2 {
   text-transform: capitalize;
 }
 
-.aside-card {
-  background: #ffffff;
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
-  padding: 16px 18px 18px;
-  border: 0.3px solid #50bdbd;
+.snippet {
+  color: #475569;
 }
 
-.aside-card:hover {
-  transform: none;
-  box-shadow: none;
+.aside-card {
+  border: 1px solid rgba(80, 189, 189, 0.24);
 }
 
 .aside-title {
@@ -864,7 +913,8 @@ h2 {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -874,11 +924,18 @@ h2 {
 
 .modal-card {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 18px;
   width: 100%;
   max-width: 380px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  color: #50bdbd;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .modal-actions {
@@ -900,16 +957,35 @@ h2 {
   border: 0;
 }
 
+@media (max-width: 768px) {
+  .contenido {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .section-title,
+  .aside-title {
+    font-size: 1.1rem;
+  }
+
+  .card {
+    padding: 14px 14px;
+  }
+}
+
 @media (max-width: 520px) {
   .modal-actions {
-    flex-direction: row;     
+    flex-direction: row;
     align-items: center;
   }
 
   .modal-actions .btn {
-    width: 50%;              
+    width: 50%;
     flex: 1 1 0;
-    padding: 10px 12px;      
+    padding: 10px 12px;
     font-size: 0.9rem;
   }
 }
@@ -918,6 +994,7 @@ h2 {
   .modal-actions {
     gap: 8px;
   }
+
   .modal-actions .btn {
     font-size: 0.85rem;
     padding: 9px 10px;

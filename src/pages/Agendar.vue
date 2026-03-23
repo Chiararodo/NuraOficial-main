@@ -23,7 +23,7 @@ const opciones = computed(() => [
     img: '/covers/sesiongrupal.png',
     boton: t('agendar.options.sessions.button')
   },
-   {
+  {
     id: 'eventos' as OpcionId,
     titulo: t('agendar.options.events.title'),
     descripcion: t('agendar.options.events.description'),
@@ -37,7 +37,6 @@ const opciones = computed(() => [
     img: '/covers/turnos.jpeg',
     boton: t('agendar.options.appointment.button')
   },
-
   {
     id: 'foro' as OpcionId,
     titulo: t('agendar.options.forum.title'),
@@ -53,54 +52,68 @@ function handleClick(id: OpcionId) {
 </script>
 
 <template>
- <main class="contenido">
+  <main class="contenido">
     <header class="page-head">
-      <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
+      <h1 class="visually-hidden">Agendar</h1>
+      <h2 class="page-title">Agendar</h2>
+      <p class="page-sub">
+        Elegí cómo querés organizar tu próxima actividad dentro de Nura.
+      </p>
+    </header>
 
-      <h2>Agendar</h2>
+    <section class="lista" aria-label="Opciones para agendar">
+      <article v-for="item in opciones" :key="item.id" class="card">
+        <div class="card-img">
+          <img :src="item.img" :alt="item.titulo" loading="lazy" />
+        </div>
 
-       </header>
+        <div class="card-body">
+          <h3 class="title">{{ item.titulo }}</h3>
+          <p class="desc">{{ item.descripcion }}</p>
 
-     <section class="lista">
-  <article v-for="item in opciones" :key="item.id" class="card">
-    <div class="card-img">
-      <img :src="item.img" :alt="item.titulo" loading="lazy" />
-    </div>
-
-    <div class="card-body">
-      <h3 class="title">{{ item.titulo }}</h3>
-      <p class="desc">{{ item.descripcion }}</p>
-
-      <div class="actions">
-        <button class="action-btn action-btn--primary" type="button" @click="handleClick(item.id)">
-          {{ item.boton }}
-        </button>
-      </div>
-    </div>
-  </article>
-</section>
- </main>
- 
+          <div class="actions">
+            <button
+              class="action-btn action-btn--primary"
+              type="button"
+              @click="handleClick(item.id)"
+            >
+              {{ item.boton }}
+            </button>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
 </template>
 
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 20px 18px 40px;
+  padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
 
-/* Header  */
 .page-head {
   display: grid;
-  gap: 15px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-h2 {
+
+.page-title {
   margin: 0;
-  padding: 10px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
+}
+
+.page-sub {
+  margin: 0;
+  color: #475569;
+  font-size: 0.96rem;
+  line-height: 1.4;
+  max-width: 72ch;
 }
 
 .visually-hidden {
@@ -112,13 +125,12 @@ h2 {
   white-space: nowrap;
 }
 
-/* ====== LISTA ====== */
 .lista {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
-  width: 95%;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 0;
 }
 
@@ -128,7 +140,6 @@ h2 {
   }
 }
 
-/* ====== CARD====== */
 .card {
   display: flex;
   flex-direction: row;
@@ -136,26 +147,36 @@ h2 {
   gap: 18px;
   margin: 0;
   min-height: 200px;
-  padding: 18px 18px;
+  padding: 18px;
   border-radius: 20px;
   border: 1px solid #e2edf7;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
-  transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease;
 }
 
-.card:hover {
-  transform: translateY(-1px);
-  border-color: #b6ebe5;
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: #b6ebe5;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
 }
 
-/* ====== IMAGEN ====== */
 .card-img {
   flex: 0 0 130px;
   width: 130px;
   height: 130px;
   border-radius: 18px;
-  overflow: hidden; 
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid #e8eef5;
 }
 
 .card-img img {
@@ -165,57 +186,71 @@ h2 {
   display: block;
 }
 
-/* ====== BODY ====== */
 .card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 10px;
+  min-width: 0;
 }
 
 .title {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #111827;
 }
 
 .desc {
-  margin: 2px 0 0;
-  font-size: 1.05rem;
+  margin: 0;
+  font-size: 0.98rem;
   color: #374151;
+  line-height: 1.45;
 }
 
-/* ====== BOTONES====== */
 .actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .action-btn {
   border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 1.1rem;
+  padding: 10px 16px;
+  font-size: 0.95rem;
   border: none;
-  background: var(--nura-green);
+  background: #50bdbd;
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, opacity 0.15s ease;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.28);
-  width: 40%;
+  min-height: 42px;
+  min-width: 170px;
+  max-width: 240px;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  box-sizing: border-box;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    opacity 0.15s ease;
 }
 
-.action-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.24);
+@media (hover: hover) {
+  .action-btn:hover:not(:disabled) {
+    background: #3ea9a9;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+  }
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .action-btn:disabled {
@@ -229,30 +264,48 @@ h2 {
   background: #50bdbd;
 }
 
-/* ====== MOBILE ====== */
 @media (max-width: 700px) {
+  .contenido {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+  }
+
   .card {
     flex-direction: column;
     align-items: flex-start;
+    padding: 16px 14px;
+    min-height: auto;
   }
 
   .card-img {
     flex: none;
     width: 100%;
-    height: 170px; 
+    height: 180px;
   }
 
   .card-img img {
     width: 100%;
     height: 100%;
-    object-fit: cover; 
-    display: block;
+    object-fit: cover;
+  }
+
+  .title {
+    font-size: 1.05rem;
+  }
+
+  .desc {
+    font-size: 0.92rem;
   }
 }
 
 @media (max-width: 520px) {
   .action-btn {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 </style>

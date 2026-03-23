@@ -6,9 +6,26 @@ import { usePremium } from '@/composables/usePremium'
 import { useAuthStore } from '@/store/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
+const { isPremium, refresh: refreshPremium } = usePremium()
 
-const isAdmin = computed(() => (auth.user as any)?.email === 'admin@nura.app')
+const isAdmin = ref(false)
 
+async function loadAdminState() {
+  const uid = auth.user?.id
+  if (!uid) {
+    isAdmin.value = false
+    return
+  }
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', uid)
+    .single()
+
+  isAdmin.value = data?.is_admin === true
+}
 
 type ForumRow = {
   id: string
@@ -27,9 +44,6 @@ type CommentRow = {
   created_at: string
 }
 
-const router = useRouter()
-const { isPremium, refresh: refreshPremium } = usePremium()
-
 const q = ref('')
 const categories = ['Alimentación', 'Ansiedad', 'Autoestima'] as const
 const activeCat = ref<string | 'Todas'>('Todas')
@@ -41,9 +55,10 @@ const loading = ref(true)
 const showUpsell = ref(false)
 
 const showPremiumCta = computed(() => !isPremium.value)
-
 const ctaTitle = computed(() => 'Solo Premium')
-const ctaText = computed(() => 'Para publicar un foro necesitás el plan Premium. Podés leer y comentar gratis.')
+const ctaText = computed(
+  () => 'Para publicar un foro necesitás el plan Premium. Podés leer y comentar gratis.'
+)
 
 const showPurge = ref(false)
 const purging = ref(false)
@@ -52,8 +67,13 @@ function askPurge() {
   showPurge.value = true
 }
 
+function closePurge() {
+  if (!purging.value) showPurge.value = false
+}
+
 async function confirmPurge() {
   if (!isAdmin.value) return
+
   purging.value = true
   try {
     const { error } = await supabase.rpc('admin_purge_forum')
@@ -91,18 +111,23 @@ async function loadForums() {
   ;(c as CommentRow[] | null)?.forEach((r) => {
     map.set(r.forum_id, (map.get(r.forum_id) ?? 0) + 1)
   })
-  commentCount.value = map
 
+  commentCount.value = map
   loading.value = false
 }
 
 let channel: ReturnType<typeof supabase.channel> | null = null
+
 function setupRealtime() {
   channel = supabase
     .channel('forums-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'forums' }, (payload: any) => {
-      forums.value = [payload.new as ForumRow, ...forums.value]
-    })
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'forums' },
+      (payload: any) => {
+        forums.value = [payload.new as ForumRow, ...forums.value]
+      }
+    )
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'forum_comments' },
@@ -117,6 +142,7 @@ function setupRealtime() {
 
 onMounted(async () => {
   await refreshPremium()
+  await loadAdminState()
   await loadForums()
   setupRealtime()
 })
@@ -127,6 +153,7 @@ onBeforeUnmount(() => {
 
 const filtered = computed(() => {
   const term = q.value.trim().toLowerCase()
+
   return forums.value.filter((f) => {
     const catOk = activeCat.value === 'Todas' || f.category === activeCat.value
     const txt = `${f.title ?? ''} ${f.body ?? ''}`.toLowerCase()
@@ -153,11 +180,10 @@ function countFor(id: string) {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Foro Nura</h1>
-
   <main class="foro">
     <header class="page-head">
-      <h2>Foro</h2>
+      <h1 class="visually-hidden">Foro Nura</h1>
+      <h2 class="page-title">Foro</h2>
       <p class="subtitle">Compartí experiencias, dudas y recursos con la comunidad.</p>
 
       <div v-if="showPremiumCta" class="premium-inline">
@@ -165,7 +191,7 @@ function countFor(id: string) {
           <div class="premium-inline__top">
             <span class="premium-badge">Gratis</span>
           </div>
-          <p class="premium-inline__title">{{ ctaTitle }}</p>
+          <h2 class="premium-inline__title">{{ ctaTitle }}</h2>
           <p class="premium-inline__desc">{{ ctaText }}</p>
         </div>
 
@@ -175,37 +201,55 @@ function countFor(id: string) {
       </div>
     </header>
 
-
-    <div v-if="isAdmin" style="display:flex;justify-content:flex-end;margin:10px 0;">
-  <button class="pill" type="button" style="background:#ef4444;color:#fff;border:none;" @click="askPurge">
-    Borrar todo el foro
+   <div v-if="isAdmin" class="admin-actions">
+  <button class="pill pill-soft" @click="router.push('/app/admin/usuarios')">
+    Manejar usuarios
   </button>
 </div>
 
-<div v-if="showPurge" class="modal-overlay" @click.self="showPurge = false">
-  <div class="modal-card" role="dialog" aria-modal="true">
-    <h3 class="modal-title">¿Borrar TODO?</h3>
-    <p class="modal-text">Se eliminarán todos los foros y comentarios. Esta acción no se puede deshacer.</p>
-    <div class="modal-actions">
-      <button class="modal-btn soft" type="button" @click="showPurge = false">Cancelar</button>
-      <button class="modal-btn" type="button" :disabled="purging" style="background:#ef4444" @click="confirmPurge">
-        {{ purging ? 'Borrando…' : 'Borrar todo' }}
-      </button>
+    <div v-if="showPurge" class="modal-overlay" @click.self="closePurge">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="purge-title">
+        <h2 id="purge-title" class="modal-title">¿Borrar todo el foro?</h2>
+        <p class="modal-text">
+          Se eliminarán todos los foros y comentarios. Esta acción no se puede deshacer.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn soft" type="button" @click="closePurge" :disabled="purging">
+            Cancelar
+          </button>
+          <button
+            class="modal-btn danger"
+            type="button"
+            :disabled="purging"
+            @click="confirmPurge"
+          >
+            {{ purging ? 'Borrando…' : 'Borrar todo' }}
+          </button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
 
     <div class="search">
       <label for="forum-search" class="visually-hidden">Buscar en el foro</label>
       <span class="loupe">🔍</span>
-      <input id="forum-search" v-model="q" type="search" placeholder="Buscar por tema o palabra clave" />
+      <input
+        id="forum-search"
+        v-model="q"
+        type="search"
+        placeholder="Buscar por tema o palabra clave"
+      />
     </div>
 
     <div class="filters" aria-label="Filtrar por categoría">
-      <button class="pill" :class="{ active: activeCat === 'Todas' }" type="button" @click="activeCat = 'Todas'">
+      <button
+        class="pill"
+        :class="{ active: activeCat === 'Todas' }"
+        type="button"
+        @click="activeCat = 'Todas'"
+      >
         Todas
       </button>
+
       <button
         v-for="c in categories"
         :key="c"
@@ -218,8 +262,10 @@ function countFor(id: string) {
       </button>
     </div>
 
-    <div v-if="loading" class="loading">Cargando foros…</div>
-    <p v-else-if="!filtered.length" class="empty">No hay foros para mostrar con esos filtros.</p>
+    <div v-if="loading" class="state">Cargando foros…</div>
+    <p v-else-if="!filtered.length" class="state empty">
+      No hay foros para mostrar con esos filtros.
+    </p>
 
     <ul v-else class="forum-list">
       <li v-for="f in filtered" :key="f.id" class="forum-item" @click="openForum(f)">
@@ -236,12 +282,16 @@ function countFor(id: string) {
     </div>
 
     <div v-if="showUpsell" class="modal-overlay" @click.self="showUpsell = false">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Requiere Premium">
-        <h3 class="modal-title">Requiere Premium</h3>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="upsell-title">
+        <h2 id="upsell-title" class="modal-title">Requiere Premium</h2>
         <p class="modal-text">Para crear un foro necesitás el plan Premium.</p>
         <div class="modal-actions">
-          <button class="modal-btn soft" type="button" @click="showUpsell = false">Entendido</button>
-          <button class="modal-btn" type="button" @click="goPremium">Suscribirme</button>
+          <button class="modal-btn soft" type="button" @click="showUpsell = false">
+            Entendido
+          </button>
+          <button class="modal-btn" type="button" @click="goPremium">
+            Suscribirme
+          </button>
         </div>
       </div>
     </div>
@@ -265,25 +315,27 @@ function countFor(id: string) {
   background: #fff;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 18px 18px 26px;
+  padding: 20px 18px 48px;
 }
 
 .page-head {
   display: grid;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
-h2 {
-  margin: 0 0 2px;
+.page-title {
+  margin: 0;
   color: #50bdbd;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 800;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #6b7280;
+  line-height: 1.4;
 }
 
 .premium-inline {
@@ -297,6 +349,18 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   margin-top: 6px;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .premium-inline:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 34px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .premium-inline__left {
@@ -324,13 +388,6 @@ h2 {
   font-size: 0.72rem;
 }
 
-.premium-inline__right {
-  font-size: 0.78rem;
-  color: #475569;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
 .premium-inline__title {
   margin: 0;
   font-weight: 900;
@@ -349,17 +406,32 @@ h2 {
 .premium-inline__btn {
   border: none;
   border-radius: 999px;
-  padding: 7px 10px;
-  font-weight: 900;
-  font-size: 0.82rem;
+  padding: 9px 12px;
+  min-height: 42px;
+  font-weight: 800;
+  font-size: 0.90rem;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
   white-space: nowrap;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.premium-inline__btn:hover {
-  background: #3daaaa;
+@media (hover: hover) {
+  .premium-inline__btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
+}
+
+.admin-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0;
 }
 
 .search {
@@ -384,6 +456,16 @@ h2 {
   background: #f6fbff;
   outline: none;
   font-size: 0.95rem;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.search input:focus {
+  border-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.16);
 }
 
 .filters {
@@ -400,14 +482,45 @@ h2 {
   background: #eaf6ff;
   color: #2d2d2d;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
   font-size: 0.9rem;
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+  }
+}
+
+
+.pill-soft {
+  color: #50bdbd;
+  background: #fff;
+  border-color: #50bdbd;
 }
 
 .pill.active {
   background: #50bdbd;
   color: #fff;
   border-color: transparent;
+}
+
+.pill-danger {
+  background: #ef4444;
+  color: #fff;
+  border-color: transparent;
+}
+
+@media (hover: hover) {
+  .pill-danger:hover {
+    background: #dc2626;
+  }
 }
 
 .forum-list {
@@ -422,11 +535,26 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
   border: 1px solid #e8eef3;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
   cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .forum-item:hover {
+    background: #eefafa;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.12);
+    border-color: #d7f1ef;
+  }
 }
 
 .dot {
@@ -434,17 +562,20 @@ h2 {
   height: 8px;
   border-radius: 999px;
   background: #50bdbd;
+  flex: 0 0 auto;
 }
 
 .title {
   flex: 1;
   color: #111827;
   font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .count {
-  opacity: 0.7;
+  opacity: 0.75;
   font-size: 0.85rem;
+  color: #475569;
 }
 
 .cta {
@@ -455,19 +586,37 @@ h2 {
 
 .btn-primary {
   padding: 12px 20px;
+  min-height: 44px;
   border-radius: 999px;
   border: none;
   background: #50bdbd;
   color: #fff;
   font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
-  box-shadow: 0 10px 26px rgba(80, 189, 189, 0.45);
+  box-shadow: 0 10px 26px rgba(80, 189, 189, 0.28);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.loading,
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: #3daaaa;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.32);
+  }
+}
+
+.state {
+  opacity: 0.78;
+  font-size: 0.92rem;
+  color: #475569;
+}
+
 .empty {
-  opacity: 0.75;
-  font-size: 0.9rem;
+  margin-top: 4px;
 }
 
 .modal-overlay {
@@ -486,7 +635,7 @@ h2 {
   background: #ffffff;
   border-radius: 18px;
   max-width: 520px;
-  width: 70%;
+  width: 100%;
   padding: 16px 16px 12px;
   box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
   border: 1px solid #e8eef3;
@@ -502,22 +651,38 @@ h2 {
 .modal-text {
   margin: 0 0 12px;
   color: #475569;
+  line-height: 1.45;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .modal-btn {
   border-radius: 999px;
   border: none;
   padding: 9px 14px;
-  font-weight: 900;
+  min-height: 42px;
+  font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .modal-btn:hover:not(:disabled) {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
 .modal-btn.soft {
@@ -526,13 +691,62 @@ h2 {
   border: 1px solid #b6ebe5;
 }
 
-@media (max-width: 640px) {
+@media (hover: hover) {
+  .modal-btn.soft:hover:not(:disabled) {
+    background: #e0faf7;
+  }
+}
+
+.modal-btn.danger {
+  background: #ef4444;
+}
+
+@media (hover: hover) {
+  .modal-btn.danger:hover:not(:disabled) {
+    background: #dc2626;
+  }
+}
+
+@media (max-width: 768px) {
+  .foro {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+  }
+
   .premium-inline {
     flex-direction: column;
     align-items: stretch;
   }
+
   .premium-inline__btn {
     width: 100%;
+  }
+
+  .btn-primary {
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-actions .modal-btn {
+    width: 100%;
+  }
+
+  .forum-item {
+    align-items: flex-start;
+  }
+
+  .count {
+    margin-left: auto;
   }
 }
 </style>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
+import Footer from '@/components/Footer.vue'
 
 const router = useRouter()
 
@@ -14,11 +15,19 @@ const year = ref<number | null>(null)
 const loading = ref(false)
 const currentYear = new Date().getFullYear()
 
+const formError = ref('')
+const formInfo = ref('')
+
+function clearMessages() {
+  formError.value = ''
+  formInfo.value = ''
+}
+
 const dob = computed(() => {
   if (!day.value || !month.value || !year.value) return null
   const d = String(day.value).padStart(2, '0')
   const m = String(month.value).padStart(2, '0')
-  return `${year.value}-${m}-${d}` // YYYY-MM-DD
+  return `${year.value}-${m}-${d}`
 })
 
 function calcAge(dateStr: string): number {
@@ -28,101 +37,145 @@ function calcAge(dateStr: string): number {
   const today = new Date()
   let age = today.getFullYear() - birth.getFullYear()
   const m = today.getMonth() - birth.getMonth()
+
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
     age--
   }
+
   return age
+}
+
+function isValidDateParts(dayNum: number, monthNum: number, yearNum: number) {
+  const test = new Date(yearNum, monthNum - 1, dayNum)
+
+  return (
+    test.getFullYear() === yearNum &&
+    test.getMonth() === monthNum - 1 &&
+    test.getDate() === dayNum
+  )
 }
 
 function mapSupabaseError(err: any): string {
   const raw = (err?.message || '').toLowerCase()
 
-  if (raw.includes('user already registered') || raw.includes('email')) {
+  if (raw.includes('user already registered')) {
     return 'Ya existe una cuenta con ese correo. Probá iniciar sesión o usar otro email.'
   }
+
+  if (raw.includes('invalid email')) {
+    return 'Ingresá un correo válido.'
+  }
+
   if (raw.includes('password')) {
     return 'La contraseña es demasiado débil. Usá al menos 6 caracteres.'
   }
+
   return 'No pudimos crear tu cuenta en este momento. Probá nuevamente en unos minutos.'
 }
 
+onMounted(async () => {
+  const { data } = await supabase.auth.getSession()
+  if (data?.session?.user) {
+    router.replace('/app/home')
+  }
+})
+
 async function submit() {
-  if (!name.value.trim()) {
-    alert('Ingresá tu nombre.')
+  clearMessages()
+
+  const cleanName = name.value.trim()
+  const cleanEmail = email.value.trim()
+
+  if (!cleanName) {
+    formError.value = 'Ingresá tu nombre.'
     return
   }
 
-  if (!dob.value) {
-    alert('Completá tu fecha de nacimiento.')
+  if (!cleanEmail) {
+    formError.value = 'Ingresá tu correo.'
+    return
+  }
+
+  if (!dob.value || !day.value || !month.value || !year.value) {
+    formError.value = 'Completá tu fecha de nacimiento.'
+    return
+  }
+
+  if (!isValidDateParts(day.value, month.value, year.value)) {
+    formError.value = 'La fecha de nacimiento no es válida. Revisá día, mes y año.'
     return
   }
 
   const age = calcAge(dob.value)
+
   if (Number.isNaN(age)) {
-    alert('La fecha de nacimiento no es válida. Revisá día, mes y año.')
-    return
-  }
-  if (age < 15) {
-    alert('Por ahora Nura está disponible a partir de los 15 años.')
+    formError.value = 'La fecha de nacimiento no es válida. Revisá día, mes y año.'
     return
   }
 
-  if (password.value.length < 6) {
-    alert('La contraseña debe tener al menos 6 caracteres.')
+  if (age < 15) {
+    formError.value = 'Por ahora Nura está disponible a partir de los 15 años.'
+    return
+  }
+
+  if (password.value.trim().length < 6) {
+    formError.value = 'La contraseña debe tener al menos 6 caracteres.'
     return
   }
 
   loading.value = true
 
   try {
-    // 1) Crear el usuario en Supabase Auth
     const { data, error } = await supabase.auth.signUp({
-      email: email.value.trim(),
+      email: cleanEmail,
       password: password.value,
       options: {
         data: {
-          name: name.value.trim(),
+          name: cleanName,
           dob: dob.value
         },
         emailRedirectTo: window.location.origin + '/login'
       }
     })
 
-    if (error) {
-      throw error
-    }
+    if (error) throw error
 
-    // 2) Guardar/actualizar perfil en tabla profiles (solo columnas que existen)
     if (data.user) {
       try {
-        await supabase.from('profiles').upsert(
+        const { error: profileError } = await supabase.from('profiles').upsert(
           {
             id: data.user.id,
-            full_name: name.value.trim()
+            full_name: cleanName,
+            name: cleanName
           },
           { onConflict: 'id' }
         )
+
+        if (profileError) {
+          console.error('Error guardando perfil en profiles:', profileError)
+          formInfo.value =
+            'Tu cuenta se creó, pero faltó guardar parte de tu perfil. Podés completarlo después desde Perfil.'
+        }
       } catch (profileErr) {
         console.error('Error guardando perfil en profiles:', profileErr)
-        // No cortamos el flujo, solo avisamos genérico
-        alert(
-          'Tu cuenta se creó, pero no pudimos guardar tu perfil completo. Podés actualizarlo después en la sección Perfil.'
-        )
+        formInfo.value =
+          'Tu cuenta se creó, pero faltó guardar parte de tu perfil. Podés completarlo después desde Perfil.'
       }
     }
 
-    // 3) Redirecciones según haya sesión o confirmación por email
     if (data.session) {
       router.replace('/onboarding')
     } else {
-      alert(
+      formInfo.value =
         'Te enviamos un correo para confirmar tu cuenta. Iniciá sesión cuando lo hayas confirmado.'
-      )
-      router.replace('/login')
+
+      setTimeout(() => {
+        router.replace('/login')
+      }, 1800)
     }
   } catch (e: any) {
     console.error('Error en registro:', e)
-    alert(mapSupabaseError(e))
+    formError.value = mapSupabaseError(e)
   } finally {
     loading.value = false
   }
@@ -130,191 +183,328 @@ async function submit() {
 </script>
 
 <template>
-  <section class="register-page">
-    <!-- Logo -->
-    <img
-      src="/logos/OFICIALwhite.png"
-      alt="Nura"
-      class="brand"
-      onerror="this.src='/icons/icon-192.png'"
-    />
+  <div class="register-layout">
+    <h1 class="visually-hidden">Crear cuenta en Nura</h1>
 
-    <!-- Formulario -->
-    <form class="form" @submit.prevent="submit">
-      <p class="hint">Ingresá tus datos:</p>
-
-      <input
-        class="field"
-        v-model="name"
-        type="text"
-        placeholder="Nombre"
-        required
-        autocomplete="name"
+    <main class="register-page">
+      <img
+        src="/logos/OFICIALwhite.png"
+        alt="Nura"
+        class="brand"
+        @error="(e: any) => (e.target.src = '/icons/icon-192.png')"
       />
 
-      <input
-        class="field"
-        v-model="email"
-        type="email"
-        placeholder="Correo"
-        required
-        autocomplete="email"
-      />
+      <section class="card" aria-labelledby="register-title">
+        <h2 id="register-title" class="card-title">Crear cuenta</h2>
 
-      <input
-        class="field"
-        v-model="password"
-        type="password"
-        placeholder="Contraseña (mínimo 6 caracteres)"
-        required
-        autocomplete="new-password"
-        minlength="6"
-      />
+        <p class="hint">Ingresá tus datos para registrarte</p>
 
-      <p class="hint small">¿Cuál es tu fecha de nacimiento?</p>
+        <p v-if="formError" class="message message-error" role="alert">
+          {{ formError }}
+        </p>
 
-      <div class="dob">
-        <input
-          class="chip"
-          v-model.number="day"
-          type="number"
-          placeholder="Día"
-          min="1"
-          max="31"
-          required
-        />
-        <input
-          class="chip"
-          v-model.number="month"
-          type="number"
-          placeholder="Mes"
-          min="1"
-          max="12"
-          required
-        />
-        <input
-          class="chip"
-          v-model.number="year"
-          type="number"
-          placeholder="Año"
-          min="1900"
-          :max="currentYear"
-          required
-        />
-      </div>
+        <p v-if="formInfo" class="message message-info" role="status">
+          {{ formInfo }}
+        </p>
 
-      <button class="cta" type="submit" :disabled="loading">
-        {{ loading ? 'Creando…' : 'Crear Cuenta' }}
-      </button>
-    </form>
-  </section>
+        <form class="form" @submit.prevent="submit" novalidate>
+          <div class="field-wrap">
+            <label for="register-name">Nombre</label>
+            <input
+              id="register-name"
+              class="field"
+              v-model="name"
+              type="text"
+              placeholder="Tu nombre"
+              required
+              autocomplete="name"
+              @input="clearMessages"
+            />
+          </div>
 
-  <RouterLink to="/login" class="link-btn" role="button">
-    ¿Ya tenés cuenta? Iniciá sesión
-  </RouterLink>
+          <div class="field-wrap">
+            <label for="register-email">Correo</label>
+            <input
+              id="register-email"
+              class="field"
+              v-model="email"
+              type="email"
+              placeholder="Tu correo"
+              required
+              autocomplete="email"
+              @input="clearMessages"
+            />
+          </div>
+
+          <div class="field-wrap">
+            <label for="register-password">Contraseña</label>
+            <input
+              id="register-password"
+              class="field"
+              v-model="password"
+              type="password"
+              placeholder="Mínimo 6 caracteres"
+              required
+              autocomplete="new-password"
+              minlength="6"
+              @input="clearMessages"
+            />
+          </div>
+
+          <div class="dob-block">
+            <p class="hint small">¿Cuál es tu fecha de nacimiento?</p>
+
+            <div class="dob">
+              <input
+                class="chip"
+                v-model.number="day"
+                type="number"
+                placeholder="Día"
+                min="1"
+                max="31"
+                required
+                @input="clearMessages"
+              />
+              <input
+                class="chip"
+                v-model.number="month"
+                type="number"
+                placeholder="Mes"
+                min="1"
+                max="12"
+                required
+                @input="clearMessages"
+              />
+              <input
+                class="chip"
+                v-model.number="year"
+                type="number"
+                placeholder="Año"
+                min="1900"
+                :max="currentYear"
+                required
+                @input="clearMessages"
+              />
+            </div>
+          </div>
+
+          <button class="cta" type="submit" :disabled="loading">
+            {{ loading ? 'Creando…' : 'Crear cuenta' }}
+          </button>
+        </form>
+
+        <RouterLink to="/login" class="link-btn">
+          ¿Ya tenés cuenta? Iniciá sesión
+        </RouterLink>
+      </section>
+    </main>
+  </div>
 </template>
 
-
-
 <style scoped>
-/* Fondo del Splash */
-.register-page {
+.register-layout {
   min-height: 100dvh;
-  background: url('/bgs/splash.png') center/cover no-repeat;
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  padding: 48px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  background: url('/bgs/splash.png') center / cover no-repeat;
 }
 
-/* Logo */
+.register-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
 .brand {
   width: 150px;
   height: auto;
   margin-bottom: 18px;
-  filter: drop-shadow(0 2px 4px #0002);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
 }
 
-/* Formulario “flotando” sobre el fondo */
+.card {
+  width: 100%;
+  max-width: 540px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 42px;
+  padding: 28px 24px 32px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+
+.card-title {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 1.35rem;
+  color: #183153;
+}
+
+.hint {
+  color: #3d5875;
+  font-size: 0.96rem;
+  margin: 0 0 14px;
+  text-align: center;
+}
+
+.hint.small {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: #3d5875;
+}
+
+.message {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.93rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.message-error {
+  background: #fff1f2;
+  color: #b42318;
+  border: 1px solid #fecdd3;
+}
+
+.message-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
 .form {
   width: 100%;
   max-width: 360px;
-  display: grid;
-  justify-items: center;
+  margin: 0 auto;
 }
 
-/* Textos guía */
-.hint {
-  color: #ffffffcc;
-  font-size: 0.96rem;
-  margin: 6px 0 8px;
-  text-align: center;
-}
-.hint.small {
-  margin-top: 12px;
-  font-size: 0.9rem;
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 
-/* Campos principales */
+.field-wrap label {
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: #111827;
+}
+
 .field {
-  width: 88%;
+  width: 100%;
+  min-height: 46px;
   padding: 0.7rem 0.9rem;
-  margin: 0.35rem 0;
   border-radius: 12px;
-  border: none;
+  border: 1px solid #ccd7e2;
   outline: none;
-  background: #ffffffeb;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  background: #f9fcff;
   font-size: 0.95rem;
-}
-.field:focus {
-  box-shadow: 0 0 0 3px rgba(133, 182, 224, 0.35);
+  box-sizing: border-box;
 }
 
-/* Fecha de nacimiento (chips) */
+.field:focus,
+.chip:focus {
+  border-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.22);
+}
+
+.dob-block {
+  margin-bottom: 14px;
+}
+
 .dob {
-  width: 88%;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin: 8px 0 12px;
 }
+
 .chip {
+  width: 100%;
+  min-height: 46px;
   text-align: center;
   padding: 0.55rem 0.4rem;
   border-radius: 10px;
-  border: none;
-  background: #ffffffeb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ccd7e2;
+  background: #f9fcff;
   font-size: 0.92rem;
+  outline: none;
+  box-sizing: border-box;
 }
 
-/* CTA */
 .cta {
-  width: 70%;
+  width: 100%;
+  min-height: 48px;
   margin-top: 8px;
-  padding: 0.7rem 1rem;
-  border: none;
-  border-radius: 16px;
-  background: var(--nura-blue, #85b6e0);
+  padding: 0.78rem 1rem;
+  border: 1px solid #50bdbd;
+  border-radius: 999px;
+  background: #50bdbd;
   color: #fff;
   font-weight: 700;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  font-size: 0.98rem;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
   cursor: pointer;
-  transition: 0.2s ease;
-}
-.cta:hover {
-  background: var(--nura-green, #50bdbd);
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-/* Link a login */
+.cta:hover:not(:disabled) {
+  background: #3ea9a9;
+  border-color: #3ea9a9;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
+}
+
+.cta:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .link-btn {
-  margin-top: 10px;
-  background: transparent;
-  border: none;
-  color: #ffffffdd;
+  display: block;
+  width: fit-content;
+  margin: 16px auto 0;
+  color: #2f6ea4;
   text-decoration: underline;
-  cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.93rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .register-page {
+    padding: 20px 14px;
+  }
+
+  .brand {
+    width: 128px;
+    margin-bottom: 14px;
+  }
+
+  .card {
+    border-radius: 28px;
+    padding: 22px 16px 24px;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+  }
 }
 </style>

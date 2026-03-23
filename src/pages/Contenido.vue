@@ -4,12 +4,12 @@ import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
 import { useI18n } from 'vue-i18n'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const tabs = computed(() => [
   { key: 'videos', label: t('content.tabs.videos') },
   { key: 'biblioteca', label: t('content.tabs.library') },
-  { key: 'guias', label: t('content.tabs.guides') },
+  { key: 'guias', label: t('content.tabs.guides') }
 ] as const)
 
 type TabKey = 'videos' | 'biblioteca' | 'guias'
@@ -25,12 +25,14 @@ type VideoRow = {
   file_path: string
   duration_seconds: number | null
 }
+
 type BookRow = {
   id: IdType
   title: string
   cover_path: string | null
   file_path: string
 }
+
 type ArticleRow = {
   id: IdType
   title: string
@@ -38,6 +40,7 @@ type ArticleRow = {
   cover_path: string | null
   read_minutes: number | null
 }
+
 type GuideRow = {
   id: IdType
   title: string
@@ -102,7 +105,7 @@ async function uploadPdf(file: File, folder: 'books' | 'guides') {
   const { data, error } = await supabase.storage.from(BUCKET).upload(path, file, {
     upsert: true,
     cacheControl: '3600',
-    contentType: file.type,
+    contentType: file.type
   })
 
   if (error) {
@@ -117,6 +120,7 @@ async function uploadPdf(file: File, folder: 'books' | 'guides') {
 /* Loaders */
 async function loadVideos() {
   loading.value.videos = true
+
   const { data, error } = await supabase
     .from('videos')
     .select('id,title,description,cover_path,file_path,duration_seconds')
@@ -133,6 +137,7 @@ async function loadVideos() {
 
 async function loadBooksAndArticles() {
   loading.value.books = true
+
   const { data: b, error: errB } = await supabase
     .from('books')
     .select('id,title,cover_path,file_path')
@@ -157,6 +162,7 @@ async function loadBooksAndArticles() {
 
 async function loadGuides() {
   loading.value.guides = true
+
   const { data: g, error } = await supabase
     .from('guides')
     .select('id,title,description,cover_path,file_path')
@@ -175,21 +181,22 @@ async function loadGuides() {
       .eq('user_id', auth.user.id)
 
     if (errP) console.error(errP)
+
     progressMap.value = new Map(
-      ((p as any[] | null) ?? []).map((r) => [r.guide_id as IdType, r.percent]),
+      ((p as any[] | null) ?? []).map((r) => [r.guide_id as IdType, r.percent])
     )
   }
 
   loading.value.guides = false
 }
 
-/* ABM NUEVOS (create) */
+/* CREATE */
 const videoCreateForm = ref({
   title: '',
   description: '',
   cover_path: '',
   file_path: '',
-  duration_seconds: null as number | null,
+  duration_seconds: null as number | null
 })
 
 function resetVideoCreateForm() {
@@ -198,7 +205,7 @@ function resetVideoCreateForm() {
     description: '',
     cover_path: '',
     file_path: '',
-    duration_seconds: null,
+    duration_seconds: null
   }
 }
 
@@ -213,7 +220,7 @@ async function createVideo() {
     description: videoCreateForm.value.description || null,
     cover_path: videoCreateForm.value.cover_path || null,
     file_path: videoCreateForm.value.file_path,
-    duration_seconds: videoCreateForm.value.duration_seconds,
+    duration_seconds: videoCreateForm.value.duration_seconds
   }
 
   const { error } = await supabase.from('videos').insert([payload])
@@ -231,7 +238,7 @@ async function createVideo() {
 const bookCreateForm = ref({
   title: '',
   cover_path: '',
-  file_path: '',
+  file_path: ''
 })
 
 function resetBookCreateForm() {
@@ -255,7 +262,7 @@ async function createBook() {
   const payload = {
     title: bookCreateForm.value.title,
     cover_path: bookCreateForm.value.cover_path || null,
-    file_path: bookCreateForm.value.file_path,
+    file_path: bookCreateForm.value.file_path
   }
 
   const { error } = await supabase.from('books').insert([payload])
@@ -274,7 +281,7 @@ const guideCreateForm = ref({
   title: '',
   description: '',
   cover_path: '',
-  file_path: '',
+  file_path: ''
 })
 
 function resetGuideCreateForm() {
@@ -282,7 +289,7 @@ function resetGuideCreateForm() {
     title: '',
     description: '',
     cover_path: '',
-    file_path: '',
+    file_path: ''
   }
   guidePdfFile.value = null
   guidePdfName.value = ''
@@ -304,7 +311,7 @@ async function createGuide() {
     title: guideCreateForm.value.title,
     description: guideCreateForm.value.description || null,
     cover_path: guideCreateForm.value.cover_path || null,
-    file_path: guideCreateForm.value.file_path,
+    file_path: guideCreateForm.value.file_path
   }
 
   const { error } = await supabase.from('guides').insert([payload])
@@ -338,7 +345,7 @@ function startEditVideo(v: VideoRow) {
     description: v.description ?? '',
     cover_path: v.cover_path ?? '',
     file_path: v.file_path,
-    duration_seconds: v.duration_seconds ?? null,
+    duration_seconds: v.duration_seconds ?? null
   }
 }
 
@@ -348,7 +355,7 @@ function startEditBook(b: BookRow) {
     id: b.id,
     title: b.title,
     cover_path: b.cover_path ?? '',
-    file_path: b.file_path,
+    file_path: b.file_path
   }
 }
 
@@ -359,7 +366,7 @@ function startEditGuide(g: GuideRow) {
     title: g.title,
     description: g.description ?? '',
     cover_path: g.cover_path ?? '',
-    file_path: g.file_path,
+    file_path: g.file_path
   }
 }
 
@@ -384,7 +391,7 @@ async function saveEdit() {
         description: m.description || null,
         cover_path: m.cover_path || null,
         file_path: m.file_path,
-        duration_seconds: m.duration_seconds ?? null,
+        duration_seconds: m.duration_seconds ?? null
       }
       const { error } = await supabase.from('videos').update(payload).eq('id', m.id)
       if (error) throw error
@@ -394,18 +401,18 @@ async function saveEdit() {
       const payload = {
         title: m.title,
         cover_path: m.cover_path || null,
-        file_path: m.file_path,
+        file_path: m.file_path
       }
       const { error } = await supabase.from('books').update(payload).eq('id', m.id)
       if (error) throw error
       showToast(t('content.toasts.bookEdited'), 'success')
       await loadBooksAndArticles()
-    } else if (m.type === 'guide') {
+    } else {
       const payload = {
         title: m.title,
         description: m.description || null,
         cover_path: m.cover_path || null,
-        file_path: m.file_path,
+        file_path: m.file_path
       }
       const { error } = await supabase.from('guides').update(payload).eq('id', m.id)
       if (error) throw error
@@ -421,8 +428,12 @@ async function saveEdit() {
   closeEditModal()
 }
 
-/* Confirm delete */
-const confirmDelete = ref<{ type: 'video' | 'book' | 'guide'; id: IdType; title: string } | null>(null)
+/* DELETE */
+const confirmDelete = ref<{
+  type: 'video' | 'book' | 'guide'
+  id: IdType
+  title: string
+} | null>(null)
 
 function askDelete(type: 'video' | 'book' | 'guide', id: IdType, title: string) {
   confirmDelete.value = { type, id, title }
@@ -501,8 +512,7 @@ function mmss(total: number) {
   <main class="contenido">
     <header class="page-head">
       <h1 class="visually-hidden">{{ $t('content.pageSrTitle') }}</h1>
-
-      <h2>{{ $t('content.pageTitle') }}</h2>
+      <h2 class="page-title">{{ $t('content.pageTitle') }}</h2>
 
       <nav class="tabs" :aria-label="$t('content.tabsAria')">
         <button
@@ -518,47 +528,31 @@ function mmss(total: number) {
       </nav>
     </header>
 
-    <!-- VIDEOS -->
     <section v-if="tab === 'videos'" class="section">
       <div v-if="isAdmin" class="content-row">
-        <!-- LISTA VIDEOS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.videos" class="loading">
-            {{ $t('content.loadingVideos') }}
-          </div>
-          <p v-else-if="!videos.length" class="empty">
-            {{ $t('content.emptyVideos') }}
-          </p>
+          <div v-if="loading.videos" class="loading">{{ $t('content.loadingVideos') }}</div>
+          <p v-else-if="!videos.length" class="empty">{{ $t('content.emptyVideos') }}</p>
 
           <div v-else class="grid">
             <article
               v-for="v in videos"
               :key="v.id"
-              class="card video-card"
+              class="card media-card"
               @click="openVideo(v)"
             >
-              <div class="thumb">
+              <div class="thumb thumb-video">
                 <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-                <span class="duration" v-if="v.duration_seconds">
-                  {{ mmss(v.duration_seconds) }}
-                </span>
+                <span class="duration" v-if="v.duration_seconds">{{ mmss(v.duration_seconds) }}</span>
               </div>
 
-              <h3 class="title">{{ v.title }}</h3>
+              <h3 class="card-title">{{ v.title }}</h3>
 
               <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button
-                  class="abm-btn abm-btn--edit"
-                  type="button"
-                  @click="startEditVideo(v)"
-                >
+                <button class="abm-btn abm-btn--edit" type="button" @click="startEditVideo(v)">
                   {{ $t('content.actions.edit') }}
                 </button>
-                <button
-                  class="abm-btn abm-btn--delete"
-                  type="button"
-                  @click="askDelete('video', v.id, v.title)"
-                >
+                <button class="abm-btn abm-btn--delete" type="button" @click="askDelete('video', v.id, v.title)">
                   {{ $t('content.actions.delete') }}
                 </button>
               </div>
@@ -566,11 +560,10 @@ function mmss(total: number) {
           </div>
         </div>
 
-        <!-- ABM VIDEO DERECHA -->
         <section class="abm card abm-box">
           <h3 class="abm-title">{{ $t('content.video.newTitle') }}</h3>
 
-          <div class="abm-grid abm-2col">
+          <div class="abm-grid">
             <div class="field">
               <label>{{ $t('content.fields.title') }}</label>
               <input v-model="videoCreateForm.title" type="text" />
@@ -588,136 +581,99 @@ function mmss(total: number) {
 
             <div class="field">
               <label>{{ $t('content.video.duration') }}</label>
-              <input
-                v-model.number="videoCreateForm.duration_seconds"
-                type="number"
-                min="0"
-              />
+              <input v-model.number="videoCreateForm.duration_seconds" type="number" min="0" />
             </div>
 
-            <div class="field field--full">
+            <div class="field">
               <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="2" v-model="videoCreateForm.description" />
             </div>
           </div>
 
           <div class="abm-actions">
-            <button
-              type="button"
-              class="pill pill--primary"
-              @click="createVideo"
-            >
+            <button type="button" class="pill pill--primary" @click="createVideo">
               {{ $t('content.video.create') }}
             </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetVideoCreateForm"
-            >
+            <button type="button" class="pill pill--soft" @click="resetVideoCreateForm">
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <!-- VISTA SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.videos" class="loading">
-          {{ $t('content.loadingVideos') }}
-        </div>
-        <p v-else-if="!videos.length" class="empty">
-          {{ $t('content.emptyVideos') }}
-        </p>
+        <div v-if="loading.videos" class="loading">{{ $t('content.loadingVideos') }}</div>
+        <p v-else-if="!videos.length" class="empty">{{ $t('content.emptyVideos') }}</p>
 
         <div v-else class="grid">
           <article
             v-for="v in videos"
             :key="v.id"
-            class="card video-card"
+            class="card media-card"
             @click="openVideo(v)"
           >
-            <div class="thumb">
+            <div class="thumb thumb-video">
               <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-              <span class="duration" v-if="v.duration_seconds">
-                {{ mmss(v.duration_seconds) }}
-              </span>
+              <span class="duration" v-if="v.duration_seconds">{{ mmss(v.duration_seconds) }}</span>
             </div>
-            <h3 class="title">{{ v.title }}</h3>
+            <h3 class="card-title">{{ v.title }}</h3>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- BIBLIOTECA -->
     <section v-else-if="tab === 'biblioteca'" class="section">
       <div v-if="isAdmin" class="content-row">
-        <!-- LISTA LIBROS + ARTÍCULOS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.books" class="loading">
-            {{ $t('content.loadingLibrary') }}
-          </div>
-          <p v-else-if="!books.length" class="empty">
-            {{ $t('content.emptyBooks') }}
-          </p>
+          <div v-if="loading.books" class="loading">{{ $t('content.loadingLibrary') }}</div>
+          <p v-else-if="!books.length" class="empty">{{ $t('content.emptyBooks') }}</p>
 
           <div v-else class="grid">
             <article
               v-for="b in books"
               :key="b.id"
-              class="card book-card"
+              class="card media-card"
               @click="openBook(b)"
             >
-              <div class="book-thumb">
+              <div class="thumb thumb-book">
                 <img :src="publicUrl(b.cover_path)" :alt="b.title" />
               </div>
-              <h3 class="title">{{ b.title }}</h3>
+
+              <h3 class="card-title">{{ b.title }}</h3>
 
               <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button
-                  class="abm-btn abm-btn--edit"
-                  type="button"
-                  @click="startEditBook(b)"
-                >
+                <button class="abm-btn abm-btn--edit" type="button" @click="startEditBook(b)">
                   {{ $t('content.actions.edit') }}
                 </button>
-                <button
-                  class="abm-btn abm-btn--delete"
-                  type="button"
-                  @click="askDelete('book', b.id, b.title)"
-                >
+                <button class="abm-btn abm-btn--delete" type="button" @click="askDelete('book', b.id, b.title)">
                   {{ $t('content.actions.delete') }}
                 </button>
               </div>
             </article>
           </div>
 
-          <h3 class="subhead" v-if="articles.length">
-            {{ $t('content.articles.title') }}
-          </h3>
+          <section v-if="articles.length" class="articles-section">
+            <h3 class="subhead">{{ $t('content.articles.title') }}</h3>
 
-          <div class="articles" v-if="articles.length">
-            <article v-for="a in articles" :key="a.id" class="article-card">
-              <img
-                class="art-cover"
-                :src="publicUrl(a.cover_path)"
-                :alt="a.title"
-              />
-              <div class="art-body">
-                <h4 class="art-title">{{ a.title }}</h4>
-                <p class="art-summary">{{ a.summary }}</p>
-                <small v-if="a.read_minutes">
-                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
-                </small>
-              </div>
-            </article>
-          </div>
+            <div class="articles">
+              <article v-for="a in articles" :key="a.id" class="article-card">
+                <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+                <div class="art-body">
+                  <h4 class="art-title">{{ a.title }}</h4>
+                  <p class="art-summary">{{ a.summary }}</p>
+                  <small v-if="a.read_minutes">
+                    {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                  </small>
+                </div>
+              </article>
+            </div>
+          </section>
         </div>
 
-        <!-- ABM LIBROS DERECHA -->
         <section class="abm card abm-box">
           <h3 class="abm-title">{{ $t('content.book.newTitle') }}</h3>
 
-          <div class="abm-2col">
+          <div class="abm-grid">
             <div class="field">
               <label>{{ $t('content.fields.title') }}</label>
               <input v-model="bookCreateForm.title" type="text" />
@@ -747,16 +703,10 @@ function mmss(total: number) {
                   class="file-input"
                   @change="onBookPdfSelected"
                 />
-                <button
-                  type="button"
-                  class="upload-btn"
-                  @click="bookPdfInput?.click()"
-                >
+                <button type="button" class="upload-btn" @click="bookPdfInput?.click()">
                   {{ $t('content.pdf.select') }}
                 </button>
-                <span v-if="bookPdfName" class="file-name">
-                  {{ bookPdfName }}
-                </span>
+                <span v-if="bookPdfName" class="file-name">{{ bookPdfName }}</span>
               </div>
             </div>
           </div>
@@ -765,82 +715,69 @@ function mmss(total: number) {
             <button type="button" class="pill pill--primary" @click="createBook">
               {{ $t('content.book.create') }}
             </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetBookCreateForm"
-            >
+            <button type="button" class="pill pill--soft" @click="resetBookCreateForm">
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <!-- SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.books" class="loading">
-          {{ $t('content.loadingLibrary') }}
-        </div>
-        <p v-else-if="!books.length" class="empty">
-          {{ $t('content.emptyBooks') }}
-        </p>
+        <div v-if="loading.books" class="loading">{{ $t('content.loadingLibrary') }}</div>
+        <p v-else-if="!books.length" class="empty">{{ $t('content.emptyBooks') }}</p>
 
         <div v-else class="grid">
           <article
             v-for="b in books"
             :key="b.id"
-            class="card book-card"
+            class="card media-card"
             @click="openBook(b)"
           >
-            <div class="book-thumb">
+            <div class="thumb thumb-book">
               <img :src="publicUrl(b.cover_path)" :alt="b.title" />
             </div>
-            <h3 class="title">{{ b.title }}</h3>
+            <h3 class="card-title">{{ b.title }}</h3>
           </article>
         </div>
 
-        <h3 class="subhead" v-if="articles.length">
-          {{ $t('content.articles.title') }}
-        </h3>
-        <div class="articles" v-if="articles.length">
-          <article v-for="a in articles" :key="a.id" class="article-card">
-            <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
-            <div class="art-body">
-              <h4 class="art-title">{{ a.title }}</h4>
-              <p class="art-summary">{{ a.summary }}</p>
-              <small v-if="a.read_minutes">
-                {{ $t('content.articles.reading', { m: a.read_minutes }) }}
-              </small>
-            </div>
-          </article>
-        </div>
+        <section v-if="articles.length" class="articles-section">
+          <h3 class="subhead">{{ $t('content.articles.title') }}</h3>
+
+          <div class="articles">
+            <article v-for="a in articles" :key="a.id" class="article-card">
+              <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+              <div class="art-body">
+                <h4 class="art-title">{{ a.title }}</h4>
+                <p class="art-summary">{{ a.summary }}</p>
+                <small v-if="a.read_minutes">
+                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                </small>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
     </section>
 
-    <!-- GUÍAS -->
     <section v-else-if="tab === 'guias'" class="section">
       <div v-if="isAdmin" class="content-row">
-        <!-- LISTA GUÍAS IZQUIERDA -->
         <div class="content-main">
-          <div v-if="loading.guides" class="loading">
-            {{ $t('content.loadingGuides') }}
-          </div>
-          <p v-else-if="!guides.length" class="empty">
-            {{ $t('content.emptyGuides') }}
-          </p>
+          <div v-if="loading.guides" class="loading">{{ $t('content.loadingGuides') }}</div>
+          <p v-else-if="!guides.length" class="empty">{{ $t('content.emptyGuides') }}</p>
 
           <div v-else class="grid">
             <article
               v-for="g in guides"
               :key="g.id"
-              class="card guide-card"
+              class="card media-card"
               @click="openGuide(g)"
             >
-              <div class="guide-thumb">
+              <div class="thumb thumb-guide">
                 <img :src="publicUrl(g.cover_path)" :alt="g.title" />
               </div>
+
               <div class="guide-body">
-                <h3 class="guide-title">{{ g.title }}</h3>
+                <h3 class="card-title">{{ g.title }}</h3>
                 <p class="guide-summary">{{ g.description }}</p>
 
                 <div class="guide-actions">
@@ -848,32 +785,20 @@ function mmss(total: number) {
                     {{ $t('content.actions.continue') }}
                   </button>
 
-                  <div class="progress" v-if="progressMap.get(g.id) !== undefined">
-                    <div
-                      class="bar"
-                      :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
-                    />
+                  <div class="progress-wrap" v-if="progressMap.get(g.id) !== undefined">
+                    <div class="progress">
+                      <div class="bar" :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }" />
+                    </div>
+                    <small class="pct">{{ progressMap.get(g.id) }}%</small>
                   </div>
-
-                  <small class="pct" v-if="progressMap.get(g.id) !== undefined">
-                    {{ progressMap.get(g.id) }}%
-                  </small>
                 </div>
 
                 <div v-if="isAdmin" class="small-actions" @click.stop>
-                  <button
-                    class="abm-btn abm-btn--edit"
-                    type="button"
-                    @click="startEditGuide(g)"
-                  >
+                  <button class="abm-btn abm-btn--edit" type="button" @click="startEditGuide(g)">
                     {{ $t('content.actions.edit') }}
                   </button>
-                  <button
-                    class="abm-btn abm-btn--delete"
-                    type="button"
-                    @click="askDelete('guide', g.id, g.title)"
-                  >
-                   {{ $t('content.actions.delete') }}
+                  <button class="abm-btn abm-btn--delete" type="button" @click="askDelete('guide', g.id, g.title)">
+                    {{ $t('content.actions.delete') }}
                   </button>
                 </div>
               </div>
@@ -881,11 +806,10 @@ function mmss(total: number) {
           </div>
         </div>
 
-        <!-- ABM GUÍAS DERECHA -->
         <section class="abm card abm-box">
           <h3 class="abm-title">{{ $t('content.guide.newTitle') }}</h3>
 
-          <div class="abm-2col">
+          <div class="abm-grid">
             <div class="field">
               <label>{{ $t('content.fields.title') }}</label>
               <input v-model="guideCreateForm.title" type="text" />
@@ -915,20 +839,14 @@ function mmss(total: number) {
                   class="file-input"
                   @change="onGuidePdfSelected"
                 />
-                <button
-                  type="button"
-                  class="upload-btn"
-                  @click="guidePdfInput?.click()"
-                >
+                <button type="button" class="upload-btn" @click="guidePdfInput?.click()">
                   {{ $t('content.pdf.select') }}
                 </button>
-                <span v-if="guidePdfName" class="file-name">
-                  {{ guidePdfName }}
-                </span>
+                <span v-if="guidePdfName" class="file-name">{{ guidePdfName }}</span>
               </div>
             </div>
 
-            <div class="field field--full">
+            <div class="field">
               <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="2" v-model="guideCreateForm.description" />
             </div>
@@ -938,38 +856,30 @@ function mmss(total: number) {
             <button type="button" class="pill pill--primary" @click="createGuide">
               {{ $t('content.guide.create') }}
             </button>
-            <button
-              type="button"
-              class="pill pill--ghost"
-              @click="resetGuideCreateForm"
-            >
+            <button type="button" class="pill pill--soft" @click="resetGuideCreateForm">
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <!-- SOLO LISTA PARA NO ADMIN -->
       <div v-else class="content-main">
-        <div v-if="loading.guides" class="loading">
-          {{ $t('content.loadingGuides') }}
-        </div>
-        <p v-else-if="!guides.length" class="empty">
-          {{ $t('content.emptyGuides') }}
-        </p>
+        <div v-if="loading.guides" class="loading">{{ $t('content.loadingGuides') }}</div>
+        <p v-else-if="!guides.length" class="empty">{{ $t('content.emptyGuides') }}</p>
 
         <div v-else class="grid">
           <article
             v-for="g in guides"
             :key="g.id"
-            class="card guide-card"
+            class="card media-card"
             @click="openGuide(g)"
           >
-            <div class="guide-thumb">
+            <div class="thumb thumb-guide">
               <img :src="publicUrl(g.cover_path)" :alt="g.title" />
             </div>
+
             <div class="guide-body">
-              <h3 class="guide-title">{{ g.title }}</h3>
+              <h3 class="card-title">{{ g.title }}</h3>
               <p class="guide-summary">{{ g.description }}</p>
 
               <div class="guide-actions">
@@ -977,16 +887,12 @@ function mmss(total: number) {
                   {{ $t('content.actions.continue') }}
                 </button>
 
-                <div class="progress" v-if="progressMap.get(g.id) !== undefined">
-                  <div
-                    class="bar"
-                    :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }"
-                  />
+                <div class="progress-wrap" v-if="progressMap.get(g.id) !== undefined">
+                  <div class="progress">
+                    <div class="bar" :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }" />
+                  </div>
+                  <small class="pct">{{ progressMap.get(g.id) }}%</small>
                 </div>
-
-                <small class="pct" v-if="progressMap.get(g.id) !== undefined">
-                  {{ progressMap.get(g.id) }}%
-                </small>
               </div>
             </div>
           </article>
@@ -994,27 +900,26 @@ function mmss(total: number) {
       </div>
     </section>
 
-    <!-- OVERLAYS Y MODALES -->
-    <div v-if="currentVideo" class="overlay">
-      <div class="modal-card">
+    <div v-if="currentVideo" class="overlay" @click.self="closeVideo">
+      <div class="modal-card media-modal">
         <button type="button" class="close" @click="closeVideo">×</button>
         <div class="player">
           <video v-if="videoSrc" :src="videoSrc" controls playsinline />
         </div>
-        <h3 class="modal-title">{{ currentVideo?.title }}</h3>
-        <p class="modal-desc" v-if="currentVideo?.description">
-          {{ currentVideo?.description }}
-        </p>
+        <div class="modal-copy">
+          <h2 class="modal-title">{{ currentVideo?.title }}</h2>
+          <p class="modal-desc" v-if="currentVideo?.description">{{ currentVideo?.description }}</p>
+        </div>
       </div>
     </div>
 
     <div v-if="currentPdf" class="overlay" @click.self="closePdf">
-      <div class="modal-card">
+      <div class="modal-card media-modal">
         <button type="button" class="close" @click="closePdf">×</button>
-        <h3 class="modal-title">{{ currentPdf?.title }}</h3>
-        <p class="modal-desc" v-if="currentPdf?.description">
-          {{ currentPdf?.description }}
-        </p>
+        <div class="modal-copy">
+          <h2 class="modal-title">{{ currentPdf?.title }}</h2>
+          <p class="modal-desc" v-if="currentPdf?.description">{{ currentPdf?.description }}</p>
+        </div>
         <div class="pdf">
           <iframe v-if="pdfSrc" :src="pdfSrc" :title="$t('content.pdf.iframeTitle')" />
         </div>
@@ -1022,16 +927,14 @@ function mmss(total: number) {
     </div>
 
     <div v-if="editModal" class="overlay" @click.self="closeEditModal">
-      <div class="edit-card">
+      <div class="modal-card edit-card">
         <header class="edit-header">
-          <h3 class="edit-title">
+          <h2 class="edit-title">
             <span v-if="editModal.type === 'video'">{{ $t('content.edit.video') }}</span>
             <span v-else-if="editModal.type === 'book'">{{ $t('content.edit.book') }}</span>
             <span v-else>{{ $t('content.edit.guide') }}</span>
-          </h3>
-          <button class="edit-close" type="button" @click="closeEditModal">
-            ×
-          </button>
+          </h2>
+          <button class="edit-close" type="button" @click="closeEditModal">×</button>
         </header>
 
         <section class="edit-body">
@@ -1058,14 +961,10 @@ function mmss(total: number) {
 
             <div v-if="editModal.type === 'video'" class="field">
               <label>{{ $t('content.video.duration') }}</label>
-              <input
-                v-model.number="editModal.duration_seconds"
-                type="number"
-                min="0"
-              />
+              <input v-model.number="editModal.duration_seconds" type="number" min="0" />
             </div>
 
-            <div v-if="editModal.type !== 'book'" class="field field--full">
+            <div v-if="editModal.type !== 'book'" class="field">
               <label>{{ $t('content.fields.description') }}</label>
               <textarea rows="3" v-model="editModal.description" />
             </div>
@@ -1073,7 +972,7 @@ function mmss(total: number) {
         </section>
 
         <footer class="edit-footer">
-          <button class="pill pill--ghost" type="button" @click="closeEditModal">
+          <button class="pill pill--soft" type="button" @click="closeEditModal">
             {{ $t('content.actions.cancel') }}
           </button>
           <button class="pill pill--primary" type="button" @click="saveEdit">
@@ -1084,16 +983,16 @@ function mmss(total: number) {
     </div>
 
     <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
-      <div class="confirm-card">
-        <h3>
+      <div class="modal-card confirm-card">
+        <h2 class="confirm-title">
           {{ $t('content.delete.title', { item: $t(`content.delete.labels.${confirmDelete.type}`) }) }}
-        </h3>
-        <p>
+        </h2>
+        <p class="confirm-text">
           {{ $t('content.delete.text') }}
           <strong>«{{ confirmDelete.title }}»</strong>?
         </p>
         <div class="confirm-actions">
-          <button class="pill pill--primary" type="button" @click="cancelDelete">
+          <button class="pill pill--soft" type="button" @click="cancelDelete">
             {{ $t('content.actions.cancel') }}
           </button>
           <button class="pill pill--danger" type="button" @click="performDelete">
@@ -1109,60 +1008,65 @@ function mmss(total: number) {
   </main>
 </template>
 
-
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 20px 30px 40px;
+  padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
 }
 
-/* Head + Tabs */
 .page-head {
   display: grid;
-  gap: 15px;
-  margin-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
-h2 {
+
+.page-title {
   margin: 0;
-  padding: 10px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
 }
 
 .tabs {
   display: flex;
-  justify-content: space-around;
-  align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
+
 .tab {
- padding: 10px 20px;
+  padding: 10px 18px;
   border-radius: 999px;
   border: none;
   background: #85b6e0;
   color: #fff;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.96rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
-.tab:hover {
-  background: #50bdbd;
-  color: #fff;
-  transform: translateY(-1px);
+
+@media (hover: hover) {
+  .tab:hover {
+    background: #50bdbd;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.18);
+  }
 }
+
 .tab.active {
   background: #50bdbd;
-  color: #fff;
   box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.15) inset;
 }
 
-/* LAYOUT ABM + LISTA */
 .section {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .content-row {
@@ -1177,341 +1081,364 @@ h2 {
 }
 
 .abm-box {
-  flex: 0 0 260px;
-  max-width: 280px;
+  flex: 0 0 320px;
+  max-width: 320px;
 }
 
-/* En pantallas chicas: ABM arriba y centrado */
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .content-row {
     flex-direction: column-reverse;
   }
+
   .abm-box {
-    flex: 1 1 auto;
-    width: 90%;
-    margin: 0 auto 12px auto;
+    width: 100%;
+    max-width: 100%;
   }
 }
 
-/* ABM panel */
-.abm {
-  margin-bottom: 18px;
-}
-.abm-title {
-  margin: 0 0 10px;
-  font-size: 1.05rem;
-}
-.abm-grid {
-  display: grid;
-  gap: 12px;
-}
-
-/* ABM una sola columna */
-.abm-2col {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-/* Inputs y labels ABM */
-.abm-2col .field {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.abm-2col .field--full {
-  grid-column: 1 / -1;
-}
-
-.abm-2col .field label {
-  font-size: 0.85rem;
-  color: #50bdbd;
-  letter-spacing: 0.03em;
-  font-weight: 600;
-}
-
-.abm-2col input,
-.abm-2col textarea {
-  border-radius: 12px;
-  border: 1.6px solid #50bdbd;
-  background: #e6fbfb;
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.abm-2col input:focus,
-.abm-2col textarea:focus {
-  background: #ffffff;
-  border-color: #37a8a8;
-  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
-}
-
-.field--full {
-  grid-column: 1 / -1;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.field label {
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  color: #6b7280;
-}
-.field input,
-.field textarea {
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  padding: 7px 10px;
-  font-size: 0.86rem;
-  background: #f9fafb;
-}
-.field input:focus,
-.field textarea:focus {
-  outline: none;
-  border-color: #50bdbd;
-  background: #ffffff;
-}
-
-.abm-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-/* Upload PDF */
-.upload-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.file-input {
-  display: none;
-}
-.upload-btn {
-  padding: 7px 14px;
-  border-radius: 999px;
-  border: none;
-  background: #50bdbd;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-.upload-btn:hover {
-  background: #37a8a8;
-}
-.file-name {
-  font-size: 0.8rem;
-  color: #374151;
-}
-
-/* Grid */
 .grid {
   display: grid;
   gap: 18px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
-/* Card */
 .card {
-  background: #d9f5f5;
-  width: 90%;
-  border-radius: 18px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
-  padding: 12px;
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
-}
-.card:hover {
-  background: #d9f5f5;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
-}
-
-/* Edit / delete buttons estilo pill */
-.small-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.abm-btn {
-  border-radius: 999px;
-  padding: 6px 15px;
-  border: 2px solid #50bdbd;
+  width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: 0.15s ease;
-}
-.abm-btn--edit {
-  color: #50bdbd;
-}
-.abm-btn--edit:hover {
-  background: rgba(80, 189, 189, 0.06);
-}
-.abm-btn--delete {
-  color: #e53935;
-  border-color: #e53935;
-}
-.abm-btn--delete:hover {
-  background: rgba(235, 24, 20, 0.274);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid #e2edf7;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-/* Videos */
-.video-card .thumb {
-  position: relative;
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
+}
+
+.media-card {
+  cursor: pointer;
+}
+
+.thumb {
   border-radius: 14px;
   overflow: hidden;
-  background: #f6fbff;
-  aspect-ratio: 16 / 9;
+  background: #f8fafc;
+  border: 1px solid #e8eef5;
 }
-.video-card .thumb img {
+
+.thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
-}
-.duration {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  font-size: 0.8rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-}
-.title {
-  margin: 10px 6px 6px;
-  font-size: 1rem;
+  object-fit: cover;
 }
 
-/* Biblioteca */
-.book-card .book-thumb {
-  border-radius: 14px;
-  overflow: hidden;
-  background: #fff;
+.thumb-video {
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+
+.thumb-book,
+.thumb-guide {
   aspect-ratio: 7 / 10;
   display: grid;
   place-items: center;
 }
-.book-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+
+.duration {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 0.76rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
 }
 
-/* Guías */
-.guide-card {
+.card-title {
+  margin: 10px 4px 6px;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.guide-body {
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 12px;
+  gap: 8px;
 }
-.guide-thumb {
-  border-radius: 14px;
-  overflow: hidden;
-  aspect-ratio: 7 / 10;
-  background: #fff;
-}
-.guide-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.guide-title {
-  margin: 0 6px 4px;
-}
+
 .guide-summary {
-  margin: 0 6px 8px;
-  opacity: 0.9;
+  margin: 0 4px;
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .guide-actions {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 0 6px 6px;
+  gap: 8px;
+  padding: 0 4px 4px;
 }
-.btn {
-  align-self: flex-start;
-  padding: 7px 18px;
-  border-radius: 999px;
-  border: none;
-  background: #50bdbd;
-  color: #ffffff;
-  font-size: 0.9rem;
-  width: 100%;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(80, 189, 189, 0.4);
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.18s ease;
+
+.progress-wrap {
+  display: grid;
+  gap: 4px;
 }
-.btn:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.5);
-}
+
 .progress {
   height: 10px;
   background: #e8eef3;
   border-radius: 999px;
   overflow: hidden;
 }
-.progress .bar {
+
+.bar {
   height: 100%;
   background: #85b6e0;
 }
+
 .pct {
-  opacity: 0.8;
+  color: #6b7280;
+}
+
+.btn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .btn:hover {
+    background: #3ea9a9;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(80, 189, 189, 0.28);
+  }
+}
+
+.small-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.abm-btn {
+  border-radius: 999px;
+  padding: 7px 14px;
+  border: 1px solid #b6ebe5;
+  background: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.abm-btn--edit {
+  color: #50bdbd;
+}
+
+@media (hover: hover) {
+  .abm-btn--edit:hover {
+    background: #f3fffe;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
+  }
+}
+
+.abm-btn--delete {
+  color: #e53935;
+  border-color: rgba(229, 57, 53, 0.5);
+}
+
+@media (hover: hover) {
+  .abm-btn--delete:hover {
+    background: rgba(229, 57, 53, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(229, 57, 53, 0.12);
+  }
+}
+
+.abm {
+  display: grid;
+  gap: 14px;
+}
+
+.abm-title {
+  margin: 0;
+  font-size: 1.08rem;
+  color: #50bdbd;
+  font-weight: 800;
+}
+
+.abm-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #50bdbd;
+}
+
+.field input,
+.field textarea {
+  border-radius: 12px;
+  border: 1.5px solid #dbe7f3;
+  background: #ffffff;
+  padding: 9px 12px;
+  font-size: 0.92rem;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.18);
+}
+
+.abm-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #50bdbd;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .upload-btn:hover {
+    background: #37a8a8;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.18);
+  }
+}
+
+.file-name {
+  font-size: 0.82rem;
+  color: #374151;
+  word-break: break-word;
+}
+
+.articles-section {
+  margin-top: 18px;
+}
+
+.subhead {
+  margin: 0 0 12px;
+  font-size: 1.08rem;
+  color: #50bdbd;
+  font-weight: 800;
 }
 
 .articles {
   display: grid;
   gap: 12px;
 }
+
 .article-card {
   display: grid;
   grid-template-columns: 96px 1fr;
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
-  background: #eaf6ff;
-  border: 1px solid #e0edf5;
+  background: #f8fafc;
+  border: 1px solid #e2edf7;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
+
+@media (hover: hover) {
+  .article-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+  }
+}
+
 .art-cover {
   width: 96px;
   height: 96px;
   object-fit: cover;
   border-radius: 10px;
 }
+
 .art-title {
   margin: 0 0 4px;
+  font-size: 1rem;
 }
+
 .art-summary {
   margin: 0 0 4px;
-  opacity: 0.85;
+  color: #4b5563;
 }
 
 .loading,
 .empty {
-  opacity: 0.75;
+  color: #6b7280;
 }
 
-/* Overlay genérico con blur (video, pdf, editar, borrar) */
 .overlay {
   position: fixed;
   inset: 0;
@@ -1524,21 +1451,32 @@ h2 {
   padding: 16px;
 }
 
-/* Modal principal (video/pdf) */
 .modal-card {
-  position: relative;
   background: #ffffff;
   border-radius: 18px;
+  width: min(920px, 96vw);
+  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
+  border: 1px solid #e8eef3;
   overflow: hidden;
-  width: min(900px, 96vw);
+  position: relative;
 }
+
+.media-modal {
+  display: grid;
+  gap: 0;
+}
+
+.modal-copy {
+  padding: 14px 18px 16px;
+}
+
 .close {
   z-index: 20;
   position: absolute;
   right: 14px;
   top: 12px;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   border: none;
   cursor: pointer;
@@ -1548,68 +1486,58 @@ h2 {
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
+  font-weight: 700;
 }
+
 .modal-title {
-  margin: 0;
-  padding: 10px 48px 10px 18px;
-  background: #50bdbd;
-  height: 30px;
-  color: #ffffff;
+  margin: 0 40px 8px 0;
   font-size: 1.2rem;
+  color: #50bdbd;
+  font-weight: 800;
 }
+
 .modal-desc {
   margin: 0;
-  padding: 10px 18px 14px;
-  background: #50bdbd;
-  color: #ffffff;
+  color: #475569;
 }
+
 .player {
   background: #000;
 }
+
 .player video {
   width: 100%;
   height: auto;
   display: block;
 }
+
 .pdf {
   height: 70vh;
 }
+
 .pdf iframe {
   width: 100%;
   height: 100%;
   border: 0;
 }
 
-/* Card del modal de edición */
 .edit-card {
-  background: #ffffff;
-  border-radius: 24px;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
-  overflow: hidden;
-  font-family: 'Inter', sans-serif;
+  max-width: 440px;
 }
 
 .edit-header {
-  padding: 14px 20px;
+  padding: 14px 18px;
   border-bottom: 1px solid #eef2f7;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
 }
 
 .edit-title {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1.15rem;
   color: #50bdbd;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-weight: 800;
 }
 
 .edit-close {
@@ -1619,127 +1547,105 @@ h2 {
   background: #f0f4f8;
   border: none;
   font-size: 1.1rem;
-  font-weight: 500;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000000;
+  color: #111827;
   cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.edit-close:hover {
-  background: #e2e8f0;
-  transform: scale(1.05);
 }
 
 .edit-body {
-  padding: 20px 22px 10px;
-}
-
-.edit-body .field label {
-  font-size: 0.8rem;
-  font-weight: 750;
-  color: #50bdbd;
-  letter-spacing: 0.05em;
-}
-
-.edit-body input,
-.edit-body textarea {
-  border-radius: 14px;
-  border: 1.5px solid #50bdbd;
-  background: #d9f5f5;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  font-family: 'Inter', sans-serif;
-  color: #111827;
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.edit-body input:focus,
-.edit-body textarea:focus {
-  border-color: #3ea9a9;
-  background: #e6fbfb;
-  box-shadow: 0 0 0 2px rgba(80, 189, 189, 0.2);
+  padding: 18px;
 }
 
 .edit-footer {
-  padding: 16px 22px 18px;
+  padding: 14px 18px 18px;
   border-top: 1px solid #eef2f7;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-/* Confirm delete */
 .confirm-card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 20px 22px 18px;
-  max-width: 380px;
-  width: 100%;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  max-width: 400px;
+  padding: 20px;
 }
-.confirm-card h3 {
+
+.confirm-title {
   margin: 0 0 8px;
+  font-size: 1.15rem;
+  color: #111827;
 }
-.confirm-card p {
+
+.confirm-text {
   margin: 0 0 16px;
+  color: #475569;
 }
+
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-/* Pills */
 .pill {
   border-radius: 999px;
-  padding: 7px 16px;
-  font-size: 0.8rem;
+  padding: 9px 18px;
+  font-size: 0.9rem;
   border: none;
-  background: #50bdbd;
-  color: #ffffff;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
+
 .pill--primary {
-  padding: 9px 22px;
-  font-size: 0.9rem;
-}
-
-.pill--ghost {
-  background: #ef4444;
+  background: #50bdbd;
   color: #ffffff;
-  border: none;
-  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
 }
 
-.pill--ghost:hover {
-  background: #dc2626;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .pill--primary:hover {
+    background: #3ea9a9;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(80, 189, 189, 0.28);
+  }
+}
+
+.pill--soft {
+  background: #ffffff;
+  color: #50bdbd;
+  border: 1px solid #b6ebe5;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
+}
+
+@media (hover: hover) {
+  .pill--soft:hover {
+    background: #e0faf7;
+    transform: translateY(-1px);
+  }
 }
 
 .pill--danger {
   background: #e53935;
-  box-shadow: 0 8px 18px rgba(229, 57, 53, 0.4);
-}
-.pill:hover {
-  transform: translateY(-1px);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(229, 57, 53, 0.24);
 }
 
-/* Toast */
+@media (hover: hover) {
+  .pill--danger:hover {
+    background: #c62828;
+    transform: translateY(-1px);
+  }
+}
+
 .toast {
   position: fixed;
   right: 18px;
@@ -1751,126 +1657,122 @@ h2 {
   z-index: 3000;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
 }
+
 .toast.success {
   background: #50bdbd;
 }
+
 .toast.error {
   background: #ef4444;
 }
 
-/* =========================
-   Mobile
-   ========================= */
-@media (max-width: 480px) {
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
   .contenido {
-    padding: 46px 18px 54px;  
-    align-items: flex-start; 
-    min-height: 100dvh;
+    padding: 16px 12px 96px;
   }
 
-  .tab {
- padding: 7px 18px;
- font-size: 1rem;
- }
+  .page-title {
+    font-size: 1.35rem;
+  }
 
- .grid {
+  .card {
+    padding: 12px;
+  }
+
+  .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
-  .card {
-    padding: 10px;
-    border-radius: 16px;
-    
+  .tab {
+    font-size: 0.9rem;
+    padding: 9px 14px;
   }
 
-  .title {
-    font-size: 0.92rem;
-    margin: 8px 4px 4px;
+  .article-card {
+    grid-template-columns: 80px 1fr;
   }
 
-  /* ===== LIBROS===== */
-  .book-card .book-thumb {
-    aspect-ratio: 16 / 10;     
-    border-radius: 12px;
-    background: #ffffff;        
-    border: 1px solid #e6f3f6;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
+  .art-cover {
+    width: 80px;
+    height: 80px;
   }
 
-  .book-card img {
+  .edit-footer,
+  .confirm-actions,
+  .abm-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-footer .pill,
+  .confirm-actions .pill,
+  .abm-actions .pill {
     width: 100%;
-    height: 100%;
-    object-fit: contain;        
-    padding: 6px;               
-    background: #ffffff;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  /* ===== GUÍAS===== */
-  .guide-thumb {
-    aspect-ratio: 16 / 10;      
-    border-radius: 12px;
-    background: #ffffff;
-    border: 1px solid #e6f3f6;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
+  .thumb-book,
+  .thumb-guide {
+    aspect-ratio: 16 / 10;
   }
 
-  .guide-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;        
+  .thumb-book img,
+  .thumb-guide img {
+    object-fit: contain;
     padding: 6px;
     background: #ffffff;
   }
 
-  /* textos guías más compactos */
-  .guide-title {
+  .card-title {
     font-size: 0.92rem;
-    margin: 6px 4px 4px;
   }
 
   .guide-summary {
-    font-size: 0.8rem;
-    line-height: 1.15rem;
-    margin: 0 4px 8px;
-  }
-
-  /* botón continuar más chico */
-  .guide-actions .btn {
-    padding: 6px 12px;
     font-size: 0.82rem;
   }
 
-  .progress {
-    height: 8px;
+  .guide-actions .btn {
+    width: 100%;
+  }
+
+  .tabs {
+    gap: 8px;
+  }
+
+  .tab {
+    flex: 1 1 auto;
+    text-align: center;
   }
 }
 
-/* Extra compacto */
 @media (max-width: 360px) {
   .contenido {
-    padding: 16px 12px 36px;
+    padding: 16px 10px 36px;
   }
 
-  .grid {
-    gap: 10px;
-  }
-
-    .tab {
- padding: 7px 8px;
- font-size: 0.85rem;
- }
-
-  .title {
-    font-size: 0.88rem;
+  .tab {
+    font-size: 0.82rem;
+    padding: 8px 10px;
   }
 
   .abm-btn {
-  padding: 3px 10px;
-  font-size: 0.85rem;
-} }
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+}
 </style>

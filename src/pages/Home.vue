@@ -63,7 +63,6 @@ function openPremiumPopupOncePerDay() {
   if (isPremium.value) return
   if (!shouldShowPremiumPopupToday()) return
 
-  // Marcamos acá para que cuente como "ya mostrado" aunque no lo cierre
   markPremiumPopupShownToday()
 
   setTimeout(() => {
@@ -73,7 +72,6 @@ function openPremiumPopupOncePerDay() {
 
 function closePremiumPopup() {
   showPremiumPopup.value = false
- 
   markPremiumPopupShownToday()
 }
 
@@ -107,12 +105,16 @@ const diasCuidado = computed(() => {
 
   const inicio = new Date(auth.user.created_at)
   const hoy = new Date()
-  const diff = Math.floor((hoy.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+  const diff = Math.floor(
+    (hoy.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)
+  )
   return diff + 1
 })
 
 const meta = 30
-const progresoPorcentaje = computed(() => Math.min((diasCuidado.value / meta) * 100, 100))
+const progresoPorcentaje = computed(() =>
+  Math.min((diasCuidado.value / meta) * 100, 100)
+)
 
 /* ========= Foro activo ========= */
 const forosActivos = ref<ForoResumen[]>([])
@@ -174,7 +176,8 @@ const frases = computed(() => {
 const fraseDelDia = computed(() => {
   if (!frases.value.length) return ''
   const idx =
-    [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % frases.value.length
+    [...hoyYYYYMMDD].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) %
+    frases.value.length
   return frases.value[idx]
 })
 
@@ -188,7 +191,10 @@ function setMood(mood: Mood) {
 
   if (auth.user) {
     const key = `nura_moods_${auth.user.id}`
-    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, Mood>
+    const stored = JSON.parse(localStorage.getItem(key) || '{}') as Record<
+      string,
+      Mood
+    >
     stored[today] = mood
     localStorage.setItem(key, JSON.stringify(stored))
   }
@@ -203,7 +209,7 @@ function handleWriteDiaryFromModal() {
   escribirDiario()
 }
 
-/* ========= Calendario  ========= */
+/* ========= Calendario ========= */
 const today = new Date()
 
 const monthName = computed(() => {
@@ -236,8 +242,11 @@ function exportApptToGoogle(a: Appt) {
   const url = new URL('https://calendar.google.com/calendar/render')
   url.searchParams.set('action', 'TEMPLATE')
   url.searchParams.set('text', a.title || t('home.calendar.defaultEventTitle'))
+  url.searchParams.set(
+    'details',
+    a.details || t('home.calendar.defaultEventDetails')
+  )
   url.searchParams.set('dates', `${start}/${end}`)
-  url.searchParams.set('details', a.details || t('home.calendar.defaultEventDetails'))
   url.searchParams.set('ctz', 'America/Argentina/Buenos_Aires')
 
   window.open(url.toString(), '_blank')
@@ -259,7 +268,6 @@ onMounted(async () => {
 
   if (!error && data) activities.value = data as Appt[]
 
-  // Premium popup (1 vez por día)
   await gate.refresh()
   openPremiumPopupOncePerDay()
 })
@@ -270,52 +278,36 @@ onMounted(async () => {
 
   <main class="home-page">
     <div class="grid">
-      <!-- COLUMNA IZQUIERDA -->
       <section class="col">
-        <!-- Saludo + Moods -->
         <div class="card">
           <h2>{{ $t('home.greeting', { name: displayName }) }}</h2>
           <p class="sub">{{ $t('home.howFeeling') }}</p>
 
           <div class="moods">
             <button class="mood" @click="setMood('triste')" type="button">
-              <img
-                src="/icons/nuri-triste.png"
-
-                :alt="$t('home.moods.sad')"
-              />
+              <img src="/icons/nuri-triste.png" :alt="$t('home.moods.sad')" />
               <span>{{ $t('home.moods.sad') }}</span>
             </button>
 
             <button class="mood" @click="setMood('normal')" type="button">
-              <img
-                src="/icons/nuri-normal.png"
-                :alt="$t('home.moods.ok')"
-              />
+              <img src="/icons/nuri-normal.png" :alt="$t('home.moods.ok')" />
               <span>{{ $t('home.moods.ok') }}</span>
             </button>
 
             <button class="mood" @click="setMood('bien')" type="button">
-              <img
-                src="/icons/nuri-bien.png"
-                :alt="$t('home.moods.good')"
-              />
+              <img src="/icons/nuri-bien.png" :alt="$t('home.moods.good')" />
               <span>{{ $t('home.moods.good') }}</span>
             </button>
 
             <button class="mood" @click="setMood('muybien')" type="button">
-              <img
-                src="/icons/nuri-muybien.png"
-                :alt="$t('home.moods.great')"
-              />
+              <img src="/icons/nuri-muybien.png" :alt="$t('home.moods.great')" />
               <span>{{ $t('home.moods.great') }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Frase del día -->
         <div class="card frase-dia-card">
-          <h3>{{ $t('home.quoteTitle') }}</h3>
+          <h2>{{ $t('home.quoteTitle') }}</h2>
 
           <div class="quote">"{{ fraseDelDia }}"</div>
           <p class="frase">{{ $t('home.quoteSubtitle') }}</p>
@@ -353,10 +345,9 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Foro activo -->
         <div class="card">
           <div class="foro-card-header">
-            <h3>{{ $t('home.activeForum') }}</h3>
+            <h2>{{ $t('home.activeForum') }}</h2>
           </div>
 
           <ul class="foro-list">
@@ -381,11 +372,9 @@ onMounted(async () => {
         </div>
       </section>
 
-      <!-- COLUMNA DERECHA -->
       <section class="col">
-        <!-- ACTIVIDADES + CALENDARIO -->
         <div class="card">
-          <h3>{{ $t('home.todayActivities') }}</h3>
+          <h2>{{ $t('home.todayActivities') }}</h2>
 
           <div v-if="activities.length" class="activities-wrap">
             <ul class="activities-list">
@@ -422,13 +411,10 @@ onMounted(async () => {
             {{ $t('home.noActivities') }}
           </p>
 
-          <!-- CALENDARIO  -->
           <div class="calendar">
             <div class="cal-head">
               <span class="month-and-day">
-                {{
-                  monthName.charAt(0).toUpperCase() + monthName.slice(1)
-                }}
+                {{ monthName.charAt(0).toUpperCase() + monthName.slice(1) }}
                 {{ today.getDate() }}
               </span>
             </div>
@@ -452,7 +438,6 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- BOTONES BAJO CALENDARIO -->
           <div class="cal-actions">
             <button type="button" class="foro-btn" @click="goDiaryList">
               {{ $t('home.viewAllEntries') }}
@@ -463,9 +448,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- NuriChat -->
         <div class="card">
-          <h3>{{ $t('home.nurichatTitle') }}</h3>
+          <h2>{{ $t('home.nurichatTitle') }}</h2>
           <RouterLink to="/app/chatbot" class="chatbot-card">
             <img
               src="/banners/chatbot-home.png"
@@ -477,16 +461,25 @@ onMounted(async () => {
     </div>
   </main>
 
-  <!-- Premium Popup (al entrar) -->
   <div
     v-if="showPremiumPopup"
     class="premium-pop-overlay"
     @click.self="closePremiumPopup"
   >
-    <div class="premium-pop-card" role="dialog" aria-modal="true" aria-label="Pasar a Premium">
+    <div
+      class="premium-pop-card"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pasar a Premium"
+    >
       <div class="premium-pop-top">
         <span class="premium-pop-badge">Gratis</span>
-        <button class="premium-pop-x" type="button" @click="closePremiumPopup" aria-label="Cerrar">
+        <button
+          class="premium-pop-x"
+          type="button"
+          @click="closePremiumPopup"
+          aria-label="Cerrar"
+        >
           ✕
         </button>
       </div>
@@ -507,7 +500,7 @@ onMounted(async () => {
         </div>
         <div class="benefit">
           <span class="dot"></span>
-          <span> Crear y comentar sin límites en el foro</span>
+          <span>Crear y comentar sin límites en el foro</span>
         </div>
       </div>
 
@@ -519,8 +512,6 @@ onMounted(async () => {
           Ver Premium
         </button>
       </div>
-
-     
     </div>
   </div>
 
@@ -534,7 +525,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-
 .home-page {
   background: #fff;
   padding: 20px 18px 48px;
@@ -542,7 +532,6 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
-/* Grid */
 .grid {
   display: grid;
   gap: 24px;
@@ -564,44 +553,45 @@ onMounted(async () => {
   gap: 20px;
 }
 
-/* Cards */
 .card {
+  width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
   border-radius: 18px;
   padding: 14px 18px;
-  width: 100%;
-  box-sizing: border-box;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-.card:hover {
-  background: #fbffffff;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+    background: #ffffff;
+  }
 }
 
-/* Títulos */
 h2 {
-  margin: 0 0 6px;
-  font-size: 1.5rem;
-  color: #50bdbd;
-}
-h3 {
   margin: 0 0 12px;
   font-size: 1.3rem;
   color: #50bdbd;
 }
 
+
 .sub {
   margin-bottom: 10px;
 }
 
-/* Moods */
 .moods {
   display: grid;
   grid-template-columns: repeat(4, minmax(70px, 1fr));
   gap: 14px;
 }
+
 .mood {
   background: #fff;
   border: 1px solid #e8eef3;
@@ -611,23 +601,37 @@ h3 {
   gap: 6px;
   justify-items: center;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.05s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
-.mood:hover {
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+
+@media (hover: hover) {
+  .mood:hover {
+    background: #fcffff;
+    border-color: #cdeeed;
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.16);
+    transform: translateY(-2px);
+  }
 }
+
+.mood:active {
+  transform: scale(0.98);
+}
+
 .mood img {
   width: 64px;
   height: 64px;
   object-fit: contain;
 }
+
 .mood span {
   font-size: 0.9rem;
   color: #000;
 }
 
-/* Frase del día */
 .frase-dia-card {
   display: flex;
   flex-direction: column;
@@ -646,6 +650,10 @@ h3 {
   border: 1px solid #e0eef4;
 }
 
+.frase {
+  margin: 0;
+}
+
 .progreso-box {
   margin-top: 2px;
   display: flex;
@@ -657,12 +665,14 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .progreso-text {
   font-size: 1rem;
   color: #0f172a;
 }
+
 .progreso-text strong {
   color: #50bdbd;
 }
@@ -670,6 +680,7 @@ h3 {
 .meta-text {
   font-size: 0.8rem;
   color: #6b7280;
+  white-space: nowrap;
 }
 
 .progreso-bar {
@@ -691,7 +702,6 @@ h3 {
   transform: translateY(7px);
 }
 
-/* Foro */
 .foro-card-header {
   display: flex;
   align-items: center;
@@ -712,15 +722,23 @@ h3 {
   padding: 10px 6px;
   border-bottom: 1px solid #eef3f6;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.15s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  border-radius: 10px;
 }
+
 .foro-item:last-child {
   border-bottom: none;
 }
-.foro-item:hover {
-  background: #e9f7f7;
-  transform: translateX(4px);
-  border-radius: 8px;
+
+@media (hover: hover) {
+  .foro-item:hover {
+    background: #eefafa;
+    transform: translateX(4px);
+    box-shadow: 0 8px 18px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .foro-title {
@@ -737,7 +755,6 @@ h3 {
   font-weight: 600;
 }
 
-/* Botones pill  */
 .foro-btn {
   display: inline-block;
   box-sizing: border-box;
@@ -753,16 +770,25 @@ h3 {
   text-decoration: none;
   border: none;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(80, 189, 189, 0.25);
-  transition: background 0.2s, transform 0.12s ease, box-shadow 0.12s ease;
-}
-.foro-btn:hover {
-  background: #3daaaa;
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-/* ==== Calendario  ==== */
+@media (hover: hover) {
+  .foro-btn:hover {
+    background: #3daaaa;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+  }
+}
+
+.foro-btn:active {
+  transform: scale(0.98);
+}
+
 .calendar {
   margin-top: 20px;
   padding: 10px 6px 16px;
@@ -818,7 +844,10 @@ h3 {
   font-size: 0.9rem;
   color: #1f2937;
   cursor: default;
-  transition: 0.15s;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .cal-day.today {
@@ -828,7 +857,6 @@ h3 {
   box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.25);
 }
 
-/* Acciones debajo del calendario */
 .cal-actions {
   display: flex;
   gap: 14px;
@@ -836,7 +864,6 @@ h3 {
   flex-wrap: wrap;
 }
 
-/* ==== Actividades de hoy ==== */
 .activities-wrap {
   margin-bottom: 10px;
 }
@@ -859,12 +886,20 @@ h3 {
   background: #d4efec;
   border: 1px solid #cbecee;
   cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.activity-item:hover {
-  background: #d9f5f5;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+@media (hover: hover) {
+  .activity-item:hover {
+    background: #def7f4;
+    border-color: #bfe8e4;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(80, 189, 189, 0.16);
+  }
 }
 
 .activity-time {
@@ -902,11 +937,20 @@ h3 {
   color: #50bdbd;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(80, 189, 189, 0.3);
+  box-shadow: 0 4px 10px rgba(80, 189, 189, 0.16);
   white-space: nowrap;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
-.google-btn:hover {
-  background: #e0faf7;
+
+@media (hover: hover) {
+  .google-btn:hover {
+    background: #eafffb;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.22);
+  }
 }
 
 .no-activities {
@@ -915,9 +959,6 @@ h3 {
   color: #6b7280;
 }
 
-/* =========================
-   PREMIUM POPUP (HOME)
-========================= */
 .premium-pop-overlay {
   position: fixed;
   inset: 0;
@@ -969,11 +1010,20 @@ h3 {
   cursor: pointer;
   font-weight: 900;
   color: #0f172a;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.premium-pop-x:hover {
-  background: #f6fffe;
-  border-color: #b6ebe5;
+@media (hover: hover) {
+  .premium-pop-x:hover {
+    background: #f6fffe;
+    border-color: #b6ebe5;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .premium-pop-title {
@@ -1032,10 +1082,19 @@ h3 {
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.premium-pop-btn:hover {
-  background: #3daaaa;
+@media (hover: hover) {
+  .premium-pop-btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
 .premium-pop-btn.soft {
@@ -1044,36 +1103,20 @@ h3 {
   border: 1px solid #b6ebe5;
 }
 
-.premium-pop-btn.soft:hover {
-  background: #e0faf7;
-}
-
-.premium-pop-foot {
-  margin: 10px 0 0;
-  font-size: 0.78rem;
-  color: #6b7280;
-}
-
-@media (max-width: 768px) {
-  .premium-pop-card {
-    max-width: 520px;
-    padding: 12px 12px 10px;
-  }
-  .premium-pop-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .premium-pop-btn {
-    width: 100%;
+@media (hover: hover) {
+  .premium-pop-btn.soft:hover {
+    background: #e0faf7;
   }
 }
 
-/* ===== Chatbot Banner (NuriChat) ===== */
 .chatbot-card {
   display: block;
   overflow: hidden;
   border-radius: 20px;
   max-width: 100%;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 .chatbot-card img {
@@ -1084,7 +1127,22 @@ h3 {
   object-fit: cover;
 }
 
-/* ===== MOBILE (iPhone / <= 768px) ===== */
+@media (hover: hover) {
+  .chatbot-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 @media (max-width: 768px) {
   .home-page {
     padding: 16px 12px 96px;
@@ -1092,10 +1150,6 @@ h3 {
 
   h2 {
     font-size: 1.25rem;
-  }
-
-  h3 {
-    font-size: 1.1rem;
   }
 
   .grid {
@@ -1127,6 +1181,11 @@ h3 {
 
   .quote {
     font-size: 0.95rem;
+  }
+
+  .progreso-top {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .month-and-day {
@@ -1184,6 +1243,20 @@ h3 {
 
   .chatbot-card img {
     max-height: 220px;
+  }
+
+  .premium-pop-card {
+    max-width: 520px;
+    padding: 12px 12px 10px;
+  }
+
+  .premium-pop-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .premium-pop-btn {
+    width: 100%;
   }
 }
 </style>

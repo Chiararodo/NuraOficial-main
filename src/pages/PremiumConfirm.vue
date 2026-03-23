@@ -21,15 +21,18 @@ const emailSavedOk = ref(false)
 
 const currentConfirmEmail = ref('')
 
-function openEditEmail() {
+function clearEmailMessages() {
   emailError.value = ''
   emailSavedOk.value = false
+}
+
+function openEditEmail() {
+  clearEmailMessages()
   emailMode.value = 'edit'
 }
 
 function cancelEditEmail() {
-  emailError.value = ''
-  emailSavedOk.value = false
+  clearEmailMessages()
   emailMode.value = 'view'
   editableEmail.value = currentConfirmEmail.value
 }
@@ -57,21 +60,24 @@ async function loadConfirmEmail() {
 }
 
 async function saveEmail() {
-  emailError.value = ''
-  emailSavedOk.value = false
+  clearEmailMessages()
 
   const next = editableEmail.value.trim()
+
   if (!next) {
     emailError.value = 'Ingresá un email.'
     return
   }
+
   if (!isValidEmail(next)) {
     emailError.value = 'El formato del email no es válido.'
     return
   }
+
   if (!auth.user) return
 
   emailSaving.value = true
+
   try {
     const { error } = await supabase
       .from('profiles')
@@ -84,14 +90,14 @@ async function saveEmail() {
     emailSavedOk.value = true
     emailMode.value = 'view'
   } catch (e: any) {
-    emailError.value = e?.message ?? 'No se pudo guardar el email. Probá nuevamente.'
+    emailError.value =
+      e?.message ?? 'No se pudo guardar el email. Probá nuevamente.'
   } finally {
     emailSaving.value = false
   }
 }
 
 onMounted(async () => {
-  // 1) Marcar Premium en localStorage (demo)
   const now = new Date()
   const next = new Date(now)
   next.setMonth(next.getMonth() + 1)
@@ -100,12 +106,10 @@ onMounted(async () => {
   localStorage.setItem('nura_premium_subscribed_at', now.toISOString())
   localStorage.setItem('nura_premium_next_payment', next.toISOString())
 
-  // 2) Marcar premium en profiles
   if (auth.user) {
     await supabase.from('profiles').update({ premium: true }).eq('id', auth.user.id)
   }
 
-  // 3) Cargar email editable
   await loadConfirmEmail()
 })
 
@@ -115,17 +119,23 @@ function goPremiumArea() {
 </script>
 
 <template>
+  <h1 class="visually-hidden">Suscripción Premium confirmada</h1>
+
   <main class="page">
     <section class="wrap">
       <header class="head">
         <p class="kicker">Suscripción confirmada</p>
-        <h2 class="title">Nura Premium</h2>
-        <p class="sub">Tu plan quedó activo. Ya podés acceder a beneficios ilimitados.</p>
+        <h2 class="page-title">Nura Premium</h2>
+        <p class="page-sub">
+          Tu plan quedó activo. Ya podés acceder a beneficios ilimitados.
+        </p>
       </header>
 
-      <section class="card hero">
+      <section class="card hero" aria-labelledby="confirm-title">
         <div class="hero-left">
-          <p class="hero-title">¡Listo! Tu suscripción está confirmada.</p>
+          <h2 id="confirm-title" class="hero-title">
+            ¡Listo! Tu suscripción está confirmada.
+          </h2>
           <p class="hero-text">
             Desde ahora tenés acceso a herramientas premium, encuentros en vivo y contenido exclusivo.
           </p>
@@ -137,17 +147,19 @@ function goPremiumArea() {
         </div>
       </section>
 
-      <!-- Email -->
-      <section class="card">
-        <h3 class="card-title">Email de confirmación</h3>
-        <p class="card-sub">Usaremos este email para comunicaciones del plan.</p>
+      <section class="card" aria-labelledby="email-title">
+        <h2 id="email-title" class="section-title">Email de confirmación</h2>
+        <p class="section-sub">Usaremos este email para comunicaciones del plan.</p>
 
         <div v-if="emailMode === 'view'" class="email-row">
           <div class="email-box">
             <p class="email-label">Email</p>
             <p class="email-value">{{ currentConfirmEmail || authEmail }}</p>
 
-            <p v-if="currentConfirmEmail && authEmail && currentConfirmEmail !== authEmail" class="email-hint">
+            <p
+              v-if="currentConfirmEmail && authEmail && currentConfirmEmail !== authEmail"
+              class="email-hint"
+            >
               Cuenta iniciada con: <span class="mono">{{ authEmail }}</span>
             </p>
           </div>
@@ -158,9 +170,10 @@ function goPremiumArea() {
         </div>
 
         <div v-else class="edit-area">
-          <label class="field">
+          <label class="field" for="premium-confirm-email">
             <span class="label">Email</span>
             <input
+              id="premium-confirm-email"
               v-model="editableEmail"
               type="email"
               class="input"
@@ -170,24 +183,37 @@ function goPremiumArea() {
             />
           </label>
 
-          <p v-if="emailError" class="msg msg--error">{{ emailError }}</p>
-          <p v-else-if="emailSavedOk" class="msg msg--ok">Email actualizado.</p>
+          <p v-if="emailError" class="msg msg--error" role="alert">
+            {{ emailError }}
+          </p>
+          <p v-else-if="emailSavedOk" class="msg msg--ok" role="status">
+            Email actualizado.
+          </p>
 
           <div class="actions">
-            <button class="btn btn-soft" type="button" @click="cancelEditEmail" :disabled="emailSaving">
+            <button
+              class="btn btn-soft"
+              type="button"
+              @click="cancelEditEmail"
+              :disabled="emailSaving"
+            >
               Cancelar
             </button>
-            <button class="btn btn-primary" type="button" @click="saveEmail" :disabled="emailSaving">
+            <button
+              class="btn btn-primary"
+              type="button"
+              @click="saveEmail"
+              :disabled="emailSaving"
+            >
               {{ emailSaving ? 'Guardando…' : 'Guardar' }}
             </button>
           </div>
         </div>
       </section>
 
-      <!-- Recordatorio -->
-      <section class="card">
-        <h3 class="card-title">Recordatorio mensual</h3>
-        <p class="card-sub">Opcional</p>
+      <section class="card" aria-labelledby="reminder-title">
+        <h2 id="reminder-title" class="section-title">Recordatorio mensual</h2>
+        <p class="section-sub">Opcional</p>
 
         <label class="toggle">
           <input v-model="wantsReminder" type="checkbox" />
@@ -204,7 +230,7 @@ function goPremiumArea() {
       </section>
 
       <div class="bottom">
-        <button class="btn btn-primary btn-full" type="button" @click="goPremiumArea">
+        <button class="btn btn-primary btn-cta" type="button" @click="goPremiumArea">
           Ir a mi espacio Premium
         </button>
       </div>
@@ -215,15 +241,15 @@ function goPremiumArea() {
 <style scoped>
 .page {
   min-height: calc(100dvh - 64px);
-  background: #f5fbfd;
-  padding: 28px 16px 40px;
+  background: #ffffff;
+  padding: 24px 18px 48px;
 }
 
 .wrap {
   max-width: 980px;
   margin: 0 auto;
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .head {
@@ -233,52 +259,54 @@ function goPremiumArea() {
 
 .kicker {
   margin: 0 0 6px;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #64748b;
   font-weight: 800;
 }
 
-.title {
+.page-title {
   margin: 0;
   font-size: 1.65rem;
   font-weight: 850;
-  color: #0f172a;
+  color: #50bdbd;
 }
 
-.sub {
+.page-sub {
   margin: 8px 0 0;
   color: #475569;
-  font-size: 1.02rem;
+  font-size: 1rem;
 }
 
 .card {
+  width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
   border-radius: 18px;
   padding: 18px 18px 16px;
   border: 1px solid #e2edf7;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-.card-title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 850;
-  color: #0f172a;
-}
-
-.card-sub {
-  margin: 6px 0 12px;
-  font-size: 0.95rem;
-  color: #64748b;
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
 }
 
 .hero {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   background: linear-gradient(135deg, #e3f6fb, #f0f9ff);
   border: 1px solid #d7eef6;
 }
@@ -287,12 +315,13 @@ function goPremiumArea() {
   margin: 0 0 6px;
   font-weight: 850;
   color: #0f172a;
+  font-size: 1.2rem;
 }
 
 .hero-text {
   margin: 0;
   color: #475569;
-  font-size: 0.95rem;
+  font-size: 0.96rem;
   max-width: 62ch;
 }
 
@@ -318,6 +347,19 @@ function goPremiumArea() {
   box-shadow: 0 0 0 2px #bbf7d0;
 }
 
+.section-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 850;
+  color: #50bdbd;
+}
+
+.section-sub {
+  margin: 6px 0 12px;
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
 .email-row {
   display: flex;
   gap: 12px;
@@ -331,7 +373,7 @@ function goPremiumArea() {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 12px 12px;
+  padding: 12px;
 }
 
 .email-label {
@@ -379,12 +421,17 @@ function goPremiumArea() {
 
 .input {
   width: 100%;
+  box-sizing: border-box;
   border: 1.5px solid #dbe7f3;
   background: #ffffff;
   border-radius: 14px;
   padding: 10px 12px;
   font-size: 0.98rem;
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .input:focus {
@@ -396,9 +443,11 @@ function goPremiumArea() {
   margin: 0;
   font-size: 0.92rem;
 }
+
 .msg--error {
   color: #b42318;
 }
+
 .msg--ok {
   color: #0f766e;
 }
@@ -468,49 +517,112 @@ function goPremiumArea() {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 44px;
   border-radius: 999px;
   border: none;
   padding: 10px 16px;
-  font-size: 0.98rem;
+  font-size: 0.96rem;
   font-weight: 800;
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+  box-sizing: border-box;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .btn-primary {
   background: #50bdbd;
   color: #ffffff;
-  box-shadow: 0 10px 24px rgba(80, 189, 189, 0.28);
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
 }
-.btn-primary:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(80, 189, 189, 0.35);
+
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #3ea9a9;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+  }
 }
 
 .btn-soft {
   background: #ffffff;
   color: #50bdbd;
   border: 1px solid #b6ebe5;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.22);
-}
-.btn-soft:hover {
-  background: #e0faf7;
-  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
 }
 
-.btn-full {
-  width: 100%;
+@media (hover: hover) {
+  .btn-soft:hover:not(:disabled) {
+    background: #e0faf7;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
+  }
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .bottom {
   padding-top: 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.btn-cta {
+  width: auto;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 @media (max-width: 680px) {
+  .page {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+  }
+
+  .card {
+    padding: 16px 14px;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+
   .email-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions .btn,
+  .bottom .btn-cta {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
@@ -36,6 +36,21 @@ const pwdSending = ref(false)
 const pwdError = ref('')
 const pwdSuccess = ref('')
 
+const avatarInitial = computed(() => {
+  const base = name.value?.trim() || auth.user?.email || 'U'
+  return base.charAt(0).toUpperCase()
+})
+
+function clearProfileMessages() {
+  errorMsg.value = ''
+  successMsg.value = ''
+}
+
+function clearPasswordMessages() {
+  pwdError.value = ''
+  pwdSuccess.value = ''
+}
+
 function withCacheBust(url: string) {
   return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
 }
@@ -54,7 +69,9 @@ function publicUrlFrom(bucket: string, path: string): string {
   return data?.publicUrl ? withCacheBust(data.publicUrl) : ''
 }
 
-async function resolveAvatarAny(value: string | null | undefined): Promise<string | null> {
+async function resolveAvatarAny(
+  value: string | null | undefined
+): Promise<string | null> {
   const raw = (value || '').trim()
   if (!raw) return null
 
@@ -62,11 +79,9 @@ async function resolveAvatarAny(value: string | null | undefined): Promise<strin
 
   const path = normalizeAvatarValue(raw)
 
-  // intento público (bucket nuevo)
   const u1 = publicUrlFrom(BUCKET, path)
   if (u1) return u1
 
-  // fallback legacy: public o signed
   const u2 = publicUrlFrom(LEGACY_BUCKET, path)
   if (u2) return u2
 
@@ -81,7 +96,6 @@ async function resolveAvatarAny(value: string | null | undefined): Promise<strin
 async function loadExistingAvatar() {
   if (!auth.user) return
 
-  // fuente de verdad: profiles
   const { data: p } = await supabase
     .from('profiles')
     .select('avatar_url, name, full_name')
@@ -90,17 +104,27 @@ async function loadExistingAvatar() {
 
   if (p?.avatar_url) originalAvatarPath.value = String(p.avatar_url)
 
-  // nombre también (si querés)
-  if (p?.name && String(p.name).trim()) name.value = String(p.name)
+  if (p?.name && String(p.name).trim()) {
+    name.value = String(p.name)
+  } else if (p?.full_name && String(p.full_name).trim()) {
+    name.value = String(p.full_name)
+  }
 
   const resolved = await resolveAvatarAny(originalAvatarPath.value)
   avatarPreview.value = resolved
 }
 
 function onFileChange(e: Event) {
+  clearProfileMessages()
+
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    errorMsg.value = 'Seleccioná una imagen válida.'
+    return
+  }
 
   avatarFile.value = file
 
@@ -117,24 +141,30 @@ async function saveProfile() {
     return
   }
 
+  clearProfileMessages()
+
+  if (!name.value.trim()) {
+    errorMsg.value = 'Ingresá un nombre válido.'
+    return
+  }
+
   saving.value = true
-  errorMsg.value = ''
-  successMsg.value = ''
 
   let savedAvatarPath: string | null = originalAvatarPath.value
 
-  // 1) upload si hay archivo nuevo
   try {
     if (avatarFile.value) {
       const file = avatarFile.value
       const safeName = file.name.replace(/\s+/g, '-').toLowerCase()
       const path = `avatars/${auth.user.id}/${Date.now()}-${safeName}`
 
-      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type || 'image/png'
-      })
+      const { error: uploadErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type || 'image/png'
+        })
 
       if (uploadErr) throw uploadErr
       savedAvatarPath = path
@@ -146,11 +176,14 @@ async function saveProfile() {
     return
   }
 
-  // 2) auth metadata
   try {
     const { error } = await supabase.auth.updateUser({
-      data: { name: name.value, avatar_url: savedAvatarPath }
+      data: {
+        name: name.value.trim(),
+        avatar_url: savedAvatarPath
+      }
     })
+
     if (error) throw error
 
     const { data: refUser } = await supabase.auth.getUser()
@@ -162,14 +195,14 @@ async function saveProfile() {
     return
   }
 
-  // 3) profiles (lo que consume perfil + foro + perfil publico)
   try {
     const payload = {
       id: auth.user.id,
-      name: name.value,
-      full_name: name.value,
+      name: name.value.trim(),
+      full_name: name.value.trim(),
       avatar_url: savedAvatarPath
     }
+
     const { error } = await supabase.from('profiles').upsert(payload)
     if (error) throw error
   } catch (err) {
@@ -179,18 +212,16 @@ async function saveProfile() {
     return
   }
 
-  // 4) refrescar preview con url real
   const resolved = await resolveAvatarAny(savedAvatarPath)
   avatarPreview.value = resolved
   originalAvatarPath.value = savedAvatarPath
 
-  successMsg.value = 'Cambios de perfil guardados correctamente ✔'
+  successMsg.value = 'Cambios de perfil guardados correctamente.'
   saving.value = false
 }
 
 async function sendPasswordResetEmail() {
-  pwdError.value = ''
-  pwdSuccess.value = ''
+  clearPasswordMessages()
 
   if (!pwdEmail.value || !pwdEmail.value.includes('@')) {
     pwdError.value = 'Ingresá un email válido para continuar.'
@@ -198,6 +229,7 @@ async function sendPasswordResetEmail() {
   }
 
   pwdSending.value = true
+
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(pwdEmail.value, {
       redirectTo: `${window.location.origin}/auth/reset-password`
@@ -205,8 +237,12 @@ async function sendPasswordResetEmail() {
 
     if (error) {
       const msg = (error.message || '').toLowerCase()
-      if (msg.includes('rate limit')) pwdError.value = 'Hiciste demasiadas solicitudes. Esperá unos minutos.'
-      else pwdError.value = 'No pudimos enviar el email. Probá de nuevo en unos minutos.'
+      if (msg.includes('rate limit')) {
+        pwdError.value = 'Hiciste demasiadas solicitudes. Esperá unos minutos.'
+      } else {
+        pwdError.value =
+          'No pudimos enviar el email. Probá de nuevo en unos minutos.'
+      }
       return
     }
 
@@ -229,146 +265,236 @@ onMounted(() => {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Perfil</h1>
+  <h1 class="visually-hidden">Editar perfil</h1>
 
   <main class="perfil-edit">
-    <header class="top">
-      <button class="back-btn" type="button" @click="goBack">←</button>
-      <h2>Editar perfil</h2>
+    <header class="page-head">
+      <button class="back-btn" type="button" @click="goBack" aria-label="Volver">
+        ←
+      </button>
+      <h2 class="page-title">Editar perfil</h2>
     </header>
 
-    <section class="card edit-card">
-      <div class="avatar-wrap">
-        <div v-if="avatarPreview" class="avatar-img">
-         <img
-  v-if="avatarPreview"
-  :src="avatarPreview"
-  alt="Avatar"
-  @error="avatarPreview = null"
-/> </div>
-        <div v-else class="avatar-generated">
-          {{ name.charAt(0).toUpperCase() }}
-        </div>
+    <div class="grid">
+      <section class="col">
+        <section class="card edit-card" aria-labelledby="edit-profile-title">
+          <h2 id="edit-profile-title" class="section-title">Tus datos</h2>
 
-        <label class="upload-btn">
-          Cambiar foto
-          <input
-            type="file"
-            accept="image/*"
-            @change="onFileChange"
-            aria-label="Cambiar foto de perfil"
-          />
-        </label>
-      </div>
+          <div class="avatar-wrap">
+            <div v-if="avatarPreview" class="avatar-img">
+              <img
+                :src="avatarPreview"
+                alt="Avatar del perfil"
+                @error="avatarPreview = null"
+              />
+            </div>
 
-      <label class="label" for="profile-name">Nombre</label>
-      <input
-        id="profile-name"
-        v-model="name"
-        type="text"
-        class="input"
-        aria-label="Nombre del perfil"
-      />
+            <div v-else class="avatar-generated">
+              {{ avatarInitial }}
+            </div>
 
-      <label class="label" for="profile-email">Email</label>
-      <input
-        id="profile-email"
-        v-model="email"
-        type="email"
-        class="input"
-        aria-label="Email del perfil"
-        disabled
-      />
-      <p class="security-msg" style="margin-top:-10px;color:#64748b;font-size:.9rem;">
-        (El email se cambia con confirmación; lo dejamos bloqueado acá.)
-      </p>
+            <label class="upload-btn">
+              Cambiar foto
+              <input
+                type="file"
+                accept="image/*"
+                @change="onFileChange"
+                aria-label="Cambiar foto de perfil"
+              />
+            </label>
+          </div>
 
-      <p v-if="errorMsg" class="msg error">{{ errorMsg }}</p>
-      <p v-if="successMsg" class="msg success">{{ successMsg }}</p>
+          <div class="field-wrap">
+            <label class="label" for="profile-name">Nombre</label>
+            <input
+              id="profile-name"
+              v-model="name"
+              type="text"
+              class="input"
+              aria-label="Nombre del perfil"
+              @input="clearProfileMessages"
+            />
+          </div>
 
-      <button class="save-btn" type="button" :disabled="saving" @click="saveProfile">
-        {{ saving ? 'Guardando…' : 'Guardar cambios' }}
-      </button>
-    </section>
+          <div class="field-wrap">
+            <label class="label" for="profile-email">Email</label>
+            <input
+              id="profile-email"
+              v-model="email"
+              type="email"
+              class="input"
+              aria-label="Email del perfil"
+              disabled
+            />
+            <p class="helper-text">
+              El email se cambia con confirmación; por eso queda bloqueado acá.
+            </p>
+          </div>
 
-    <section class="security-card">
-      <h3 class="security-title">Seguridad · Contraseña</h3>
+          <p v-if="errorMsg" class="msg msg-error" role="alert">
+            {{ errorMsg }}
+          </p>
 
-      <p class="security-text">
-        Por tu privacidad, el cambio de contraseña se hace en un formulario
-        separado y se confirma por email. Te enviaremos un enlace seguro
-        para que elijas una nueva contraseña.
-      </p>
+          <p v-if="successMsg" class="msg msg-success" role="status">
+            {{ successMsg }}
+          </p>
 
-      <label class="security-label">Email para recibir el enlace</label>
+          <div class="actions-row">
+            <button class="btn btn-primary" type="button" :disabled="saving" @click="saveProfile">
+              {{ saving ? 'Guardando…' : 'Guardar cambios' }}
+            </button>
+          </div>
+        </section>
+      </section>
 
-      <div class="security-email-pill">
-        {{ auth.user?.email }}
-      </div>
+      <section class="col">
+        <section class="card security-card" aria-labelledby="security-title">
+          <h2 id="security-title" class="section-title">Seguridad y contraseña</h2>
 
-      <p v-if="pwdError" class="security-msg security-msg--error">
-        {{ pwdError }}
-      </p>
+          <p class="security-text">
+            Por tu privacidad, el cambio de contraseña se hace en un formulario separado
+            y se confirma por email. Te enviaremos un enlace seguro para que elijas
+            una nueva contraseña.
+          </p>
 
-      <p v-if="pwdSuccess" class="security-msg security-msg--ok">
-        {{ pwdSuccess }}
-      </p>
+          <div class="field-wrap">
+            <label class="label" for="security-email">Email para recibir el enlace</label>
+            <div id="security-email" class="security-email-pill">
+              {{ auth.user?.email }}
+            </div>
+          </div>
 
-      <button
-        type="button"
-        class="primary-btn security-btn"
-        :disabled="pwdSending"
-        @click="sendPasswordResetEmail"
-      >
-        {{ pwdSending ? 'Enviando…' : 'Enviar email para cambiar contraseña' }}
-      </button>
-    </section>
+          <p v-if="pwdError" class="msg msg-error" role="alert">
+            {{ pwdError }}
+          </p>
+
+          <p v-if="pwdSuccess" class="msg msg-success" role="status">
+            {{ pwdSuccess }}
+          </p>
+
+          <div class="actions-row">
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="pwdSending"
+              @click="sendPasswordResetEmail"
+            >
+              {{ pwdSending ? 'Enviando…' : 'Enviar email para cambiar contraseña' }}
+            </button>
+          </div>
+        </section>
+      </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
-/* 👇 dejo tus estilos tal como estaban, no toqué la estética */
 .perfil-edit {
   background: #fff;
-  padding: 20px 16px 40px;
-  max-width: 1100px;
+  padding: 20px 18px 48px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
-.top {
+.page-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  margin: 0;
+  color: #50bdbd;
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .back-btn {
+  width: 42px;
+  height: 42px;
   border: none;
-  background: transparent;
+  border-radius: 999px;
+  background: #e8fbf8;
   color: #50bdbd;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-btn:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: start;
+  }
+}
+
+.col {
+  display: grid;
+  gap: 20px;
 }
 
 .card {
+  width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
   border-radius: 18px;
-  padding: 22px 20px;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.07);
-  border: 1px solid #eef2f7;
+  padding: 16px 18px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+    background: #ffffff;
+  }
+}
+
+.section-title {
+  margin: 0 0 14px;
+  font-size: 1.25rem;
+  color: #50bdbd;
+  font-weight: 700;
 }
 
 .edit-card {
   display: grid;
   gap: 16px;
-  margin-bottom: 18px;
 }
 
 .avatar-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
 .avatar-img img {
@@ -376,38 +502,52 @@ onMounted(() => {
   height: 130px;
   border-radius: 999px;
   object-fit: cover;
-  border: 1.5px solid #50bdbd;
+  border: 2px solid #50bdbd;
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.14);
 }
 
 .avatar-generated {
-  width: 110px;
-  height: 110px;
+  width: 118px;
+  height: 118px;
   border-radius: 999px;
   background: #50bdbd;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
-  font-weight: bold;
+  font-size: 44px;
+  font-weight: 800;
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.16);
 }
 
 .upload-btn {
-  padding: 7px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 2px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
   background: #ffffff;
   color: #50bdbd;
-  border: 3px solid #b6ebe5;
-  box-shadow: 0 6px 12px rgba(148, 163, 184, 0.22);
+  border: 1px solid #b6ebe5;
+  box-shadow: 0 8px 18px rgba(148, 163, 184, 0.16);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.upload-btn:hover {
-  background: #e0faf7;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .upload-btn:hover {
+    background: #e0faf7;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.14);
+  }
 }
 
 .upload-btn input {
@@ -417,18 +557,30 @@ onMounted(() => {
   cursor: pointer;
 }
 
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .label {
   font-weight: 700;
-  font-size: 1rem;
-  color: #333;
+  font-size: 0.98rem;
+  color: #1f2937;
 }
 
 .input {
+  width: 100%;
+  box-sizing: border-box;
   border-radius: 12px;
   border: 1px solid #ccd7e2;
-  padding: 0.55rem 0.9rem;
-  font-size: 0.99rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.97rem;
   background: #f9fcff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .input:focus {
@@ -437,116 +589,104 @@ onMounted(() => {
   outline: none;
 }
 
+.helper-text {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
 .msg {
   margin: 0;
-  font-size: 1rem;
-}
-
-.error {
-  color: #d33;
-}
-
-.success {
-  color: #1a8f58;
-}
-
-.save-btn {
-  background: #50bdbd;
-  color: #fff;
-  font-weight: 600;
-  font-size: 1rem;
-  padding: 0.7rem;
-  border: none;
+  padding: 12px 14px;
   border-radius: 14px;
+  font-size: 0.93rem;
+  line-height: 1.35;
+}
+
+.msg-error {
+  background: #fff1f2;
+  color: #b42318;
+  border: 1px solid #fecdd3;
+}
+
+.msg-success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #abefc6;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: 0.15s ease;
-  box-shadow: 0 6px 18px rgba(80, 189, 189, 0.35);
+  text-decoration: none;
+  box-sizing: border-box;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.save-btn:hover:not(:disabled) {
-  background: #3ea9a9;
-  transform: translateY(-1px);
+.btn-primary {
+  background: #50bdbd;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  min-width: 180px;
+  max-width: 320px;
 }
 
-.save-btn:disabled {
-  opacity: 0.6;
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #3daaaa;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+  }
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
 .security-card {
-  margin-top: 18px;
-  padding: 22px 22px 20px;
-  border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e4eef5;
-}
-
-.security-title {
-  margin: 0 0 6px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #0f172a;
+  display: grid;
+  gap: 14px;
 }
 
 .security-text {
-  margin: 0 0 14px;
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.98rem;
   color: #4b5563;
   line-height: 1.5;
-}
-
-.security-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #374151;
 }
 
 .security-email-pill {
   border-radius: 12px;
   border: 1px solid #ccd7e2;
-  padding: 0.55rem 0.9rem;
-  font-size: 1rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.97rem;
   background: #f9fcff;
-}
-
-.security-msg {
-  margin: 6px 0 0;
-  font-size: 0.93rem;
-  width: 100%;
-}
-
-.security-msg--error {
-  color: #dc2626;
-}
-
-.security-msg--ok {
-  color: #16a34a;
-}
-
-.primary-btn {
-  width: 100%;
-  background: #50bdbd;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-  padding: 0.8rem;
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: 0.15s ease;
-  box-shadow: 0 5px 16px rgba(80, 189, 189, 0.35);
-}
-
-.primary-btn:hover:not(:disabled) {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-}
-
-.security-btn {
-  margin-top: 8px;
+  color: #334155;
+  word-break: break-word;
 }
 
 .visually-hidden {
@@ -556,5 +696,46 @@ onMounted(() => {
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .perfil-edit {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .card {
+    padding: 14px 14px;
+  }
+
+  .avatar-img img {
+    width: 112px;
+    height: 112px;
+  }
+
+  .avatar-generated {
+    width: 104px;
+    height: 104px;
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 520px) {
+  .actions-row {
+    justify-content: stretch;
+  }
+
+  .btn-primary {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 </style>

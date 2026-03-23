@@ -3,24 +3,22 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
-
 import { useFeatureGate } from '@/composables/useFeatureGate'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-/** Gate: 10 por mes para CREAR (editar no consume) */
 const gate = useFeatureGate('diary')
 
-/* ========= Fechas AR ========= */
 const TZ = 'America/Argentina/Buenos_Aires'
+
 function isoDateInAR(d: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ,
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
+    day: '2-digit'
   }).formatToParts(d)
 
   const y = parts.find((p) => p.type === 'year')?.value ?? '1970'
@@ -29,7 +27,6 @@ function isoDateInAR(d: Date) {
   return `${y}-${m}-${day}`
 }
 
-/* ========= Estado UI ========= */
 const showSavedModal = ref(false)
 const viewDate = ref(new Date())
 const selectedDate = ref(new Date())
@@ -47,8 +44,8 @@ onMounted(async () => {
   const param = route.query.date as string | undefined
   if (param) selectedDate.value = new Date(param)
 
-  await gate.reloadPremium() // asegura premium actualizado
-  await gate.refresh() // refresca stats locales
+  await gate.reloadPremium()
+  await gate.refresh()
 
   await loadCalendarHistory()
   await loadDraft()
@@ -62,11 +59,10 @@ onBeforeUnmount(() => {
   if (tick) window.clearInterval(tick)
 })
 
-/* ========= Calendario ========= */
 const monthName = computed(() => {
   const str = viewDate.value.toLocaleString('es-AR', {
     month: 'long',
-    year: 'numeric',
+    year: 'numeric'
   })
   return str.charAt(0).toUpperCase() + str.slice(1)
 })
@@ -74,11 +70,12 @@ const monthName = computed(() => {
 const firstOfMonth = computed(
   () => new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), 1)
 )
+
 const lastOfMonth = computed(
   () => new Date(viewDate.value.getFullYear(), viewDate.value.getMonth() + 1, 0)
 )
 
-const weekdayFirst = computed(() => (firstOfMonth.value.getDay() + 6) % 7) // lunes=0
+const weekdayFirst = computed(() => (firstOfMonth.value.getDay() + 6) % 7)
 const daysInMonth = computed(() => lastOfMonth.value.getDate())
 
 function prevMonth() {
@@ -106,7 +103,6 @@ const isFuture = (day: number) => {
   return date > new Date()
 }
 
-/* ========= DB ========= */
 type Mood = 'triste' | 'normal' | 'bien' | 'muybien'
 const calendarMap = ref<Record<string, Mood>>({})
 
@@ -135,11 +131,13 @@ async function loadCalendarHistory() {
 
 async function pickDay(d: number) {
   if (isFuture(d)) return
+
   selectedDate.value = new Date(
     viewDate.value.getFullYear(),
     viewDate.value.getMonth(),
     d
   )
+
   await loadDraft()
 }
 
@@ -179,11 +177,39 @@ async function loadDraft() {
   }
 }
 
-/* ========= Límite (solo CREAR consume) ========= */
+function countRealWords(text: string) {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
+function validateEntryContent() {
+  const trimmed = content.value.trim()
+
+  if (!trimmed) {
+    errorMsg.value = 'Escribí algo en tu registro antes de guardarlo.'
+    return false
+  }
+
+  const words = countRealWords(trimmed)
+
+  if (words < 3) {
+    errorMsg.value = 'Tu registro debe tener al menos 3 palabras.'
+    return false
+  }
+
+  return true
+}
+
 const canSave = computed(() => {
   if (!auth.user) return false
   if (saving.value || loadingEntry.value) return false
-  return content.value.trim().length > 1
+
+  const trimmed = content.value.trim()
+  const words = trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0
+
+  return words >= 3
 })
 
 const isPremium = computed(() => !!gate.premium.value)
@@ -193,13 +219,11 @@ const remainingThisMonth = computed(() => {
   return gate.freeStats.value.remaining
 })
 
-/** solo aplica para CREAR */
 const canCreateThisMonth = computed(() => {
   if (isPremium.value) return true
   return gate.canUse.value
 })
 
-/** CTA tipo Foro: siempre visible si NO es premium */
 const showPremiumCta = computed(() => {
   if (gate.loading.value) return false
   return !isPremium.value
@@ -218,11 +242,13 @@ async function saveEntry() {
     errorMsg.value = 'Tenés que iniciar sesión.'
     return
   }
-  if (!canSave.value) return
+
+  if (!validateEntryContent()) {
+    return
+  }
 
   const isCreate = !existingEntry.value
 
-  // SOLO bloquea si es NUEVA entrada
   if (isCreate && !canCreateThisMonth.value) {
     showLimitModal.value = true
     return
@@ -236,7 +262,7 @@ async function saveEntry() {
       user_id: auth.user.id,
       on_date: selectedISO.value,
       mood: mood.value,
-      content: content.value.trim(),
+      content: content.value.trim()
     }
 
     const { error } = await supabase
@@ -247,7 +273,6 @@ async function saveEntry() {
 
     calendarMap.value[selectedISO.value] = mood.value
 
-    // si era NUEVO, ahora consume 1
     if (isCreate) {
       existingEntry.value = true
       gate.consume(1)
@@ -255,9 +280,7 @@ async function saveEntry() {
       existingEntry.value = true
     }
 
-    // si preferís NO limpiar al editar, comentá la línea:
     content.value = ''
-
     gate.refresh()
 
     showSavedModal.value = true
@@ -270,7 +293,6 @@ async function saveEntry() {
   }
 }
 
-/* ========= Export ========= */
 function exportToGoogle() {
   const base = selectedISO.value.replace(/-/g, '')
   const start = `${base}T090000`
@@ -280,7 +302,7 @@ function exportToGoogle() {
     triste: 'Triste',
     normal: 'Normal',
     bien: 'Bien',
-    muybien: 'Muy bien',
+    muybien: 'Muy bien'
   }
 
   const url = new URL('https://calendar.google.com/calendar/render')
@@ -293,15 +315,14 @@ function exportToGoogle() {
   window.open(url.toString(), '_blank')
 }
 
-/* ========= Navegación ========= */
 function goRecent() {
   router.push('/app/diario/entradas')
 }
+
 function goPremium() {
   router.push('/app/premium')
 }
 
-/* ========= Estilos días ========= */
 function dayStyle(day: number) {
   const key = isoDateInAR(
     new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), day)
@@ -313,7 +334,7 @@ function dayStyle(day: number) {
       triste: '#74c0f4',
       normal: '#b197fc',
       bien: '#8ce99a',
-      muybien: '#ffa94d',
+      muybien: '#ffa94d'
     }
     return { background: colors[m], color: 'white', border: 'none' }
   }
@@ -324,7 +345,7 @@ function dayStyle(day: number) {
       background: '#50bdbd',
       color: 'white',
       border: 'none',
-      boxShadow: '0 0 0 2px rgba(80,189,189,0.25)',
+      boxShadow: '0 0 0 2px rgba(80,189,189,0.25)'
     }
   }
 
@@ -335,38 +356,42 @@ function dayStyle(day: number) {
 <template>
   <main class="contenido">
     <header class="page-head">
-      <h2>Diario emocional</h2>
+      <h1 class="visually-hidden">Diario emocional</h1>
+      <h2 class="page-title">Diario emocional</h2>
       <p class="subtitle">Registrá tu estado día por día.</p>
 
-      <!-- CTA igual Foro (y NO se duplica con banner) -->
-      <div v-if="showPremiumCta" class="premium-cta">
+      <section v-if="showPremiumCta" class="premium-cta" aria-labelledby="premium-cta-title">
         <div class="premium-cta__left">
           <div class="premium-cta__top">
             <span class="premium-cta__badge">Gratis</span>
             <span class="premium-cta__right">{{ ctaRight }}</span>
           </div>
-          <p class="premium-cta__title">{{ ctaTitle }}</p>
+          <h2 id="premium-cta-title" class="premium-cta__title">{{ ctaTitle }}</h2>
           <p class="premium-cta__text">{{ ctaText }}</p>
         </div>
 
         <button type="button" class="premium-cta__btn" @click="goPremium">
           Pasar a Premium
         </button>
-      </div>
+      </section>
     </header>
 
     <section class="diary-grid">
-      <section class="card card-calendar">
+      <section class="card card-calendar" aria-labelledby="calendar-title">
         <header class="card-header">
           <div>
-            <h3 class="card-title">Mi calendario emocional</h3>
+            <h2 id="calendar-title" class="card-title">Mi calendario emocional</h2>
             <p class="card-subtitle-small">Elegí un día.</p>
           </div>
 
           <div class="month-switch">
-            <button type="button" class="month-btn" @click="prevMonth">‹</button>
+            <button type="button" class="month-btn" @click="prevMonth" aria-label="Mes anterior">
+              ‹
+            </button>
             <span class="month-label">{{ monthName }}</span>
-            <button type="button" class="month-btn" @click="nextMonth">›</button>
+            <button type="button" class="month-btn" @click="nextMonth" aria-label="Mes siguiente">
+              ›
+            </button>
           </div>
         </header>
 
@@ -389,7 +414,7 @@ function dayStyle(day: number) {
               selected:
                 selectedDate.getDate() === d &&
                 selectedDate.getMonth() === viewDate.getMonth(),
-              future: isFuture(d),
+              future: isFuture(d)
             }"
             :disabled="isFuture(d)"
             :style="dayStyle(d)"
@@ -399,42 +424,42 @@ function dayStyle(day: number) {
           </button>
         </div>
 
-        <button type="button" class="btn-outline" @click="goRecent">
+        <button type="button" class="btn-soft" @click="goRecent">
           Ver entradas recientes
         </button>
       </section>
 
-      <section class="card card-form">
-        <h3 class="card-title">
+      <section class="card card-form" aria-labelledby="entry-title">
+        <h2 id="entry-title" class="card-title">
           Escribí tu registro
-        </h3>
+        </h2>
 
         <div class="chips">
           <button
             type="button"
-            :class="['chip','chip-triste',{ active: mood === 'triste' }]"
-            @click="mood='triste'"
+            :class="['chip', 'chip-triste', { active: mood === 'triste' }]"
+            @click="mood = 'triste'"
           >
             Triste
           </button>
           <button
             type="button"
-            :class="['chip','chip-normal',{ active: mood === 'normal' }]"
-            @click="mood='normal'"
+            :class="['chip', 'chip-normal', { active: mood === 'normal' }]"
+            @click="mood = 'normal'"
           >
             Normal
           </button>
           <button
             type="button"
-            :class="['chip','chip-bien',{ active: mood === 'bien' }]"
-            @click="mood='bien'"
+            :class="['chip', 'chip-bien', { active: mood === 'bien' }]"
+            @click="mood = 'bien'"
           >
             Bien
           </button>
           <button
             type="button"
-            :class="['chip','chip-muybien',{ active: mood === 'muybien' }]"
-            @click="mood='muybien'"
+            :class="['chip', 'chip-muybien', { active: mood === 'muybien' }]"
+            @click="mood = 'muybien'"
           >
             Muy bien
           </button>
@@ -445,29 +470,35 @@ function dayStyle(day: number) {
           rows="8"
           v-model="content"
           placeholder="Escribí aquí..."
+          @input="errorMsg = ''"
         />
 
-        <p v-if="errorMsg" class="err">
+        <p v-if="errorMsg" class="err" role="alert">
           {{ errorMsg }}
+        </p>
+        <p v-else class="helper">
+          Escribí al menos 3 palabras para guardar tu registro.
         </p>
 
         <div class="actions">
-          <button type="button" class="btn-outline" :disabled="!canSave" @click="saveEntry">
+          <button type="button" class="btn-primary" :disabled="!canSave" @click="saveEntry">
             {{ saving ? 'Guardando…' : 'Guardar' }}
           </button>
-          <button type="button" class="btn-outline" @click="exportToGoogle">
+          <button type="button" class="btn-soft" @click="exportToGoogle">
             Añadir a Google Calendar
           </button>
         </div>
       </section>
     </section>
 
-    <div v-if="showSavedModal" class="toast">
+    <div v-if="showSavedModal" class="toast" role="status">
       <div class="toast-content">
         <span class="check">✓</span>
         <div class="textos">
           <p class="titulo">Entrada guardada</p>
-          <button type="button" class="toast-btn" @click="goRecent">Ver mis entradas</button>
+          <button type="button" class="toast-btn" @click="goRecent">
+            Ver mis entradas
+          </button>
         </div>
       </div>
     </div>
@@ -477,8 +508,8 @@ function dayStyle(day: number) {
       class="limit-overlay"
       @click.self="showLimitModal = false"
     >
-      <div class="limit-card">
-        <h3 class="limit-title">Límite alcanzado</h3>
+      <div class="limit-card" role="dialog" aria-modal="true" aria-labelledby="limit-title">
+        <h2 id="limit-title" class="limit-title">Límite alcanzado</h2>
         <p class="limit-text">
           En el plan gratuito podés <strong>crear</strong> hasta <strong>10 entradas por mes</strong>.
         </p>
@@ -490,7 +521,9 @@ function dayStyle(day: number) {
           <button type="button" class="limit-btn soft" @click="showLimitModal = false">
             Entendido
           </button>
-          <button type="button" class="limit-btn" @click="goPremium">Ver Premium</button>
+          <button type="button" class="limit-btn" @click="goPremium">
+            Ver Premium
+          </button>
         </div>
       </div>
     </div>
@@ -500,7 +533,7 @@ function dayStyle(day: number) {
 <style scoped>
 .contenido {
   background: #fff;
-  padding: 24px 18px 48px;
+  padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
   box-sizing: border-box;
@@ -509,38 +542,46 @@ function dayStyle(day: number) {
 .page-head {
   display: grid;
   gap: 12px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
-.page-head h2 {
+.page-title {
   margin: 0;
-  font-size: 1.9rem;
+  font-size: 1.55rem;
   font-weight: 800;
   color: #50bdbd;
-  padding: 4px 0;
 }
 
-.page-head .subtitle {
+.subtitle {
   margin: 0;
   color: #5c6a75;
-  font-size: 1.2rem;
-  line-height: 1.45rem;
+  font-size: 0.98rem;
+  line-height: 1.45;
 }
 
-/* ============================
-   PREMIUM CTA (igual Foro)
-============================ */
 .premium-cta {
   margin: 0;
   background: #f6fffe;
   border: 1px solid #b6ebe5;
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: 0 10px 18px rgba(80, 189, 189, 0.08);
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 24px rgba(80, 189, 189, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .premium-cta:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 34px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .premium-cta__left {
@@ -579,65 +620,76 @@ function dayStyle(day: number) {
   margin: 0;
   font-weight: 900;
   color: #0f172a;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.15;
 }
 
 .premium-cta__text {
   margin: 0;
   color: #475569;
-  font-size: 0.82rem;
-  line-height: 1.25;
+  font-size: 0.84rem;
+  line-height: 1.3;
 }
 
 .premium-cta__btn {
   border: none;
   border-radius: 999px;
-  padding: 7px 10px;
+  padding: 9px 12px;
+  min-height: 42px;
   font-weight: 900;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
   white-space: nowrap;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.premium-cta__btn:hover {
-  background: #3daaaa;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .premium-cta__btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
-/* ============================
-   GRID PRINCIPAL
-============================ */
 .diary-grid {
   max-width: 1400px;
-  margin: 18px auto 0;
+  margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 24px;
   align-items: start;
 }
 
-
-
-/* ============================
-   CARD BASE
-============================ */
 .card {
-   box-sizing: border-box;
-  width: 100%;       
-  min-width: 0;      
-  height: auto;       
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: auto;
   background: #ffffff;
   border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   padding: 16px 18px 18px;
-  border: 0.3px solid #50bdbd;
+  border: 1px solid #e2edf7;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
 }
 
-/* ===== HEADER CARD ===== */
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -649,25 +701,17 @@ function dayStyle(day: number) {
 
 .card-title {
   margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: #50bdbd;
 }
 
-.mode {
-  font-size: 0.85rem;
-  color: #5c6a75;
-  font-weight: 600;
-  margin-left: 6px;
-}
-
 .card-subtitle-small {
-  margin: 2px 0 0;
-  font-size: 1rem;
+  margin: 4px 0 0;
+  font-size: 0.92rem;
   color: #6a7a86;
 }
 
-/* ===== SWITCH MES ===== */
 .month-switch {
   display: flex;
   align-items: center;
@@ -676,97 +720,37 @@ function dayStyle(day: number) {
 
 .month-label {
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #264055;
 }
 
 .month-btn {
-  width: 28px;
+  width: 30px;
   height: 30px;
   border-radius: 999px;
-  border: 1px solid #e3ecf6;
+  border: 1px solid #d7e6f6;
   background: #50bdbd;
   color: #ffffff;
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
-  font-size: 1.5rem;
-  font-weight: 500;
-  align-items: center;
-}
-
-.month-btn:hover {
-  background: #3daaaa;
-}
-
-/* ===== MODAL LIMITE ===== */
-.limit-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2100;
-  padding: 16px;
-}
-
-.limit-card {
-  background: #ffffff;
-  border-radius: 18px;
-  max-width: 520px;
-  width: 100%;
-  padding: 18px 18px 14px;
-  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
-  border: 1px solid #e8eef3;
-}
-
-.limit-title {
-  margin: 0 0 10px;
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.limit-text {
-  margin: 0 0 8px;
-  color: #475569;
-}
-
-.limit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.limit-btn {
-  border-radius: 999px;
-  border: none;
-  padding: 9px 14px;
+  font-size: 1.15rem;
   font-weight: 700;
-  cursor: pointer;
-  background: #50bdbd;
-  color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.limit-btn:hover {
-  background: #3daaaa;
+@media (hover: hover) {
+  .month-btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.18);
+  }
 }
 
-.limit-btn.soft {
-  background: #ffffff;
-  color: #50bdbd;
-  border: 1px solid #b6ebe5;
-}
-
-.limit-btn.soft:hover {
-  background: #e0faf7;
-}
-
-/* ===== CALENDARIO ===== */
 .cal-grid {
   display: grid;
   gap: 6px;
@@ -779,27 +763,35 @@ function dayStyle(day: number) {
   text-align: center;
   font-size: 0.75rem;
   opacity: 0.6;
+  font-weight: 700;
 }
 
 .blank {
-  height: 36px;
+  height: 38px;
 }
 
 .cal-day {
   color: #1d2b3a;
-  height: 36px;
+  height: 38px;
   border-radius: 10px;
   border: 1px solid #e8eef3;
   background: #d9f5f5;
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: 0.15s;
+  transition:
+    border-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
   font-size: 0.85rem;
 }
 
-.cal-day:hover {
-  border-color: #50bdbd;
+@media (hover: hover) {
+  .cal-day:hover:not(:disabled) {
+    border-color: #50bdbd;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .cal-day.selected {
@@ -811,30 +803,36 @@ function dayStyle(day: number) {
   cursor: not-allowed;
 }
 
-/* BOTÓN VER ENTRADAS / GOOGLE CALENDAR */
-.btn-outline {
-  display: inline-block;
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-top: 8px;
-  padding: 11px 28px;
-  background: #50bdbd;
-  color: white;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 10px 16px;
+  min-height: 42px;
+  background: #ffffff;
+  color: #50bdbd;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
   text-align: center;
   text-decoration: none;
-  transition: background 0.2s;
-  border: none;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  border: 1px solid #b6ebe5;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
 }
 
-.btn-outline:hover {
-  background: #3daaaa;
-}
-
-/* ===== FORMULARIO ===== */
-.card-form {
-  background: #ffffff;
+@media (hover: hover) {
+  .btn-soft:hover {
+    background: #e0faf7;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
+  }
 }
 
 .chips {
@@ -846,83 +844,146 @@ function dayStyle(day: number) {
 
 .chip {
   border-radius: 999px;
-  padding: 0.38rem 0.9rem;
-  font-weight: 600;
+  padding: 0.42rem 0.95rem;
+  font-weight: 700;
   cursor: pointer;
   font-size: 0.85rem;
   border-width: 1px;
   border-style: solid;
   background: #ffffff;
-  transition: 0.15s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.chip:hover {
-  background: #50bdbd3a;
+@media (hover: hover) {
+  .chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  }
 }
 
-/* TRISTE – azul */
-.chip-triste { border-color: #74c0f4; color: #24527a; }
-.chip-triste.active { background: #74c0f4; color: #ffffff; }
+.chip-triste {
+  border-color: #74c0f4;
+  color: #24527a;
+}
+.chip-triste.active {
+  background: #74c0f4;
+  color: #ffffff;
+}
 
-/* NORMAL – violeta */
-.chip-normal { border-color: #b197fc; color: #4b3f86; }
-.chip-normal.active { background: #b197fc; color: #ffffff; }
+.chip-normal {
+  border-color: #b197fc;
+  color: #4b3f86;
+}
+.chip-normal.active {
+  background: #b197fc;
+  color: #ffffff;
+}
 
-/* BIEN – verde */
-.chip-bien { border-color: #8ce99a; color: #22543d; }
-.chip-bien.active { background: #8ce99a; color: #ffffff; }
+.chip-bien {
+  border-color: #8ce99a;
+  color: #22543d;
+}
+.chip-bien.active {
+  background: #8ce99a;
+  color: #ffffff;
+}
 
-/* MUY BIEN – naranja */
-.chip-muybien { border-color: #ffa94d; color: #7c3a03; }
-.chip-muybien.active { background: #ffa94d; color: #ffffff; }
+.chip-muybien {
+  border-color: #ffa94d;
+  color: #7c3a03;
+}
+.chip-muybien.active {
+  background: #ffa94d;
+  color: #ffffff;
+}
 
 .area {
-  border: none;
+  border: 1.5px solid #dbe7f3;
   width: 100%;
   box-sizing: border-box;
   background: #d9f5f5;
-  border-radius: 12px;
+  border-radius: 14px;
   min-height: 190px;
   max-height: 230px;
-  padding: 10px 12px;
+  padding: 12px;
   resize: vertical;
   font: inherit;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.area:focus {
+  border-color: #50bdbd;
+  boxShadow: 0 0 0 3px rgba(80, 189, 189, 0.18);
 }
 
 .err {
-  color: #b3261e;
-  margin: 6px 0 0;
+  color: #b42318;
+  margin: 8px 0 0;
+  font-size: 0.92rem;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  padding: 10px 12px;
 }
 
-/* BOTONES DEL FORM (Guardar + Google) */
+.helper {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 12px;
   flex-wrap: wrap;
 }
 
 .btn-primary {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 11px 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  min-height: 42px;
   background: #50bdbd;
   color: white;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  transition: background 0.2s;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
   border: none;
   cursor: pointer;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
 }
 
-.btn-primary:hover {
-  background: #3daaaa;
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(80, 189, 189, 0.28);
+  }
 }
 
-/* ===== TOAST ===== */
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .toast {
   position: fixed;
   right: 22px;
@@ -955,7 +1016,7 @@ function dayStyle(day: number) {
 }
 
 .toast-btn {
-  margin-top: 2px;
+  margin-top: 4px;
   background: white;
   color: #50bdbd;
   border: none;
@@ -963,19 +1024,114 @@ function dayStyle(day: number) {
   font-size: 0.85rem;
   border-radius: 999px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.toast-btn:hover {
-  background: #f6fff9;
+@media (hover: hover) {
+  .toast-btn:hover {
+    background: #f6fff9;
+  }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(15px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* ===== RESPONSIVE ===== */
+.limit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  padding: 16px;
+}
+
+.limit-card {
+  background: #ffffff;
+  border-radius: 18px;
+  max-width: 520px;
+  width: 100%;
+  padding: 18px 18px 14px;
+  box-shadow: 0 18px 40px rgba(30, 41, 59, 0.22);
+  border: 1px solid #e8eef3;
+}
+
+.limit-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.limit-text {
+  margin: 0 0 8px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.limit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.limit-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 9px 14px;
+  min-height: 42px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #50bdbd;
+  color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .limit-btn:hover {
+    background: #3daaaa;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
+}
+
+.limit-btn.soft {
+  background: #ffffff;
+  color: #50bdbd;
+  border: 1px solid #b6ebe5;
+}
+
+@media (hover: hover) {
+  .limit-btn.soft:hover {
+    background: #e0faf7;
+  }
+}
+
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .diary-grid {
     grid-template-columns: 1fr;
@@ -983,41 +1139,20 @@ function dayStyle(day: number) {
   }
 
   .contenido {
-    padding: 16px 14px 72px; 
+    padding: 16px 14px 72px;
   }
 }
-
-@media (max-width: 480px) {
-
-  .btn-primary,
-  .btn-outline {
-    padding: 8px 12px;
-    font-size: 0.8rem;
-  }
-
-}
-
-@media (max-width: 420px) {
-  .contenido {
-    padding: 14px 12px 72px;
-  }
-
-  .card {
-    padding: 14px 14px 16px;
-  }
-}
-
 
 @media (max-width: 768px) {
   .contenido {
     padding: 16px 12px 72px;
   }
 
-  .page-head h2 {
+  .page-title {
     font-size: 1.4rem;
   }
 
-  .page-head .subtitle {
+  .subtitle {
     font-size: 0.9rem;
   }
 
@@ -1055,7 +1190,7 @@ function dayStyle(day: number) {
   }
 
   .actions {
-   flex-direction: row;        
+    flex-direction: row;
     justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
@@ -1063,12 +1198,12 @@ function dayStyle(day: number) {
   }
 
   .btn-primary,
-  .btn-outline {
-    width: auto;                
+  .btn-soft {
+    width: auto;
     margin-top: 0;
-    padding: 9px 14px;          
+    padding: 9px 14px;
     font-size: 0.85rem;
-    border-radius: 12px;        
+    border-radius: 999px;
   }
 
   .toast {
@@ -1088,20 +1223,39 @@ function dayStyle(day: number) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
-    justify-content: initial;
+    gap: 10px;
   }
 
   .btn-primary,
-  .actions .btn-outline {
+  .actions .btn-soft {
     width: 100%;
-    padding: 9px 10px;          
+    padding: 9px 10px;
     font-size: 0.82rem;
+  }
+
+  .limit-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .limit-actions .limit-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .contenido {
+    padding: 14px 12px 72px;
+  }
+
+  .card {
+    padding: 14px 14px 16px;
   }
 }
 
 @media (max-width: 360px) {
   .actions {
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr;
   }
 }
 

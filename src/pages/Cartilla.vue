@@ -1310,8 +1310,9 @@ background: #3ea9a9; transform: translateY(-1px);
 .modal-card {
   background: #fff;
   border-radius: 22px;
-  width: 80%;
+ width: 60%;
   max-height: 75%;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 36px rgba(30, 41, 59, 0.22);

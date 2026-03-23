@@ -29,7 +29,11 @@ onMounted(async () => {
 })
 
 watch(
-  () => [gate.settings.value.bienestar, gate.settings.value.profesional, gate.settings.value.app_updates],
+  () => [
+    gate.settings.value.bienestar,
+    gate.settings.value.profesional,
+    gate.settings.value.app_updates
+  ],
   async () => {
     await gate.upsertToSupabase()
   }
@@ -42,57 +46,64 @@ function goBack() {
 
 <template>
   <h1 class="visually-hidden">Notificaciones</h1>
+
   <main class="page">
     <header class="top">
-      <button class="back-link" type="button" @click="goBack">
+      <button class="back-link" type="button" @click="goBack" aria-label="Volver">
         <span class="arrow">←</span>
       </button>
-      <h1 class="title">{{ title }}</h1>
+
+      <div class="top-text">
+        <p class="kicker">Preferencias</p>
+        <h2 class="title">{{ title }}</h2>
+      </div>
     </header>
 
-    <section class="card">
+    <section class="card" aria-labelledby="notifications-title">
+      <h2 id="notifications-title" class="section-title">Configuración de avisos</h2>
+
       <p class="intro">
         Acá vas a ver y configurar tus avisos del sistema y de tu profesional.
       </p>
 
       <div class="list">
-        <!-- Bienestar -->
         <article class="item">
-          <div>
-            <h2 class="item-title">Recordatorios de bienestar</h2>
+          <div class="item-copy">
+            <h3 class="item-title">Recordatorios de bienestar</h3>
             <p class="item-sub">
               Ejercicios, chequeos emocionales y tips para tu día a día.
             </p>
           </div>
-          <label class="switch">
+
+          <label class="switch" aria-label="Activar recordatorios de bienestar">
             <input v-model="bienestar" type="checkbox" />
             <span class="slider" />
           </label>
         </article>
 
-        <!-- Profesional -->
         <article class="item">
-          <div>
-            <h2 class="item-title">Novedades de tu profesional</h2>
+          <div class="item-copy">
+            <h3 class="item-title">Novedades de tu profesional</h3>
             <p class="item-sub">
               Material nuevo, cambios de turno y mensajes importantes.
             </p>
           </div>
-          <label class="switch">
+
+          <label class="switch" aria-label="Activar novedades de tu profesional">
             <input v-model="profesional" type="checkbox" />
             <span class="slider" />
           </label>
         </article>
 
-        <!-- Sistema -->
         <article class="item">
-          <div>
-            <h2 class="item-title">Actualizaciones de Nura</h2>
+          <div class="item-copy">
+            <h3 class="item-title">Actualizaciones de Nura</h3>
             <p class="item-sub">
               Avisos de seguridad, nuevas funciones y mejoras de la app.
             </p>
           </div>
-          <label class="switch">
+
+          <label class="switch" aria-label="Activar actualizaciones de Nura">
             <input v-model="appUpdates" type="checkbox" />
             <span class="slider" />
           </label>
@@ -108,122 +119,166 @@ function goBack() {
 
 <style scoped>
 .page {
-  padding: 18px 16px 32px;
-  background: #f5fbfd;
+  padding: 20px 18px 48px;
+  background: #ffffff;
   min-height: calc(100dvh - 64px);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* Header */
-.sub-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 1100px;
-  margin: 0 auto 14px;
-}
-.sub-header h1 {
-  margin: 0;
-  font-size: 1.4rem;
-  color: #46bdbd;
-  font-weight: 700;
-}
-.back-link {
-  border: none;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 0;
-}
-.arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
-}
-
 .top {
   width: 100%;
-  max-width: 720px;
+  max-width: 760px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.top-text {
+  display: grid;
+  gap: 2px;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 800;
 }
 
 .title {
   margin: 0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
 }
 
-.back-btn {
+.back-link {
+  width: 42px;
+  height: 42px;
   border: none;
-  background: #50bdbd;
-  color: #fff;
-  width: 32px;
-  height: 32px;
   border-radius: 999px;
-  cursor: pointer;
-  display: flex;
+  background: #e8fbf8;
+  color: #50bdbd;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
+}
+
+.arrow {
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .card {
-  width: 90%;
-  max-width: 720px;
+  width: 100%;
+  max-width: 760px;
   background: #ffffff;
-  border-radius: 20px;
-  padding: 18px 18px 20px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09);
+  border-radius: 18px;
+  padding: 20px 20px 18px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   border: 1px solid #e2edf7;
+  box-sizing: border-box;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+  }
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #50bdbd;
 }
 
 .intro {
   margin: 0 0 14px;
   color: #4b5563;
   font-size: 0.96rem;
+  line-height: 1.45;
 }
 
 .list {
   display: grid;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  padding: 10px 10px;
-  border-radius: 14px;
+  gap: 14px;
+  padding: 14px 14px;
+  border-radius: 16px;
   background: #f8fafc;
+  border: 1px solid #e8eef5;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .item:hover {
+    background: #eefafa;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(80, 189, 189, 0.12);
+    border-color: #d7f1ef;
+  }
+}
+
+.item-copy {
+  min-width: 0;
 }
 
 .item-title {
   margin: 0;
-  font-size: 0.98rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .item-sub {
-  margin: 2px 0 0;
-  font-size: 0.85rem;
+  margin: 4px 0 0;
+  font-size: 0.88rem;
   color: #6b7280;
+  line-height: 1.4;
 }
 
-/* Switch */
 .switch {
   position: relative;
-  width: 46px;
-  height: 26px;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 auto;
   display: inline-block;
 }
 
@@ -235,37 +290,76 @@ function goBack() {
 
 .slider {
   position: absolute;
-  cursor: pointer;
   inset: 0;
+  cursor: pointer;
   background-color: #e5e7eb;
-  transition: 0.2s;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   border-radius: 999px;
 }
 
 .slider::before {
   position: absolute;
   content: '';
-  height: 18px;
-  width: 18px;
+  height: 20px;
+  width: 20px;
   left: 4px;
   top: 4px;
   background-color: white;
-  transition: 0.2s;
+  transition: transform 0.2s ease;
   border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.4);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
 }
 
 .switch input:checked + .slider {
   background-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.14);
 }
 
 .switch input:checked + .slider::before {
-  transform: translateX(18px);
+  transform: translateX(20px);
 }
 
 .hint {
   margin: 8px 0 0;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: #6b7280;
+  line-height: 1.4;
+}
+
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding: 16px 12px 96px;
+  }
+
+  .title {
+    font-size: 1.35rem;
+  }
+
+  .card {
+    padding: 16px 14px;
+    border-radius: 16px;
+  }
+
+  .item {
+    padding: 12px 12px;
+    align-items: flex-start;
+  }
+
+  .item-title {
+    font-size: 0.96rem;
+  }
+
+  .item-sub {
+    font-size: 0.84rem;
+  }
 }
 </style>

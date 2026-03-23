@@ -1,15 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import InstallButton from '@/components/InstallButton.vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '@/composables/useSupabase'
+import Footer from '@/components/Footer.vue'
 
 const router = useRouter()
+const route = useRoute()
+
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 
+const formError = ref('')
+const formInfo = ref('')
+
+const blockedMsg = computed(() => route.query.blocked === '1')
+const deletedMsg = computed(() => route.query.deleted === '1')
+
 type Provider = 'google' | 'facebook'
+
+function clearMessages() {
+  formError.value = ''
+  formInfo.value = ''
+}
 
 async function ensureProfileForUser(user: any) {
   const metaName =
@@ -26,7 +39,6 @@ async function ensureProfileForUser(user: any) {
     .maybeSingle()
 
   if (existingErr) {
-    // No bloqueamos login por esto, pero lo logueamos:
     console.warn('ensureProfileForUser: error leyendo profile', existingErr)
     return
   }
@@ -38,88 +50,181 @@ async function ensureProfileForUser(user: any) {
       name: metaName,
       avatar_url: metaAvatar
     })
-    if (upsertErr) console.warn('ensureProfileForUser: error upsert', upsertErr)
+
+    if (upsertErr) {
+      console.warn('ensureProfileForUser: error upsert', upsertErr)
+    }
   } else if (!existing.full_name && metaName) {
     const { error: updErr } = await supabase
       .from('profiles')
       .update({ full_name: metaName, name: metaName })
       .eq('id', user.id)
 
-    if (updErr) console.warn('ensureProfileForUser: error update', updErr)
+    if (updErr) {
+      console.warn('ensureProfileForUser: error update', updErr)
+    }
   }
 }
 
-// Cuando volvés del OAuth, Supabase deja sesión guardada.
-// Entonces acá detectamos sesión y mandamos a /app/home.
+async function checkUserStatus(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('blocked, blocked_reason, deleted_at')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('checkUserStatus error', error)
+    return {
+      blocked: false,
+      reason: '',
+      deleted: false
+    }
+  }
+
+  return {
+    blocked: !!data?.blocked,
+    reason: data?.blocked_reason || '',
+    deleted: !!data?.deleted_at
+  }
+}
+
 onMounted(async () => {
+  clearMessages()
+
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
-  if (user) {
-    await ensureProfileForUser(user)
+
+ if (user) {
+  const { data: userCheck, error: userCheckError } = await supabase.auth.getUser()
+
+  if (userCheckError || !userCheck?.user) {
+    await supabase.auth.signOut()
+    return
+  }
+
+  await ensureProfileForUser(user)
+
+  const status = await checkUserStatus(user.id)
+
+    if (status.deleted) {
+      await supabase.auth.signOut()
+      formError.value =
+        'Esta cuenta fue desactivada por administración. Si creés que es un error, contactanos.'
+      return
+    }
+
+    if (status.blocked) {
+      await supabase.auth.signOut()
+      formError.value = status.reason
+        ? `Tu cuenta está bloqueada: ${status.reason}`
+        : 'Tu cuenta está bloqueada.'
+      return
+    }
+
     router.replace('/app/home')
   }
 })
 
 async function emailLogin() {
+  clearMessages()
+
+  const cleanEmail = email.value.trim()
+
+  if (!cleanEmail || !password.value) {
+    formError.value = 'Completá tu email y contraseña.'
+    return
+  }
+
   try {
     loading.value = true
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.value.trim(),
+      email: cleanEmail,
       password: password.value
     })
+
     if (error) throw error
 
     const { data: userRes } = await supabase.auth.getUser()
+
+if (!userRes?.user) {
+  await supabase.auth.signOut()
+  formError.value = 'Esta cuenta ya no existe.'
+  return
+}
+
     if (userRes?.user) {
       await ensureProfileForUser(userRes.user)
+
+      const status = await checkUserStatus(userRes.user.id)
+
+      if (status.deleted) {
+        await supabase.auth.signOut()
+        formError.value =
+          'Esta cuenta fue desactivada por administración. Si creés que es un error, contactanos.'
+        return
+      }
+
+      if (status.blocked) {
+        await supabase.auth.signOut()
+        formError.value = status.reason
+          ? `Tu cuenta está bloqueada: ${status.reason}`
+          : 'Tu cuenta está bloqueada.'
+        return
+      }
     }
 
     router.replace('/app/home')
   } catch (e: any) {
-    alert(e?.message ?? 'No pudimos iniciar sesión.')
+    formError.value = e?.message ?? 'No pudimos iniciar sesión.'
   } finally {
     loading.value = false
   }
 }
 
 async function oauth(provider: Provider) {
+  clearMessages()
+
   try {
     loading.value = true
 
-    // IMPORTANTÍSIMO:
-    // - Esto hace que en local vaya a localhost
-    // - y en Netlify vaya a tu dominio real.
-    // - Volvemos a /login para correr ensureProfileForUser() y luego redirigir.
     const redirectTo = `${window.location.origin}/login`
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo }
     })
+
     if (error) throw error
   } catch (e: any) {
-    alert(e?.message ?? 'No pudimos iniciar con el proveedor seleccionado.')
-  } finally {
+    formError.value =
+      e?.message ?? 'No pudimos iniciar con el proveedor seleccionado.'
     loading.value = false
   }
 }
 
 async function forgot() {
-  if (!email.value.trim()) {
-    alert('Ingresá tu email primero.')
+  clearMessages()
+
+  const cleanEmail = email.value.trim()
+
+  if (!cleanEmail) {
+    formError.value = 'Ingresá tu email primero para recuperar la contraseña.'
     return
   }
+
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      email.value.trim(),
-      {
-        redirectTo: `${window.location.origin}/login`
-      }
-    )
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${window.location.origin}/auth/reset-password`
+    })
+
     if (error) throw error
-    alert('Te enviamos un correo para recuperar tu contraseña.')
+
+    formInfo.value = 'Te enviamos un correo para recuperar tu contraseña.'
   } catch (e: any) {
-    alert(e?.message ?? 'No pudimos enviar el correo. Intentá nuevamente.')
+    formError.value =
+      e?.message ?? 'No pudimos enviar el correo. Intentá nuevamente.'
   }
 }
 
@@ -129,171 +234,207 @@ function goRegister() {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Login</h1>
+  <div class="login-layout">
+    <h1 class="visually-hidden">Iniciar sesión en Nura</h1>
 
-  <section class="login-page">
-    <!-- Logo -->
-    <img
-      src="/logos/OFICIALwhite.png"
-      alt="Nura"
-      class="brand"
-      @error="(e: any) => (e.target.src = '/icons/icon-192.png')"
-    />
+    <main class="login-page">
+      <img
+        src="/logos/OFICIALwhite.png"
+        alt="Nura"
+        class="brand"
+        @error="(e: any) => (e.target.src = '/icons/icon-192.png')"
+      />
 
-    <!-- Card -->
-    <div class="card">
-      <!-- OAuth -->
-      <button
-        class="btn btn-oauth facebook with-icon w-field"
-        type="button"
-        @click="oauth('facebook')"
-        :disabled="loading"
-      >
-        <img src="/logos/facebook.png" alt="" />
-        Entrar con Facebook
-      </button>
+      <section class="card" aria-labelledby="login-title">
+        <h2 id="login-title" class="card-title">Iniciar sesión</h2>
 
-      <button
-        class="btn btn-oauth google with-icon w-field"
-        type="button"
-        @click="oauth('google')"
-        :disabled="loading"
-      >
-        <img src="/logos/google.jpg" alt="" />
-        Entrar con Google
-      </button>
+        <p v-if="formError" class="message message-error" role="alert">
+          {{ formError }}
+        </p>
 
-      <div class="divider w-field">o ingresá con</div>
+        <p v-if="blockedMsg" class="message message-error" role="alert">
+          Tu cuenta está bloqueada. Si creés que es un error, contactá al administrador.
+        </p>
 
-      <!-- Email / Password -->
-      <form class="form" @submit.prevent="emailLogin">
-        <div class="field w-field">
-          <label for="login-email">Usuario</label>
-          <input
-            id="login-email"
-            v-model="email"
-            type="email"
-            required
-            autocomplete="email"
-            aria-label="Usuario (email)"
-          />
-        </div>
+        <p v-if="deletedMsg" class="message message-error" role="alert">
+  No podés volver a entrar porque tu cuenta fue eliminada por administración.
+</p>
 
-        <div class="field w-field">
-          <label for="login-password">Contraseña</label>
-          <input
-            id="login-password"
-            v-model="password"
-            type="password"
-            required
-            autocomplete="current-password"
-            aria-label="Contraseña"
-          />
-        </div>
-
-        <a class="forgot" href="" @click.prevent="forgot">
-          ¿Olvidaste tu contraseña?
-        </a>
-
-        <!-- Acciones -->
-        <button
-          type="submit"
-          class="btn btn-primary w-actions"
-          :disabled="loading"
-        >
-          {{ loading ? 'Ingresando…' : 'Entrar' }}
-        </button>
+        <p v-if="formInfo" class="message message-info" role="status">
+          {{ formInfo }}
+        </p>
 
         <button
+          class="btn btn-oauth btn-facebook oauth-btn"
           type="button"
-          class="btn btn-primary w-actions"
-          @click="goRegister"
+          @click="oauth('facebook')"
           :disabled="loading"
         >
-          Registrarse
+          <img src="/logos/facebook.png" alt="" aria-hidden="true" />
+          <span>Entrar con Facebook</span>
         </button>
-      </form>
 
-    </div>
-  </section>
+        <button
+          class="btn btn-oauth btn-google oauth-btn"
+          type="button"
+          @click="oauth('google')"
+          :disabled="loading"
+        >
+          <img src="/logos/google.jpg" alt="" aria-hidden="true" />
+          <span>Entrar con Google</span>
+        </button>
+
+        <div class="divider">o ingresá con</div>
+
+        <form class="form" @submit.prevent="emailLogin" novalidate>
+          <div class="field">
+            <label for="login-email">Usuario</label>
+            <input
+              id="login-email"
+              v-model="email"
+              type="email"
+              required
+              autocomplete="email"
+              aria-label="Usuario (email)"
+              @input="clearMessages"
+            />
+          </div>
+
+          <div class="field">
+            <label for="login-password">Contraseña</label>
+            <input
+              id="login-password"
+              v-model="password"
+              type="password"
+              required
+              autocomplete="current-password"
+              aria-label="Contraseña"
+              @input="clearMessages"
+            />
+          </div>
+
+          <button
+            type="button"
+            class="forgot"
+            @click="forgot"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+
+          <button
+            type="submit"
+            class="btn btn-primary action-btn"
+            :disabled="loading"
+          >
+            {{ loading ? 'Ingresando…' : 'Entrar' }}
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-secondary action-btn"
+            @click="goRegister"
+            :disabled="loading"
+          >
+            Registrarse
+          </button>
+        </form>
+      </section>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.login-page {
+.login-layout {
   min-height: 100dvh;
-  background: url('/bgs/splash.png') center/cover no-repeat;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  justify-items: center;
-  align-items: start;
-  padding: 48px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  background: url('/bgs/splash.png') center / cover no-repeat;
 }
 
-/* ===== Logo ===== */
+.login-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
 .brand {
   width: 150px;
   height: auto;
   margin-bottom: 18px;
-  filter: drop-shadow(0 2px 4px #0002);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
 }
 
-/* ===== Card ===== */
 .card {
   width: 100%;
   max-width: 540px;
   background: #ffffff;
-  border-radius: 60px;
-  padding: 28px 20px 34px;
+  border-radius: 42px;
+  padding: 28px 24px 32px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+
+.card-title {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 1.35rem;
+  color: #183153;
+}
+
+.message {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.93rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.message-error {
+  background: #fff1f2;
+  color: #b42318;
+  border: 1px solid #fecdd3;
+}
+
+.message-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .form {
-  padding: 0 36px 4px;
+  max-width: 360px;
+  margin: 0 auto;
 }
 
-/* Helpers de ancho */
-:root,
-:host {
-  --field-w: 60%;
-  --actions-w: 40%;
-}
-.w-field,
-.w-actions {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-}
-.w-field {
-  width: var(--field-w);
-}
-.w-actions {
-  width: var(--actions-w);
-}
-
-/* Campos con label */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 0.45rem auto;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 
 .field label {
   font-size: 0.93rem;
   font-weight: 600;
-  color: #000000;
-  padding: 0.62rem 0.3rem;
+  color: #111827;
 }
 
-/* Inputs */
 .field input {
+  width: 100%;
+  min-height: 46px;
   padding: 0.7rem 0.9rem;
   border-radius: 12px;
   border: 1px solid #ccd7e2;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   outline: none;
-  width: 93%;
   background: #f9fcff;
+  box-sizing: border-box;
 }
 
 .field input:focus {
@@ -301,88 +442,115 @@ function goRegister() {
   box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.22);
 }
 
-/* Separador */
 .divider {
+  width: 100%;
+  max-width: 360px;
+  margin: 14px auto 12px;
   text-align: center;
-  opacity: 0.75;
-  margin: 12px auto 8px;
+  opacity: 0.78;
   font-size: 0.92rem;
 }
 
-/* Forgot */
 .forgot {
   display: block;
-  text-align: center;
-  margin: 6px auto 14px;
-  color: #85b6e0;
-  font-size: 0.9rem;
-  text-decoration: none;
-  padding: 0.62rem 0.9rem;
-}
-.forgot:hover {
+  margin: 4px auto 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4f8fc4;
+  font-size: 0.92rem;
   text-decoration: underline;
+  cursor: pointer;
 }
 
-/* ===== Botones base ===== */
 .btn {
-  border: none;
+  width: 100%;
+  min-height: 48px;
   border-radius: 999px;
-  padding: 0.75rem 1rem;
+  padding: 0.78rem 1rem;
   font-weight: 600;
   font-size: 0.98rem;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin: 0.5rem auto;
+  margin: 0 auto 10px;
+  box-sizing: border-box;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-/* Primario */
+.oauth-btn,
+.action-btn {
+  max-width: 360px;
+}
+
+.btn-oauth img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.btn-facebook {
+  background: #1877f2;
+  color: #fff;
+  border: 1px solid #1877f2;
+  box-shadow: 0 8px 20px rgba(24, 119, 242, 0.22);
+}
+
+.btn-facebook:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(24, 119, 242, 0.28);
+}
+
+.btn-google {
+  background: #fff;
+  color: #2b2b2b;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: #fafafa;
+  transform: translateY(-1px);
+}
+
 .btn-primary {
+  border: 1px solid #50bdbd;
   background: #50bdbd;
   color: #fff;
   box-shadow: 0 8px 20px rgba(80, 189, 189, 0.35);
 }
-.btn-primary:hover {
+
+.btn-primary:hover:not(:disabled) {
   background: #3ea9a9;
+  border-color: #3ea9a9;
   transform: translateY(-1px);
   box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
 
-/* ===== OAuth ===== */
-.btn-oauth.with-icon img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
+.btn-secondary {
+  border: 1px solid #50bdbd;
+  background: #ffffff;
+  color: #50bdbd;
+  box-shadow: 0 8px 20px rgba(80, 189, 189, 0.12);
 }
 
-.btn-oauth.facebook {
-  background: #1877f2;
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-}
-.btn-oauth.facebook:hover {
-  filter: brightness(0.95);
+.btn-secondary:hover:not(:disabled) {
+  background: #f3ffff;
+  transform: translateY(-1px);
 }
 
-.btn-oauth.google {
-  background: #fff;
-  color: #2b2b2b;
-  border: 1px solid #d1d5db;
-  box-shadow: none;
-}
-.btn-oauth.google:hover {
-  background: #fafafa;
-}
-
-/* Visually hidden */
 .visually-hidden {
   position: absolute;
   left: -9999px;
@@ -390,5 +558,25 @@ function goRegister() {
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    padding: 20px 14px;
+  }
+
+  .brand {
+    width: 128px;
+    margin-bottom: 14px;
+  }
+
+  .card {
+    border-radius: 28px;
+    padding: 22px 16px 24px;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+  }
 }
 </style>

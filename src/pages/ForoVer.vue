@@ -19,10 +19,6 @@ function publicUrl(bucket: string, path: string) {
   return data?.publicUrl ? withCacheBust(data.publicUrl) : ''
 }
 
-/**
- * Si value es URL completa -> la devolvemos.
- * Si es path -> usamos primero BUCKET (nuevo). Si falla el <img>, probamos legacy.
- */
 function avatarPrimaryUrl(value: string) {
   if (!value) return ''
   if (/^https?:\/\//i.test(value)) return withCacheBust(value)
@@ -68,22 +64,37 @@ const highlightId = computed(() => (route.query.highlight as string | undefined)
 const forum = ref<ForumRow | null>(null)
 const comments = ref<CommentRow[]>([])
 const errorMsg = ref('')
+const infoMsg = ref('')
 const newComment = ref('')
 const sending = ref(false)
 
 const canSend = computed(() => newComment.value.trim().length > 1 && !sending.value)
 
-/**
- * Maps:
- * - userNames: id -> nombre
- * - userAvatarPath: id -> avatar_url (lo que viene de DB)
- * - userAvatarUrl: id -> url resuelta (la que usa <img>)
- * - userAvatarTriedLegacy: id -> bool (si ya probamos legacy)
- */
 const userNames = ref<Map<string, string>>(new Map())
 const userAvatarPath = ref<Map<string, string>>(new Map())
 const userAvatarUrl = ref<Map<string, string | null>>(new Map())
 const userAvatarTriedLegacy = ref<Map<string, boolean>>(new Map())
+
+function clearMessages() {
+  errorMsg.value = ''
+  infoMsg.value = ''
+}
+
+function setInfo(message: string) {
+  infoMsg.value = message
+  errorMsg.value = ''
+  setTimeout(() => {
+    if (infoMsg.value === message) infoMsg.value = ''
+  }, 2500)
+}
+
+function setError(message: string) {
+  errorMsg.value = message
+  infoMsg.value = ''
+  setTimeout(() => {
+    if (errorMsg.value === message) errorMsg.value = ''
+  }, 3000)
+}
 
 /* =========================
    HELPERS (names/avatars)
@@ -116,11 +127,6 @@ function displayAvatarFor(userId: string | null | undefined): string | null {
   return userAvatarUrl.value.get(userId) ?? null
 }
 
-/**
- * Si el <img> falla:
- * - si todavía no probamos legacy, intentamos legacy
- * - si ya probamos legacy, lo limpiamos y cae a inicial
- */
 function onAvatarError(userId: string | null | undefined) {
   if (!userId) return
 
@@ -128,7 +134,6 @@ function onAvatarError(userId: string | null | undefined) {
   const path = userAvatarPath.value.get(userId) || ''
 
   if (!path) {
-    // nada que hacer
     const u = new Map(userAvatarUrl.value)
     u.set(userId, null)
     userAvatarUrl.value = u
@@ -136,7 +141,6 @@ function onAvatarError(userId: string | null | undefined) {
   }
 
   if (!tried) {
-    // probar legacy UNA vez
     const legacy = avatarLegacyUrl(path)
     const u = new Map(userAvatarUrl.value)
     u.set(userId, legacy || null)
@@ -148,7 +152,6 @@ function onAvatarError(userId: string | null | undefined) {
     return
   }
 
-  // ya probamos legacy -> fallback a inicial
   const u = new Map(userAvatarUrl.value)
   u.set(userId, null)
   userAvatarUrl.value = u
@@ -194,7 +197,6 @@ async function loadUserNames() {
 
     if (av) {
       pathMap.set(u.id, av)
-      // url primaria (bucket nuevo o url completa)
       urlMap.set(u.id, avatarPrimaryUrl(av) || null)
       triedMap.set(u.id, false)
     } else {
@@ -249,7 +251,7 @@ async function loadForum() {
 
   if (error || !data) {
     console.error(error)
-    errorMsg.value = 'No se encontró este foro.'
+    setError('No se encontró este foro.')
   } else {
     forum.value = data as ForumRow
   }
@@ -279,31 +281,56 @@ function scrollToHighlighted() {
 async function sendComment() {
   if (!canSend.value) return
 
-  sending.value = true
-  errorMsg.value = ''
-
-  const text = newComment.value.trim()
-
-  const { data, error } = await supabase
-    .from('forum_comments')
-    .insert({
-      forum_id: forumId.value,
-      user_id: auth.user?.id ?? null,
-      body: text
-    })
-    .select('id,forum_id,user_id,body,created_at')
-    .single()
-
-  if (error) {
-    console.error(error)
-    errorMsg.value = 'No se pudo enviar el comentario.'
-  } else if (data) {
-    comments.value.push(data as CommentRow)
-    newComment.value = ''
-    await loadUserNames()
+  if (!auth.user) {
+    setError('Tenés que iniciar sesión para comentar.')
+    return
   }
 
-  sending.value = false
+  sending.value = true
+  clearMessages()
+
+  try {
+    const { data: me, error: meError } = await supabase
+      .from('profiles')
+      .select('blocked, deleted_at')
+      .eq('id', auth.user.id)
+      .single()
+
+    if (meError) {
+      console.error(meError)
+      setError('No pudimos validar tu cuenta.')
+      return
+    }
+
+    if (me?.blocked || me?.deleted_at) {
+      setError('Tu cuenta no puede comentar.')
+      return
+    }
+
+    const text = newComment.value.trim()
+
+    const { data, error } = await supabase
+      .from('forum_comments')
+      .insert({
+        forum_id: forumId.value,
+        user_id: auth.user.id,
+        body: text
+      })
+      .select('id,forum_id,user_id,body,created_at')
+      .single()
+
+    if (error) {
+      console.error(error)
+      setError('No se pudo enviar el comentario.')
+    } else if (data) {
+      comments.value.push(data as CommentRow)
+      newComment.value = ''
+      await loadUserNames()
+      setInfo('Comentario enviado.')
+    }
+  } finally {
+    sending.value = false
+  }
 }
 
 /* =========================
@@ -329,7 +356,7 @@ async function confirmDelete() {
   if (!commentToDelete.value || !auth.user) return
 
   deleting.value = true
-  errorMsg.value = ''
+  clearMessages()
 
   let q = supabase.from('forum_comments').delete().eq('id', commentToDelete.value.id).select('id')
   if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
@@ -338,11 +365,12 @@ async function confirmDelete() {
 
   if (error) {
     console.error('DELETE comment error:', error)
-    errorMsg.value = error.message || 'No se pudo borrar el comentario.'
+    setError(error.message || 'No se pudo borrar el comentario.')
   } else if (!data || data.length === 0) {
-    errorMsg.value = 'No se pudo borrar (sin permisos o comentario no encontrado).'
+    setError('No se pudo borrar el comentario.')
   } else {
     comments.value = comments.value.filter((c) => c.id !== commentToDelete.value!.id)
+    setInfo('Comentario borrado.')
   }
 
   deleting.value = false
@@ -374,7 +402,7 @@ async function confirmDeleteForum() {
   if (!auth.user || !forum.value) return
 
   deletingForum.value = true
-  errorMsg.value = ''
+  clearMessages()
 
   let q = supabase.from('forums').delete().eq('id', forum.value.id).select('id')
   if (!isAdmin.value) q = q.eq('user_id', auth.user.id)
@@ -383,13 +411,13 @@ async function confirmDeleteForum() {
 
   if (error) {
     console.error('DELETE forum error:', error)
-    errorMsg.value = error.message || 'No se pudo borrar el foro.'
+    setError(error.message || 'No se pudo borrar el foro.')
     deletingForum.value = false
     return
   }
 
   if (!data || data.length === 0) {
-    errorMsg.value = 'No se pudo borrar (sin permisos o foro no encontrado).'
+    setError('No se pudo borrar el foro.')
     deletingForum.value = false
     return
   }
@@ -460,43 +488,68 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Foro Ver</h1>
+  <h1 class="visually-hidden">Ver foro</h1>
 
   <main class="contenido ver-foro">
-    <button class="back-link" type="button" @click="goBack">
-      <span class="arrow">←</span>
-    </button>
+    <header class="page-head">
+      <button class="back-link" type="button" @click="goBack" aria-label="Volver">
+        <span class="arrow">←</span>
+      </button>
 
-    <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
+      <div class="page-copy">
+        <h2 class="page-title">Detalle del foro</h2>
+        <p class="page-sub">Leé la publicación y participá en la conversación.</p>
+      </div>
+    </header>
 
-    <div v-else-if="forum" class="post-box">
+    <p v-if="errorMsg" class="form-message error" role="alert">
+      {{ errorMsg }}
+    </p>
+
+    <p v-if="infoMsg" class="form-message success" role="status">
+      {{ infoMsg }}
+    </p>
+
+    <section v-if="forum && !errorMsg" class="post-box" aria-labelledby="forum-title">
       <div class="post-header">
-        <h2>{{ forum.title }}</h2>
+        <div class="post-header-main">
+          <h2 id="forum-title" class="post-title">{{ forum.title }}</h2>
 
-        <button v-if="canDeleteForum" type="button" class="delete-forum-btn" @click="askDeleteForum">
+          <p class="meta">
+            Publicado por
+            <button
+              v-if="forum.user_id"
+              class="author-link"
+              type="button"
+              @click="goToProfile(forum.user_id)"
+            >
+              {{ authorLabel }}
+            </button>
+            <span v-else><strong>{{ authorLabel }}</strong></span>
+            · {{ formatDateTime(forum.created_at) }}
+          </p>
+        </div>
+
+        <button
+          v-if="canDeleteForum"
+          type="button"
+          class="delete-forum-btn"
+          @click="askDeleteForum"
+        >
           Borrar foro
         </button>
       </div>
 
-      <p class="meta">
-        Publicado por
-        <button v-if="forum.user_id" class="author-link" @click="goToProfile(forum.user_id)">
-          {{ authorLabel }}
-        </button>
-        <span v-else><strong>{{ authorLabel }}</strong></span>
-        · {{ formatDateTime(forum.created_at) }}
-      </p>
-
       <p class="body">{{ forum.body }}</p>
 
-      <span class="tag">{{ forum.category }}</span>
-    </div>
+      <span v-if="forum.category" class="tag">{{ forum.category }}</span>
+    </section>
 
-    <section class="comments-box">
-      <h3>Comentarios ({{ comments.length }})</h3>
+    <section v-if="forum && !errorMsg" class="comments-box" aria-labelledby="comments-title">
+      <h2 id="comments-title" class="section-title">Comentarios ({{ comments.length }})</h2>
 
-      <div v-if="comments.length > 0">
-        <div
+      <div v-if="comments.length > 0" class="comments-list">
+        <article
           v-for="c in comments"
           :key="c.id"
           :id="c.id"
@@ -520,9 +573,15 @@ onBeforeUnmount(() => {
 
           <div class="comment-body">
             <div class="comment-header">
-              <button v-if="c.user_id" class="user-btn" @click="goToProfile(c.user_id)">
+              <button
+                v-if="c.user_id"
+                class="user-btn"
+                type="button"
+                @click="goToProfile(c.user_id)"
+              >
                 {{ displayNameForComment(c) }}
               </button>
+
               <span v-else class="user">
                 {{ displayNameForComment(c) }}
               </span>
@@ -534,49 +593,72 @@ onBeforeUnmount(() => {
               <button
                 v-if="auth.user && (isAdmin || c.user_id === auth.user.id)"
                 class="delete-comment-btn"
+                type="button"
                 @click="askDelete(c)"
               >
                 Borrar
               </button>
             </div>
 
-            <p>{{ c.body }}</p>
+            <p class="comment-text">{{ c.body }}</p>
           </div>
-        </div>
+        </article>
       </div>
 
       <div v-else class="empty">Todavía no hay comentarios. ¡Sé la primera en comentar!</div>
     </section>
 
-    <section v-if="auth.user" class="new-comment">
-      <textarea v-model="newComment" placeholder="Escribí un comentario..."></textarea>
-      <button class="btn" :disabled="!canSend" @click="sendComment">Comentar</button>
+    <section v-if="auth.user && forum && !errorMsg" class="new-comment" aria-labelledby="new-comment-title">
+      <h2 id="new-comment-title" class="section-title">Agregar comentario</h2>
+
+      <label class="visually-hidden" for="forum-comment">Escribí un comentario</label>
+      <textarea
+        id="forum-comment"
+        v-model="newComment"
+        placeholder="Escribí un comentario..."
+        @input="clearMessages"
+      ></textarea>
+
+      <button class="btn-primary" type="button" :disabled="!canSend" @click="sendComment">
+        {{ sending ? 'Enviando…' : 'Comentar' }}
+      </button>
     </section>
 
-    <p v-else class="login-msg">Tenés que iniciar sesión para comentar.</p>
+    <p v-else-if="!auth.user && !errorMsg" class="login-msg">
+      Tenés que iniciar sesión para comentar.
+    </p>
 
-    <div v-if="showConfirmDelete" class="modal-backdrop">
-      <div class="modal">
-        <h4>¿Eliminar comentario?</h4>
-        <p>Esta acción no se puede deshacer.</p>
+    <div v-if="showConfirmDelete" class="modal-backdrop" @click.self="cancelDelete">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-comment-title">
+        <h2 id="delete-comment-title" class="modal-title">¿Eliminar comentario?</h2>
+        <p class="modal-text">Esta acción no se puede deshacer.</p>
 
         <div class="modal-actions">
-          <button class="modal-cancel" @click="cancelDelete">Cancelar</button>
-          <button class="modal-delete" :disabled="deleting" @click="confirmDelete">
+          <button class="modal-btn soft" type="button" @click="cancelDelete">
+            Cancelar
+          </button>
+          <button class="modal-btn danger" :disabled="deleting" type="button" @click="confirmDelete">
             {{ deleting ? 'Borrando…' : 'Eliminar' }}
           </button>
         </div>
       </div>
     </div>
 
-    <div v-if="showConfirmDeleteForum" class="modal-backdrop">
-      <div class="modal">
-        <h4>¿Eliminar foro?</h4>
-        <p>Se borrará todo el contenido y los comentarios.</p>
+    <div v-if="showConfirmDeleteForum" class="modal-backdrop" @click.self="cancelDeleteForum">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-forum-title">
+        <h2 id="delete-forum-title" class="modal-title">¿Eliminar foro?</h2>
+        <p class="modal-text">Se borrará todo el contenido y los comentarios.</p>
 
         <div class="modal-actions">
-          <button class="modal-cancel" @click="cancelDeleteForum">Cancelar</button>
-          <button class="modal-delete" :disabled="deletingForum" @click="confirmDeleteForum">
+          <button class="modal-btn soft" type="button" @click="cancelDeleteForum">
+            Cancelar
+          </button>
+          <button
+            class="modal-btn danger"
+            :disabled="deletingForum"
+            type="button"
+            @click="confirmDeleteForum"
+          >
             {{ deletingForum ? 'Borrando…' : 'Eliminar foro' }}
           </button>
         </div>
@@ -586,56 +668,152 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}
+
 .contenido {
   background: #fff;
-  padding: 24px 18px 48px;
+  padding: 20px 18px 48px;
   max-width: 1100px;
   margin: 0 auto;
 }
 
 .ver-foro {
-  padding: 16px;
+  box-sizing: border-box;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.page-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.page-title {
+  margin: 0;
+  color: #50bdbd;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.page-sub {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .back-link {
+  width: 42px;
+  height: 42px;
   border: none;
-  background: transparent;
+  border-radius: 999px;
+  background: #e8fbf8;
+  color: #50bdbd;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   cursor: pointer;
-  padding: 0;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+  flex: 0 0 auto;
+}
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
 }
 
 .arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
-.error {
-  margin-top: 10px;
-  color: #b3261e;
+.form-message {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 0 14px 54px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.93rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.form-message.error {
+  background: #fff1f2;
+  color: #b42318;
+  border: 1px solid #fecdd3;
+}
+
+.form-message.success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #abefc6;
 }
 
 .post-box {
-  background: white;
-  border-radius: 16px;
+  background: #ffffff;
+  border-radius: 18px;
   padding: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2edf7;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   margin-bottom: 20px;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .post-box:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    border-color: #d7f1ef;
+  }
 }
 
 .post-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 10px;
+}
+
+.post-header-main {
+  min-width: 0;
+}
+
+.post-title {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 1.25rem;
+  line-height: 1.2;
 }
 
 .meta {
   color: #6b6f76;
   font-size: 0.9rem;
-  margin-bottom: 10px;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .author-link {
@@ -643,28 +821,79 @@ onBeforeUnmount(() => {
   background: none;
   padding: 0;
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2933;
   cursor: pointer;
 }
 
+@media (hover: hover) {
+  .author-link:hover {
+    color: #50bdbd;
+    text-decoration: underline;
+  }
+}
+
+.body {
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  margin: 0 0 12px;
+}
+
 .tag {
+  display: inline-flex;
+  align-items: center;
   background: #50bdbd;
   color: white;
   padding: 4px 10px;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  color: #50bdbd;
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
 .comments-box {
   margin-top: 20px;
 }
 
+.comments-list {
+  display: grid;
+  gap: 10px;
+}
+
 .comment {
   display: flex;
   gap: 10px;
-  padding: 12px 0;
-  border-bottom: 1px solid #eee;
+  padding: 12px;
+  border: 1px solid #e8eef3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .comment:hover {
+    background: #eefafa;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.12);
+    border-color: #d7f1ef;
+  }
+}
+
+.highlighted {
+  background: #e0f7f7;
+  border-color: #9de2de;
 }
 
 .avatar {
@@ -674,6 +903,7 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, #6ad7d7, #2d9c9c);
   padding: 3px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  flex: 0 0 auto;
 }
 
 .avatar.clickable {
@@ -700,20 +930,22 @@ onBeforeUnmount(() => {
 
 .avatar-initial {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #2d9c9c;
 }
 
 .comment-body {
   flex: 1;
+  min-width: 0;
 }
 
 .comment-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: black;
+  flex-wrap: wrap;
 }
 
 .user-btn {
@@ -722,12 +954,19 @@ onBeforeUnmount(() => {
   background: none;
   padding: 0;
   margin: 0;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
 }
 
+@media (hover: hover) {
+  .user-btn:hover {
+    color: #50bdbd;
+    text-decoration: underline;
+  }
+}
+
 .user {
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .date {
@@ -736,56 +975,121 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 
+.comment-text {
+  margin: 0;
+  color: #334155;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 .delete-forum-btn,
 .delete-comment-btn {
   border-radius: 999px;
   border: none;
-  padding: 6px 14px;
+  padding: 7px 14px;
   background: #ef4444;
   color: #fff;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.delete-forum-btn:hover,
-.delete-comment-btn:hover {
-  background: #dc2626;
+@media (hover: hover) {
+  .delete-forum-btn:hover,
+  .delete-comment-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(239, 68, 68, 0.18);
+  }
+}
+
+.new-comment {
+  margin-top: 18px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  border: 1px solid #e2edf7;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .new-comment:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    border-color: #d7f1ef;
+  }
 }
 
 .new-comment textarea {
-  width: 95%;
-  min-height: 80px;
-  border-radius: 12px;
+  width: 100%;
+  min-height: 96px;
+  border-radius: 14px;
   border: 1px solid #dce5ec;
-  padding: 10px;
+  padding: 12px;
   font-family: inherit;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
-.btn {
-  margin-top: 10px;
+.new-comment textarea:focus {
+  border-color: #50bdbd;
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.16);
+}
+
+.btn-primary {
+  margin-top: 12px;
   background: #50bdbd;
   color: white;
   border: none;
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-radius: 999px;
   cursor: pointer;
+  font-weight: 700;
+  min-height: 42px;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.btn:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.35);
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #3ea9a9;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(80, 189, 189, 0.28);
+  }
 }
 
-.btn:disabled {
+.btn-primary:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty {
   color: #6b6f76;
   text-align: center;
   padding: 20px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8eef3;
 }
 
 .login-msg {
@@ -797,88 +1101,143 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 40;
+  padding: 16px;
 }
 
-.modal {
+.modal-card {
   background: white;
-  border-radius: 16px;
-  padding: 18px 20px;
-  width: 70%;
-  max-width: 360px;
+  border-radius: 18px;
+  padding: 18px 20px 16px;
+  width: 100%;
+  max-width: 380px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e2edf7;
 }
 
-.modal h4 {
+.modal-title {
   margin: 0 0 8px;
+  color: #50bdbd;
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
-.modal p {
+.modal-text {
   margin: 0 0 16px;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+  color: #475569;
+  line-height: 1.45;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.modal-cancel {
-  align-self: flex-start;
-  padding: 7px 18px;
+.modal-btn {
   border-radius: 999px;
   border: none;
-  background: #50bdbd;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(80, 189, 189, 0.4);
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.18s ease;
-}
-
-.modal-cancel:hover {
-  background: #3ea9a9;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.5);
-}
-
-.modal-delete {
-  background: #ef5350;
-  box-shadow: 0 3px 10px rgba(239, 83, 80, 0.3);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 0.9rem;
+  padding: 9px 14px;
+  min-height: 42px;
   font-weight: 700;
-  color: #ffffff;
-  border: none;
-  border-radius: 999px;
-  padding: 7px 14px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  background: #50bdbd;
+  color: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-.modal-delete:hover {
-  background: #e53935;
+@media (hover: hover) {
+  .modal-btn:hover:not(:disabled) {
+    background: #3ea9a9;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.2);
+  }
 }
 
-.modal-delete:disabled {
-  opacity: 0.6;
+.modal-btn.soft {
+  background: #ffffff;
+  color: #50bdbd;
+  border: 1px solid #b6ebe5;
 }
 
-.highlighted {
-  background: #e0f7f7;
-  border-radius: 8px;
+@media (hover: hover) {
+  .modal-btn.soft:hover:not(:disabled) {
+    background: #e0faf7;
+  }
 }
 
-.comment {
-  padding: 8px;
-  margin-bottom: 8px;
+.modal-btn.danger {
+  background: #ef4444;
+}
+
+@media (hover: hover) {
+  .modal-btn.danger:hover:not(:disabled) {
+    background: #dc2626;
+  }
+}
+
+.modal-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .contenido {
+    padding: 16px 12px 96px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+  }
+
+  .form-message {
+    margin-left: 0;
+    max-width: 100%;
+  }
+
+  .post-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .delete-forum-btn {
+    width: 100%;
+  }
+
+  .comment-header {
+    align-items: flex-start;
+  }
+
+  .date {
+    margin-left: 0;
+  }
+
+  .btn-primary {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-actions .modal-btn {
+    width: 100%;
+  }
+
+  .delete-comment-btn {
+    width: 100%;
+  }
 }
 </style>
