@@ -56,18 +56,26 @@ function isValidDateParts(dayNum: number, monthNum: number, yearNum: number) {
 }
 
 function mapSupabaseError(err: any): string {
-  const raw = (err?.message || '').toLowerCase()
+  const raw = String(err?.message || '').toLowerCase()
 
   if (raw.includes('user already registered')) {
     return 'Ya existe una cuenta con ese correo. Probá iniciar sesión o usar otro email.'
   }
 
-  if (raw.includes('invalid email')) {
-    return 'Ingresá un correo válido.'
-  }
+  if (
+  raw.includes('invalid email') ||
+  raw.includes('invalid format') ||
+  raw.includes('unable to validate email')
+) {
+  return 'Ingresá un correo válido.'
+}
 
   if (raw.includes('password')) {
     return 'La contraseña es demasiado débil. Usá al menos 6 caracteres.'
+  }
+
+  if (raw.includes('database error saving new user')) {
+    return 'No pudimos crear tu cuenta en este momento. Probá nuevamente en unos minutos.'
   }
 
   return 'No pudimos crear tu cuenta en este momento. Probá nuevamente en unos minutos.'
@@ -84,7 +92,8 @@ async function submit() {
   clearMessages()
 
   const cleanName = name.value.trim()
-  const cleanEmail = email.value.trim()
+  const cleanEmail = email.value.trim().toLowerCase()
+  const cleanPassword = password.value.trim()
 
   if (!cleanName) {
     formError.value = 'Ingresá tu nombre.'
@@ -95,6 +104,13 @@ async function submit() {
     formError.value = 'Ingresá tu correo.'
     return
   }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+if (!emailRegex.test(cleanEmail)) {
+  formError.value = 'Ingresá un correo válido.'
+  return
+}
 
   if (!dob.value || !day.value || !month.value || !year.value) {
     formError.value = 'Completá tu fecha de nacimiento.'
@@ -118,7 +134,7 @@ async function submit() {
     return
   }
 
-  if (password.value.trim().length < 6) {
+  if (cleanPassword.length < 6) {
     formError.value = 'La contraseña debe tener al menos 6 caracteres.'
     return
   }
@@ -128,51 +144,30 @@ async function submit() {
   try {
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
-      password: password.value,
+      password: cleanPassword,
       options: {
         data: {
           name: cleanName,
+          full_name: cleanName,
           dob: dob.value
         },
-        emailRedirectTo: window.location.origin + '/login'
+        emailRedirectTo: `${window.location.origin}/login`
       }
     })
 
     if (error) throw error
 
-    if (data.user) {
-      try {
-        const { error: profileError } = await supabase.from('profiles').upsert(
-          {
-            id: data.user.id,
-            full_name: cleanName,
-            name: cleanName
-          },
-          { onConflict: 'id' }
-        )
-
-        if (profileError) {
-          console.error('Error guardando perfil en profiles:', profileError)
-          formInfo.value =
-            'Tu cuenta se creó, pero faltó guardar parte de tu perfil. Podés completarlo después desde Perfil.'
-        }
-      } catch (profileErr) {
-        console.error('Error guardando perfil en profiles:', profileErr)
-        formInfo.value =
-          'Tu cuenta se creó, pero faltó guardar parte de tu perfil. Podés completarlo después desde Perfil.'
-      }
-    }
-
     if (data.session) {
       router.replace('/onboarding')
-    } else {
-      formInfo.value =
-        'Te enviamos un correo para confirmar tu cuenta. Iniciá sesión cuando lo hayas confirmado.'
-
-      setTimeout(() => {
-        router.replace('/login')
-      }, 1800)
+      return
     }
+
+    formInfo.value =
+      'Te enviamos un correo para confirmar tu cuenta. Iniciá sesión cuando lo hayas confirmado.'
+
+    setTimeout(() => {
+      router.replace('/login')
+    }, 1800)
   } catch (e: any) {
     console.error('Error en registro:', e)
     formError.value = mapSupabaseError(e)
@@ -298,6 +293,7 @@ async function submit() {
         </RouterLink>
       </section>
     </main>
+
   </div>
 </template>
 

@@ -46,6 +46,7 @@ async function ensureProfileForUser(user: any) {
   if (!existing) {
     const { error: upsertErr } = await supabase.from('profiles').upsert({
       id: user.id,
+      email: user.email,
       full_name: metaName,
       name: metaName,
       avatar_url: metaAvatar
@@ -57,7 +58,7 @@ async function ensureProfileForUser(user: any) {
   } else if (!existing.full_name && metaName) {
     const { error: updErr } = await supabase
       .from('profiles')
-      .update({ full_name: metaName, name: metaName })
+      .update({ full_name: metaName, name: metaName,  email: user.email })
       .eq('id', user.id)
 
     if (updErr) {

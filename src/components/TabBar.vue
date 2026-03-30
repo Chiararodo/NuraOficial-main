@@ -1,80 +1,89 @@
 <script setup>
 import { useRoute } from 'vue-router'
+
 const route = useRoute()
 
-// Marca activo por inicio de ruta (home cuenta como /app/home y /app/home/loquesea)
 const isActive = (path) => route.path.startsWith(path)
 </script>
+
 <template>
   <footer class="tabbar">
-    <!-- HOME -->
     <RouterLink to="/app/home" class="item" aria-label="Inicio">
-      <img :src="isActive('/app/home') ? '/icons/homeactive.png' : '/icons/home.png'" />
+      <img :src="isActive('/app/home') ? '/icons/homeactive.png' : '/icons/home.png'" alt="" />
     </RouterLink>
 
-    <!-- CARTILLA -->
     <RouterLink to="/app/cartilla" class="item" aria-label="Cartilla">
-      <img :src="isActive('/app/cartilla') ? '/icons/cartillaactive.png' : '/icons/cartilla.png'" />
+      <img :src="isActive('/app/cartilla') ? '/icons/cartillaactive.png' : '/icons/cartilla.png'" alt="" />
     </RouterLink>
 
-    <!-- AGENDAR (PLUS) -->
     <RouterLink to="/app/agendar" class="item plus" aria-label="Agendar">
-      <img :src="isActive('/app/agendar') ? '/icons/+active.png' : '/icons/+.png'" />
+      <img :src="isActive('/app/agendar') ? '/icons/+active.png' : '/icons/+.png'" alt="" />
     </RouterLink>
 
-    <!-- CONTENIDO -->
-    <RouterLink to="/app/contenido" class="item1" aria-label="Contenido">
-      <img :src="isActive('/app/contenido') ? '/icons/contenidoactive.png' : '/icons/contenido.png'" />
+    <RouterLink to="/app/contenido" class="item" aria-label="Contenido">
+      <img :src="isActive('/app/contenido') ? '/icons/contenidoactive.png' : '/icons/contenido.png'" alt="" />
     </RouterLink>
 
-    <!-- PERFIL -->
-    <RouterLink to="/app/perfil" class="item1"aria-label="Perfil">
-      <img :src="isActive('/app/perfil') ? '/icons/perfilactive.png' : '/icons/perfil.png'" />
+    <RouterLink to="/app/perfil" class="item" aria-label="Perfil">
+      <img :src="isActive('/app/perfil') ? '/icons/perfilactive.png' : '/icons/perfil.png'" alt="" />
     </RouterLink>
   </footer>
 </template>
 
-
 <style scoped>
 .tabbar {
   position: fixed;
-  left: 0; right: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: .6rem 10px calc(.6rem + env(safe-area-inset-bottom));
-  background: #37B3B3;
+  gap: 8px;
+  padding: 0.6rem 10px calc(0.6rem + env(safe-area-inset-bottom));
+  background: #37b3b3;
   color: #fff;
   z-index: 40;
-  box-shadow: 0 -6px 20px rgba(0,0,0,.10);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.1);
   border-top-left-radius: 14px;
   border-top-right-radius: 14px;
 }
 
-.tabbar .item img {
+.item {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.item img {
   width: 35px;
   height: 35px;
+  object-fit: contain;
+  display: block;
 }
 
-.tabbar .item.plus img {
-  width: 42px;
-  height: 42px;
-}
-
-.tabbar .item1 img { 
-  width: 40px; 
-  height: 40px; 
-  object-fit: contain; 
-  }
-
-.tabbar .item.plus {
-  padding: .25rem;
-  border-radius: 50%;
+.item.plus {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
   background: #85b6e0;
-  box-shadow: 0 4px 10px rgba(0,0,0,.12);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
-@media (min-width: 900px){
-  .tabbar { display: none; }
+.item.plus img {
+  width: 35px;
+  height: 35px;
+  object-fit: contain;
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .tabbar {
+    display: none;
+  }
 }
 </style>

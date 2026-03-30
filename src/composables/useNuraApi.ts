@@ -4,7 +4,9 @@ function normalizeBase(base: string) {
   return base.replace(/\/+$/, '')
 }
 
-const API_BASE = normalizeBase(import.meta.env.VITE_NURA_API_URL || '/api')
+const API_BASE = normalizeBase(
+  import.meta.env.VITE_NURA_API_URL || 'https://backend-nura.onrender.com/api'
+)
 
 export function useNuraApi() {
   const loading = ref(false)
@@ -16,25 +18,31 @@ export function useNuraApi() {
     loading.value = true
     error.value = null
 
-    const searchParams = new URLSearchParams()
-    Object.entries(params).forEach(([key, value]) => {
-      if (value && value.trim() !== '') searchParams.append(key, value.trim())
-    })
+    try {
+      const searchParams = new URLSearchParams()
 
-    const url =
-      `${API_BASE}/especialistas` +
-      (searchParams.toString() ? `?${searchParams.toString()}` : '')
+      Object.entries(params).forEach(([key, value]) => {
+        if (value && value.trim() !== '') {
+          searchParams.append(key, value.trim())
+        }
+      })
 
-    const res = await fetch(url)
-    if (!res.ok) {
-      error.value = `Error ${res.status}`
+      const url =
+        `${API_BASE}/especialistas` +
+        (searchParams.toString() ? `?${searchParams.toString()}` : '')
+
+      const res = await fetch(url)
+
+      if (!res.ok) {
+        error.value = `Error ${res.status}`
+        throw new Error(error.value)
+      }
+
+      const json = await res.json()
+      return json.data ?? json
+    } finally {
       loading.value = false
-      throw new Error(error.value)
     }
-
-    const json = await res.json()
-    loading.value = false
-    return json.data ?? json
   }
 
   async function fetchEspecialidades() {

@@ -420,6 +420,7 @@ onBeforeUnmount(() => {
       <p class="miembro" v-else>
         Miembro de la comunidad Nura
       </p>
+      <p v-if="user.email" class="email-line">{{ user.email }}</p>
 
       <div class="badges">
         <span class="badge">Comunidad Nura</span>
@@ -919,6 +920,12 @@ onBeforeUnmount(() => {
   background: #50bdbd;
   color: #fff;
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+}
+
+.email-line {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: #64748b;
 }
 
 @media (hover: hover) {
