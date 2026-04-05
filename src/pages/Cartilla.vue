@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
-import flatpickr from 'flatpickr'
-import { Spanish } from 'flatpickr/dist/l10n/es.js'
-import 'flatpickr/dist/flatpickr.css'
 import { useRoute, useRouter } from 'vue-router'
 import { useNuraApi } from '@/composables/useNuraApi'
 import { useNotificationSettings } from '@/composables/useNotificationSettings'
@@ -17,6 +14,7 @@ const MP_DEPOSIT_URL = 'https://mpago.la/2b1Jhzj'
 const prefs = useNotificationSettings()
 const IMAGE_BASE_URL = 'https://backend-nura.onrender.com'
 const CANCEL_LIMIT_HOURS = 48
+const API_BASE = (import.meta.env.VITE_NURA_API_URL || 'https://backend-nura.onrender.com/api').replace(/\/+$/, '')
 
 type Contact = {
   email?: string
@@ -57,6 +55,7 @@ type Profesional = {
   is_virtual?: boolean
   horarios?: Horarios
   sessionDuration?: number
+  googleCalendarConnected?: boolean
 }
 
 type AppointmentRow = {
@@ -67,6 +66,16 @@ type AppointmentRow = {
   details: string | null
   modality?: string | null
   professional?: string | null
+}
+
+type WeeklyAvailabilityDay = {
+  date: string
+  label: string
+  shortLabel: string
+  slots: string[]
+  available: boolean
+  isToday: boolean
+  isPast: boolean
 }
 
 const profesionales = ref<Profesional[]>([])
@@ -256,7 +265,7 @@ async function loadProfesionales() {
       return
     }
   } catch {
-    // fallback
+    //
   } finally {
     loading.value = false
   }
@@ -282,6 +291,7 @@ async function loadProfesionales() {
       horarios: r.horarios,
       sessionDuration: r.sessionDuration,
       coverage: r.coverage,
+      googleCalendarConnected: Boolean(r.google_calendar_connected),
       modality:
         r.modality ||
         (typeof r.is_virtual === 'boolean' ? (r.is_virtual ? 'Virtual' : 'Presencial') : '')
@@ -334,6 +344,7 @@ const insurances = computed(() => {
 
 const filteredProfesionales = computed(() => {
   const term = search.value.trim().toLowerCase()
+
   return profesionales.value.filter((p) => {
     const name = normalize(p.name)
     const specialty = normalize(p.specialty || p.type)
@@ -385,46 +396,231 @@ const pendingProForPolicy = ref<Profesional | null>(null)
 const occupiedSlots = ref<string[]>([])
 const loadingOccupiedSlots = ref(false)
 
-let fp: any = null
+/* ============ CALENDARIO SEMANAL TIPO CALENDLY ============ */
+const weekOffset = ref(0)
+const weeklyAvailability = ref<WeeklyAvailabilityDay[]>([])
+const loadingWeeklyAvailability = ref(false)
+const selectedWeekAnchor = ref('')
 
-const availableSlots = computed(() => {
-  const raw = buildRawSlots(selectedPro.value, bookingDate.value)
-  if (!raw.length) return []
+function getTodayDateISO(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
+}
 
-  const occupied = new Set(occupiedSlots.value)
+function isPastDate(dateStr: string): boolean {
+  return dateStr < getTodayDateISO()
+}
 
-  return raw.filter((slot) => {
-    if (editingAppointmentId.value) {
-      const ownEditingTime = normalizeTimeToHHMM(appointments.value.find((a) => a.id === editingAppointmentId.value)?.at_time)
-      if (slot === ownEditingTime) return true
-    }
-    return !occupied.has(slot)
+function isToday(dateStr: string): boolean {
+  return dateStr === getTodayDateISO()
+}
+
+function isPastTimeToday(dateStr: string, slotHHMM: string): boolean {
+  if (!isToday(dateStr)) return false
+
+  const [hours, minutes] = String(slotHHMM).split(':').map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return false
+
+  const now = new Date()
+  const slotDate = new Date()
+  slotDate.setHours(hours, minutes, 0, 0)
+
+  return slotDate.getTime() <= now.getTime()
+}
+
+function getStartOfWeek(base = new Date()) {
+  const date = new Date(base)
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function formatDateISO(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
+function formatDayLabel(date: Date): string {
+  return date.toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short'
   })
+}
+
+function formatShortDayLabel(date: Date): string {
+  return date.toLocaleDateString('es-AR', {
+    weekday: 'short',
+    day: 'numeric'
+  })
+}
+
+const weekLabel = computed(() => {
+  if (!weeklyAvailability.value.length) return 'Disponibilidad semanal'
+
+  const first = weeklyAvailability.value[0]?.date
+  const last = weeklyAvailability.value[weeklyAvailability.value.length - 1]?.date
+  if (!first || !last) return 'Disponibilidad semanal'
+
+  const firstDate = new Date(first + 'T00:00:00')
+  const lastDate = new Date(last + 'T00:00:00')
+
+  const firstText = firstDate.toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short'
+  })
+
+  const lastText = lastDate.toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short'
+  })
+
+  return `${firstText} al ${lastText}`
 })
 
-function initDatepicker() {
-  nextTick(() => {
-    if (fp) fp.destroy()
+const selectedDayAvailability = computed(() => {
+  return weeklyAvailability.value.find((d) => d.date === bookingDate.value) || null
+})
 
-    const input = document.querySelector('#nura-datepicker') as HTMLInputElement
-    if (!input) return
+const selectedDaySlots = computed(() => {
+  return selectedDayAvailability.value?.slots || []
+})
 
-    fp = flatpickr(input, {
-      locale: Spanish,
-      dateFormat: 'Y-m-d',
-      altInput: true,
-      altFormat: 'd/m/Y',
-      altInputClass: 'nura-date-input',
-      minDate: 'today',
-      allowInput: false,
-      defaultDate: bookingDate.value || undefined,
-      onChange: async (_selectedDates: Date[], dateStr: string) => {
-        bookingDate.value = dateStr
-        await loadOccupiedSlotsForSelected()
-        updateBookingTimeFromDate()
-      }
+function canGoPrevWeek() {
+  return weekOffset.value > 0
+}
+
+async function prevWeek() {
+  if (!canGoPrevWeek()) return
+  weekOffset.value -= 1
+  await loadWeeklyAvailability()
+}
+
+async function nextWeek() {
+  weekOffset.value += 1
+  await loadWeeklyAvailability()
+}
+
+async function selectDay(date: string) {
+  const day = weeklyAvailability.value.find((d) => d.date === date)
+  if (!day || day.isPast) return
+
+  bookingDate.value = date
+
+  if (day.slots.length) {
+    if (!day.slots.includes(bookingTime.value)) {
+      bookingTime.value = day.slots[0]
+    }
+  } else {
+    bookingTime.value = ''
+  }
+}
+
+function getWeekRange() {
+  const start = getStartOfWeek(new Date())
+  start.setDate(start.getDate() + weekOffset.value * 7)
+
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+
+  return {
+    start,
+    end,
+    from: formatDateISO(start),
+    to: formatDateISO(end)
+  }
+}
+
+async function loadOccupiedSlotsForDay(pro: Profesional | null, dateStr: string): Promise<string[]> {
+  if (!pro || !dateStr) return []
+
+  const professionalLabel = getProfessionalLabel(pro)
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('id, at_time, professional')
+    .eq('on_date', dateStr)
+    .eq('professional', professionalLabel)
+
+  if (error) {
+    console.error(error)
+    return []
+  }
+
+  return (data || [])
+    .filter((row: any) => {
+      if (editingAppointmentId.value && row.id === editingAppointmentId.value) return false
+      return true
     })
-  })
+    .map((row: any) => normalizeTimeToHHMM(row.at_time))
+    .filter(Boolean)
+}
+
+async function loadWeeklyAvailability() {
+  weeklyAvailability.value = []
+
+  if (!selectedPro.value) return
+
+  loadingWeeklyAvailability.value = true
+
+  try {
+    const { start } = getWeekRange()
+    selectedWeekAnchor.value = formatDateISO(start)
+
+    const days: WeeklyAvailabilityDay[] = []
+
+    for (let i = 0; i < 7; i++) {
+      const current = new Date(start)
+      current.setDate(start.getDate() + i)
+
+      const dateStr = formatDateISO(current)
+      const rawSlots = buildRawSlots(selectedPro.value, dateStr)
+      const occupied = new Set(await loadOccupiedSlotsForDay(selectedPro.value, dateStr))
+
+      const filteredSlots = rawSlots.filter((slot) => {
+        if (occupied.has(slot)) return false
+        if (isPastTimeToday(dateStr, slot)) return false
+        return true
+      })
+
+      const past = isPastDate(dateStr)
+
+      days.push({
+        date: dateStr,
+        label: formatDayLabel(current),
+        shortLabel: formatShortDayLabel(current),
+        slots: past ? [] : filteredSlots,
+        available: !past && filteredSlots.length > 0,
+        isToday: dateStr === getTodayDateISO(),
+        isPast: past
+      })
+    }
+
+    weeklyAvailability.value = days
+
+    const dayStillValid = days.find((d) => d.date === bookingDate.value)
+    const currentTimeStillValid =
+      !!dayStillValid &&
+      dayStillValid.slots.length > 0 &&
+      dayStillValid.slots.includes(bookingTime.value)
+
+    if (currentTimeStillValid) return
+
+    const firstAvailableDay = days.find((d) => d.slots.length > 0)
+
+    if (firstAvailableDay) {
+      bookingDate.value = firstAvailableDay.date
+      bookingTime.value = firstAvailableDay.slots[0] || ''
+    } else {
+      bookingDate.value = days[0]?.date || ''
+      bookingTime.value = ''
+    }
+  } catch (err) {
+    console.error(err)
+  } finally {
+    loadingWeeklyAvailability.value = false
+  }
 }
 
 async function loadOccupiedSlotsForSelected() {
@@ -434,23 +630,7 @@ async function loadOccupiedSlotsForSelected() {
 
   loadingOccupiedSlots.value = true
   try {
-    const professionalLabel = getProfessionalLabel(selectedPro.value)
-
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('id, at_time, professional')
-      .eq('on_date', bookingDate.value)
-      .eq('professional', professionalLabel)
-
-    if (error) throw error
-
-    occupiedSlots.value = (data || [])
-      .filter((row: any) => {
-        if (editingAppointmentId.value && row.id === editingAppointmentId.value) return false
-        return true
-      })
-      .map((row: any) => normalizeTimeToHHMM(row.at_time))
-      .filter(Boolean)
+    occupiedSlots.value = await loadOccupiedSlotsForDay(selectedPro.value, bookingDate.value)
   } catch (err) {
     console.error(err)
     occupiedSlots.value = []
@@ -458,6 +638,30 @@ async function loadOccupiedSlotsForSelected() {
     loadingOccupiedSlots.value = false
   }
 }
+
+const availableSlots = computed(() => {
+  const baseSlots = selectedDaySlots.value.length
+    ? selectedDaySlots.value
+    : buildRawSlots(selectedPro.value, bookingDate.value)
+
+  if (!baseSlots.length) return []
+
+  const occupied = new Set(occupiedSlots.value)
+
+  return baseSlots.filter((slot) => {
+    if (editingAppointmentId.value) {
+      const ownEditingTime = normalizeTimeToHHMM(
+        appointments.value.find((a) => a.id === editingAppointmentId.value)?.at_time
+      )
+      if (slot === ownEditingTime) return true
+    }
+
+    if (occupied.has(slot)) return false
+    if (isPastTimeToday(bookingDate.value, slot)) return false
+
+    return true
+  })
+})
 
 function updateBookingTimeFromDate() {
   if (!availableSlots.value.length) {
@@ -475,10 +679,12 @@ function validateTimeRangeHHMM(timeHHMM: string): boolean {
   return availableSlots.value.includes(t)
 }
 
-function nextValidSlotForProfessional(p: Profesional | null): { date: string; time: string } {
+async function nextValidSlotForProfessional(
+  p: Profesional | null
+): Promise<{ date: string; time: string }> {
   const base = new Date()
 
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 21; i++) {
     const date = new Date(base)
     date.setDate(base.getDate() + i)
 
@@ -487,9 +693,19 @@ function nextValidSlotForProfessional(p: Profesional | null): { date: string; ti
     const dd = String(date.getDate()).padStart(2, '0')
     const dateStr = `${yyyy}-${mm}-${dd}`
 
-    const slots = buildRawSlots(p, dateStr)
-    if (slots.length) {
-      return { date: dateStr, time: slots[0] }
+    const rawSlots = buildRawSlots(p, dateStr)
+    if (!rawSlots.length) continue
+
+    const occupied = new Set(await loadOccupiedSlotsForDay(p, dateStr))
+
+    const available = rawSlots.filter((slot) => {
+      if (occupied.has(slot)) return false
+      if (isPastTimeToday(dateStr, slot)) return false
+      return true
+    })
+
+    if (available.length) {
+      return { date: dateStr, time: available[0] }
     }
   }
 
@@ -518,13 +734,14 @@ async function createNotification(opts: { title: string; body?: string; type?: s
     body: opts.body ?? null,
     type: opts.type ?? null
   })
+
   if (error) console.error('Error creando notificación:', error)
 }
 
 /* ====== Flujo: política + modal de turno ====== */
 function openPolicyModal(p: Profesional) {
   if (!auth.user) {
-    alert('Tenés que iniciar sesión para agendar un turno.')
+    bookingError.value = 'Tenés que iniciar sesión para agendar un turno.'
     return
   }
   pendingProForPolicy.value = p
@@ -567,7 +784,7 @@ async function openBookingModal(p: Profesional) {
 
   selectedPro.value = p
 
-  const nextSlot = nextValidSlotForProfessional(p)
+  const nextSlot = await nextValidSlotForProfessional(p)
   bookingDate.value = nextSlot.date
   bookingTime.value = nextSlot.time
 
@@ -577,9 +794,10 @@ async function openBookingModal(p: Profesional) {
   bookingError.value = ''
   showBookingModal.value = true
   editingAppointmentId.value = null
+  weekOffset.value = 0
 
-  initDatepicker()
   await loadOccupiedSlotsForSelected()
+  await loadWeeklyAvailability()
   updateBookingTimeFromDate()
 }
 
@@ -589,6 +807,57 @@ function closeBookingModal() {
   selectedPro.value = null
   editingAppointmentId.value = null
   occupiedSlots.value = []
+  weeklyAvailability.value = []
+  weekOffset.value = 0
+  bookingDate.value = ''
+  bookingTime.value = ''
+}
+
+/* ================= GOOGLE CALENDAR ================= */
+const googleSyncLoading = ref(false)
+const googleSyncError = ref('')
+const googleSyncSuccess = ref('')
+
+async function syncGoogleCalendar() {
+  googleSyncError.value = ''
+  googleSyncSuccess.value = ''
+
+  if (!selectedPro.value) {
+    googleSyncError.value = 'Primero seleccioná un profesional.'
+    return
+  }
+
+  googleSyncLoading.value = true
+
+  try {
+    const professionalId = selectedPro.value._id || selectedPro.value.id
+
+    if (!professionalId) {
+      googleSyncError.value = 'No se pudo identificar al profesional.'
+      return
+    }
+
+    const res = await fetch(`${API_BASE}/google/auth-url?professionalId=${professionalId}`, {
+      credentials: 'include'
+    })
+
+    if (!res.ok) {
+      throw new Error('No se pudo obtener la URL de autorización.')
+    }
+
+    const data = await res.json()
+
+    if (!data?.url) {
+      throw new Error('La respuesta no incluyó URL de Google.')
+    }
+
+    window.location.href = data.url
+  } catch (err) {
+    console.error(err)
+    googleSyncError.value = 'No se pudo iniciar la sincronización con Google.'
+  } finally {
+    googleSyncLoading.value = false
+  }
 }
 
 /* PAGO SEÑA */
@@ -616,6 +885,7 @@ async function payDepositWithMercadoPago() {
   }
 
   mpLoading.value = true
+
   try {
     const details = [
       `Modalidad: ${bookingMode.value}`,
@@ -631,7 +901,7 @@ async function payDepositWithMercadoPago() {
       title: `Seña (pendiente) – ${selectedPro.value.name ?? 'Profesional'}`,
       details,
       professional: getProfessionalLabel(selectedPro.value),
-      modality: selectedPro.value.modality ?? bookingMode.value
+      modality: bookingMode.value
     })
 
     window.open(MP_DEPOSIT_URL, '_blank', 'noopener,noreferrer')
@@ -646,6 +916,7 @@ async function payDepositWithMercadoPago() {
 async function loadAppointments() {
   if (!auth.user) return
   loadingAppointments.value = true
+
   try {
     const { data, error } = await supabase
       .from('appointments')
@@ -653,6 +924,7 @@ async function loadAppointments() {
       .eq('user_id', auth.user.id)
       .order('on_date')
       .order('at_time')
+
     if (error) throw error
 
     const now = Date.now()
@@ -666,28 +938,6 @@ async function loadAppointments() {
     loadingAppointments.value = false
   }
 }
-
-watch(
-  () => bookingDate.value,
-  async () => {
-    if (!showBookingModal.value) return
-    await loadOccupiedSlotsForSelected()
-    updateBookingTimeFromDate()
-  }
-)
-
-onMounted(async () => {
-  prefs.loadFromLocal()
-  await prefs.loadFromSupabase()
-
-  await loadProfesionales()
-  await loadAppointments()
-
-  if (route.query.verTurnos === '1') {
-    showAppointmentsModal.value = true
-    router.replace({ path: route.path, query: {} })
-  }
-})
 
 /* ================= HELPERS UI ================= */
 async function openAppointmentsModal() {
@@ -714,6 +964,16 @@ function formatDate(iso: string) {
 function formatTime(t: string | null) {
   if (!t) return ''
   return String(t).slice(0, 5)
+}
+
+function formatSelectedDateLong(iso: string) {
+  if (!iso) return ''
+  const date = new Date(`${iso}T00:00:00`)
+  return date.toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  })
 }
 
 /* ================= CONFLICTO DE HORARIO ================= */
@@ -773,7 +1033,7 @@ async function saveAppointment() {
       title: `Turno – ${selectedPro.value.name ?? 'Profesional'}`,
       details: `Modalidad: ${bookingMode.value} · Email: ${bookingEmail.value}`,
       professional: getProfessionalLabel(selectedPro.value),
-      modality: selectedPro.value.modality ?? bookingMode.value
+      modality: bookingMode.value
     }
 
     if (editingAppointmentId.value) {
@@ -786,6 +1046,8 @@ async function saveAppointment() {
 
     await loadAppointments()
     await loadOccupiedSlotsForSelected()
+    await loadWeeklyAvailability()
+
     showBookingModal.value = false
     turnoConfirmado.value = true
     editingAppointmentId.value = null
@@ -805,21 +1067,27 @@ async function saveAppointment() {
 
 async function startEditAppointment(a: AppointmentRow) {
   const proName = (a.professional || a.title || '').split('–')[0].trim()
-  const matched = profesionales.value.find((p) => getProfessionalLabel(p) === (a.professional || '').trim() || (p.name || '').trim() === proName)
+  const matched = profesionales.value.find(
+    (p) =>
+      getProfessionalLabel(p) === (a.professional || '').trim() ||
+      (p.name || '').trim() === proName
+  )
 
   selectedPro.value = matched ?? ({ name: proName || 'Profesional' } as Profesional)
 
   bookingDate.value = a.on_date
   bookingTime.value = formatTime(a.at_time)
-  bookingMode.value = (a.modality as any) || 'Presencial'
+  bookingMode.value = (a.modality as 'Presencial' | 'Virtual') || 'Presencial'
   bookingHasSingleMode.value = false
   bookingEmail.value = auth.user?.email ?? ''
   editingAppointmentId.value = a.id
+  weekOffset.value = 0
 
   showAppointmentsModal.value = false
   showBookingModal.value = true
-  initDatepicker()
+
   await loadOccupiedSlotsForSelected()
+  await loadWeeklyAvailability()
   updateBookingTimeFromDate()
 }
 
@@ -871,10 +1139,11 @@ async function confirmDeleteAppointmentAction() {
     confirmDeleteAppt.value = null
     await loadAppointments()
     await loadOccupiedSlotsForSelected()
+    await loadWeeklyAvailability()
   } catch (e) {
     console.error(e)
     confirmDeleteAppt.value = null
-    alert('No se pudo cancelar el turno. Probá de nuevo.')
+    bookingError.value = 'No se pudo cancelar el turno. Probá de nuevo.'
   }
 }
 
@@ -885,6 +1154,38 @@ function goToProfessionalForRebook() {
   closeTooLateCancelModal()
   showAppointmentsModal.value = false
 }
+
+/* ================= WATCHERS ================= */
+watch(
+  () => bookingDate.value,
+  async () => {
+    if (!showBookingModal.value) return
+    await loadOccupiedSlotsForSelected()
+    updateBookingTimeFromDate()
+  }
+)
+
+watch(
+  () => showBookingModal.value,
+  async (open) => {
+    if (!open || !selectedPro.value) return
+    await loadWeeklyAvailability()
+  }
+)
+
+/* ================= MOUNT ================= */
+onMounted(async () => {
+  prefs.loadFromLocal()
+  await prefs.loadFromSupabase()
+
+  await loadProfesionales()
+  await loadAppointments()
+
+  if (route.query.verTurnos === '1') {
+    showAppointmentsModal.value = true
+    router.replace({ path: route.path, query: {} })
+  }
+})
 </script>
 
 <template>
@@ -983,8 +1284,16 @@ function goToProfessionalForRebook() {
         </div>
 
         <div class="prof-main">
-          <h3 class="prof-name">{{ p.name }}</h3>
-          <p class="prof-specialty">{{ p.specialty || p.type }}</p>
+          <div class="prof-top">
+            <div>
+              <h3 class="prof-name">{{ p.name }}</h3>
+              <p class="prof-specialty">{{ p.specialty || p.type }}</p>
+            </div>
+
+            <span v-if="p.googleCalendarConnected" class="sync-badge">
+              Agenda sincronizada
+            </span>
+          </div>
 
           <p v-if="p.city || p.province" class="prof-location">
             {{ p.city }}
@@ -1032,6 +1341,7 @@ function goToProfessionalForRebook() {
             :href="`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(getEmail(p))}`"
             target="_blank"
             rel="noopener"
+            aria-label="Enviar email"
           >
             <i class="fa-solid fa-envelope"></i>
           </a>
@@ -1052,14 +1362,11 @@ function goToProfessionalForRebook() {
           </p>
 
           <ul class="policy-list">
+            <li>Los turnos se reservan dentro del horario disponible del profesional.</li>
+            <li>Si cancelás con al menos <strong>48 horas</strong> de anticipación, la seña se devuelve.</li>
             <li>
-              Los turnos se reservan dentro del horario disponible del profesional.
-            </li>
-            <li>
-              Si cancelás con al menos <strong>48 horas</strong> de anticipación, la seña se devuelve.
-            </li>
-            <li>
-              Si querés cancelar dentro de las 48 hs previas, la seña no es reembolsable. Podés reprogramarlo sacando un nuevo turno con el profesional.
+              Si querés cancelar dentro de las 48 hs previas, la seña no es reembolsable. Podés
+              reprogramarlo sacando un nuevo turno con el profesional.
             </li>
           </ul>
 
@@ -1076,111 +1383,211 @@ function goToProfessionalForRebook() {
     </div>
 
     <div v-if="showBookingModal" class="modal-backdrop" @click.self="closeBookingModal">
-      <div class="modal-card modal-appointment animate-fade-in">
+      <div class="modal-card modal-appointment modal-appointment-wide animate-fade-in">
         <header class="modal-header">
           <h3 class="modal-title">{{ editingAppointmentId ? 'Editar turno' : 'Agendar turno' }}</h3>
           <button type="button" class="modal-close" @click="closeBookingModal">×</button>
         </header>
 
         <section class="modal-body modal-body-scroll">
-          <div class="prof-summary">
-            <img
-              v-if="selectedPro && getAvatarUrl(selectedPro)"
-              :src="getAvatarUrl(selectedPro as any)"
-              class="prof-summary-avatar"
-              alt=""
-            />
-            <div>
-              <p class="prof-summary-name">{{ selectedPro?.name }}</p>
-              <p class="prof-summary-type">
-                {{ selectedPro?.specialty || selectedPro?.type }}
-              </p>
-              <p v-if="selectedPro && bookingDate" class="modal-note">
-                Horario de atención del día:
-                {{ getScheduleForDate(selectedPro, bookingDate)?.from || '--:--' }}
-                a
-                {{ getScheduleForDate(selectedPro, bookingDate)?.to || '--:--' }}
-              </p>
+          <div class="booking-topbar">
+            <div class="prof-summary">
+              <img
+                v-if="selectedPro && getAvatarUrl(selectedPro)"
+                :src="getAvatarUrl(selectedPro as any)"
+                class="prof-summary-avatar"
+                alt=""
+              />
+              <div>
+                <p class="prof-summary-name">{{ selectedPro?.name }}</p>
+                <p class="prof-summary-type">
+                  {{ selectedPro?.specialty || selectedPro?.type }}
+                </p>
+              </div>
+            </div>
+
+            <div class="sync-actions">
+              <button
+                type="button"
+                class="pill pill--outline sync-btn"
+                :disabled="googleSyncLoading"
+                @click="syncGoogleCalendar"
+              >
+                {{ googleSyncLoading ? 'Sincronizando…' : 'Sincronizar agenda' }}
+              </button>
             </div>
           </div>
 
-          <div class="modal-field">
-            <label for="nura-datepicker">Fecha</label>
-            <input id="nura-datepicker" v-model="bookingDate" type="text" aria-label="Fecha del turno" />
+          <p v-if="googleSyncSuccess" class="modal-success">
+            {{ googleSyncSuccess }}
+          </p>
+
+          <p v-if="googleSyncError" class="modal-error">
+            {{ googleSyncError }}
+          </p>
+
+          <div class="booking-layout">
+            <section class="calendar-panel">
+              <div class="calendar-panel-head">
+                <div>
+                  <p class="calendar-kicker">Disponibilidad</p>
+                  <h4 class="calendar-title">{{ weekLabel }}</h4>
+                </div>
+
+                <div class="calendar-nav">
+                  <button
+                    type="button"
+                    class="calendar-nav-btn"
+                    :disabled="!canGoPrevWeek()"
+                    @click="prevWeek"
+                    aria-label="Semana anterior"
+                  >
+                    ‹
+                  </button>
+
+                  <button
+                    type="button"
+                    class="calendar-nav-btn"
+                    @click="nextWeek"
+                    aria-label="Semana siguiente"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="loadingWeeklyAvailability" class="week-grid week-grid--skeleton">
+                <div v-for="n in 7" :key="`day-skeleton-${n}`" class="day-card-skeleton"></div>
+              </div>
+
+              <div v-else class="week-grid">
+                <button
+                  v-for="day in weeklyAvailability"
+                  :key="day.date"
+                  type="button"
+                  class="day-card"
+                  :class="{
+                    'day-card--active': bookingDate === day.date,
+                    'day-card--muted': !day.available,
+                    'day-card--today': day.isToday,
+                    'day-card--past': day.isPast
+                  }"
+                  @click="selectDay(day.date)"
+                  :disabled="day.isPast"
+                >
+                  <span class="day-card-top">
+                    <span class="day-card-label">{{ day.shortLabel }}</span>
+                    <span v-if="day.isToday" class="day-chip">Hoy</span>
+                  </span>
+
+                  <strong class="day-card-status">
+                    {{
+                      day.isPast
+                        ? 'Día pasado'
+                        : day.available
+                          ? 'Disponible'
+                          : 'Sin horarios'
+                    }}
+                  </strong>
+
+                  <small class="day-card-count">
+                    {{
+                      day.isPast
+                        ? 'No disponible'
+                        : day.available
+                          ? `${day.slots.length} horarios`
+                          : 'Elegí otro día'
+                    }}
+                  </small>
+                </button>
+              </div>
+            </section>
+
+            <section class="slots-panel">
+              <div class="slots-panel-head">
+                <p class="slots-kicker">Horario elegido</p>
+                <h4 class="slots-title">
+                  {{ bookingDate ? formatSelectedDateLong(bookingDate) : 'Seleccioná un día' }}
+                </h4>
+                <p v-if="selectedPro && bookingDate" class="modal-note slots-note">
+                  Atención:
+                  {{ getScheduleForDate(selectedPro, bookingDate)?.from || '--:--' }}
+                  a
+                  {{ getScheduleForDate(selectedPro, bookingDate)?.to || '--:--' }}
+                  ·
+                  {{ getSessionDuration(selectedPro) }} min
+                </p>
+              </div>
+
+              <div v-if="loadingOccupiedSlots" class="slots-grid slots-grid--skeleton">
+                <div v-for="n in 8" :key="`slot-skeleton-${n}`" class="slot-skeleton"></div>
+              </div>
+
+              <div v-else-if="availableSlots.length" class="slots-grid">
+                <button
+                  v-for="slot in availableSlots"
+                  :key="slot"
+                  type="button"
+                  class="slot-btn"
+                  :class="{ 'slot-btn--active': bookingTime === slot }"
+                  @click="bookingTime = slot"
+                >
+                  {{ slot }}
+                </button>
+              </div>
+
+              <div v-else class="slots-empty">
+                <p>No hay horarios disponibles para este día.</p>
+                <small>Probá con otro día de la semana.</small>
+              </div>
+
+              <div v-if="!bookingHasSingleMode" class="modal-field">
+                <label for="booking-mode">Modalidad</label>
+                <select id="booking-mode" v-model="bookingMode" aria-label="Modalidad del turno">
+                  <option value="Presencial">Presencial</option>
+                  <option value="Virtual">Virtual</option>
+                </select>
+              </div>
+
+              <div v-else class="modal-field">
+                <label>Modalidad</label>
+                <span class="modal-readonly-pill">{{ bookingMode }}</span>
+              </div>
+
+              <div class="modal-field">
+                <label for="booking-email">Email de contacto</label>
+                <input
+                  id="booking-email"
+                  v-model="bookingEmail"
+                  type="email"
+                  aria-label="Email de contacto para el turno"
+                  placeholder="tucorreo@mail.com"
+                />
+              </div>
+
+              <div class="modal-field">
+                <label>Reserva de turno</label>
+
+                <p class="modal-note">
+                  Abonás una seña para reservar tu lugar. Si cancelás con al menos 48 horas de anticipación,
+                  se te reintegra la seña. El día del turno abonás el resto directamente al profesional.
+                </p>
+
+                <button
+                  type="button"
+                  class="pill pill--primary mp-button"
+                  :disabled="mpLoading"
+                  @click="payDepositWithMercadoPago"
+                >
+                  {{ mpLoading ? 'Redirigiendo a Mercado Pago…' : 'Pagar seña con Mercado Pago' }}
+                </button>
+
+                <p v-if="mpError" class="modal-error">{{ mpError }}</p>
+              </div>
+
+              <p v-if="bookingError" class="modal-error">{{ bookingError }}</p>
+            </section>
           </div>
-
-          <div class="modal-field">
-            <label for="booking-time">Horario disponible</label>
-
-            <select
-              id="booking-time"
-              v-model="bookingTime"
-              aria-label="Horario del turno"
-              :disabled="!availableSlots.length"
-            >
-              <option value="" disabled>
-                {{ availableSlots.length ? 'Seleccionar horario' : 'No hay horarios disponibles ese día' }}
-              </option>
-
-              <option v-for="slot in availableSlots" :key="slot" :value="slot">
-                {{ slot }}
-              </option>
-            </select>
-
-            <small class="hint" v-if="selectedPro">
-              Duración de sesión: {{ getSessionDuration(selectedPro) }} min
-            </small>
-
-            <small class="hint" v-if="loadingOccupiedSlots">
-              Revisando horarios ocupados…
-            </small>
-          </div>
-
-          <div v-if="!bookingHasSingleMode" class="modal-field">
-            <label for="booking-mode">Modalidad</label>
-            <select id="booking-mode" v-model="bookingMode" aria-label="Modalidad del turno">
-              <option value="Presencial">Presencial</option>
-              <option value="Virtual">Virtual</option>
-            </select>
-          </div>
-
-          <div v-else class="modal-field">
-            <label>Modalidad</label>
-            <span class="modal-readonly-pill">{{ bookingMode }}</span>
-          </div>
-
-          <div class="modal-field">
-            <label for="booking-email">Email de contacto</label>
-            <input
-              id="booking-email"
-              v-model="bookingEmail"
-              type="email"
-              aria-label="Email de contacto para el turno"
-              placeholder="tucorreo@mail.com"
-            />
-          </div>
-
-          <div class="modal-field">
-            <label>Reserva de turno</label>
-
-            <p class="modal-note">
-              Abonás una seña para reservar tu lugar. Si cancelás con al menos 48 horas de anticipación, se te reintegra la seña.
-              El día del turno abonás el resto directamente al profesional.
-            </p>
-
-            <button
-              type="button"
-              class="pill pill--primary mp-button"
-              :disabled="mpLoading"
-              @click="payDepositWithMercadoPago"
-            >
-              {{ mpLoading ? 'Redirigiendo a Mercado Pago…' : 'Pagar seña con Mercado Pago' }}
-            </button>
-
-            <p v-if="mpError" class="modal-error">{{ mpError }}</p>
-          </div>
-
-          <p v-if="bookingError" class="modal-error">{{ bookingError }}</p>
         </section>
 
         <footer class="modal-footer">
@@ -1219,7 +1626,7 @@ function goToProfessionalForRebook() {
           <ul v-else class="appt-list">
             <li v-for="a in appointments" :key="a.id" class="appt-item">
               <div class="appt-main">
-                <h4 class="appt-title">{{ a.title }}</h4>
+                <h4 class="appt-title">{{ a.title || `Turno – ${a.professional || 'Profesional'}` }}</h4>
                 <p class="appt-meta">
                   {{ formatDate(a.on_date) }} · {{ formatTime(a.at_time) }}
                   <span v-if="a.modality"> · {{ a.modality }}</span>
@@ -1297,7 +1704,7 @@ function goToProfessionalForRebook() {
         <section class="modal-body">
           <p>
             ¿Querés cancelar tu turno con
-            <strong>{{ confirmDeleteAppt.professional }}</strong>?
+            <strong>{{ confirmDeleteAppt.professional || 'el profesional' }}</strong>?
           </p>
           <p class="modal-note">Esta acción no se puede deshacer.</p>
         </section>
@@ -1312,7 +1719,22 @@ function goToProfessionalForRebook() {
 </template>
 
 <style scoped>
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
+
+:global(:root) {
+  --nura-green: #50bdbd;
+  --nura-green-dark: #3ea9a9;
+  --nura-green-soft: #d9f5f5;
+  --nura-green-soft-2: #ecfcfc;
+  --nura-border: #d7ecec;
+  --nura-text: #0f172a;
+  --nura-muted: #64748b;
+  --nura-danger: #ef4444;
+  --nura-danger-dark: #dc2626;
+  --nura-success: #16a34a;
+}
 
 .contenido {
   background: #fff;
@@ -1329,10 +1751,12 @@ function goToProfessionalForRebook() {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0,0,0,0);
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
 }
+
+/* ================= PAGE ================= */
 
 .page-head {
   display: flex;
@@ -1352,7 +1776,7 @@ function goToProfessionalForRebook() {
 
 .page-sub {
   margin: 4px 0 0;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: #4b5563;
 }
 
@@ -1360,12 +1784,14 @@ function goToProfessionalForRebook() {
   background: #ffffff;
   border-radius: 18px;
   padding: 14px 18px;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
 }
+
+/* ================= FILTERS ================= */
 
 .filters {
   margin-bottom: 22px;
-  background: #d9f5f5;
+  background: var(--nura-green-soft);
 }
 
 .filters-row {
@@ -1390,17 +1816,19 @@ function goToProfessionalForRebook() {
 .field label {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
-  color: #000;
+  color: #334155;
+  font-weight: 600;
 }
 
 .field input,
 .field select {
   border-radius: 999px;
-  border: 1.5px solid #50bdbd;
+  border: 1.5px solid var(--nura-green);
   padding: 9px 14px;
   font-size: 0.85rem;
   outline: none;
-  background: #ecfcfcff;
+  background: var(--nura-green-soft-2);
+  color: var(--nura-text);
 }
 
 .field input:focus,
@@ -1424,9 +1852,9 @@ function goToProfessionalForRebook() {
   gap: 8px;
   align-items: center;
   border-radius: 999px;
-  background: #d9f5f5;
+  background: var(--nura-green-soft);
   padding: 4px 6px 4px 12px;
-  border: 2px solid #50bdbd;
+  border: 2px solid var(--nura-green);
   position: relative;
 }
 
@@ -1449,6 +1877,7 @@ function goToProfessionalForRebook() {
 
 .field--search input:focus {
   outline: none;
+  box-shadow: none;
 }
 
 .filters-footer {
@@ -1474,35 +1903,47 @@ function goToProfessionalForRebook() {
   border: 1px solid #c0eaea;
 }
 
+/* ================= BUTTONS ================= */
+
 .pill {
   border-radius: 999px;
-  padding: 7px 16px;
-  font-size: 0.8rem;
+  padding: 8px 16px;
+  font-size: 0.82rem;
   border: none;
   background: var(--nura-green);
   color: #fff;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    opacity 0.15s ease;
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.35);
 }
 
-.pill:hover {
-  background: #3ea9a9;
+.pill:hover:not(:disabled) {
+  background: var(--nura-green-dark);
   transform: translateY(-1px);
+}
+
+.pill:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .pill--primary {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .pill--ghost,
 .pill--ghost-limpiar {
-  background: #50bdbd;
+  background: var(--nura-green);
   box-shadow: 0 4px 12px rgba(80, 189, 189, 0.3);
   font-weight: 600;
 }
@@ -1512,10 +1953,14 @@ function goToProfessionalForRebook() {
 }
 
 .pill--danger {
-  background: #ef4444;
-  box-shadow: 0 8px 18px rgba(239,68,68,0.4);
+  background: var(--nura-danger);
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.35);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 650;
+}
+
+.pill--danger:hover:not(:disabled) {
+  background: var(--nura-danger-dark);
 }
 
 .pill--outline {
@@ -1525,7 +1970,7 @@ function goToProfessionalForRebook() {
   box-shadow: none;
 }
 
-.pill--outline:hover {
+.pill--outline:hover:not(:disabled) {
   background: #ffffff;
 }
 
@@ -1542,19 +1987,24 @@ function goToProfessionalForRebook() {
   box-shadow: none;
 }
 
-.pill--light:hover {
+.pill--light:hover:not(:disabled) {
   background: #e0faf7;
 }
 
+/* ================= STATES ================= */
+
 .state {
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: #6b7280;
   padding: 18px 2px;
 }
 
 .state--error {
   color: #b91c1c;
+  font-weight: 600;
 }
+
+/* ================= LIST ================= */
 
 .list {
   display: grid;
@@ -1581,12 +2031,19 @@ function goToProfessionalForRebook() {
   gap: 12px;
 }
 
+.prof-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .prof-avatar img {
   width: 58px;
   height: 58px;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .prof-main {
@@ -1617,11 +2074,11 @@ function goToProfessionalForRebook() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .tag {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   padding: 4px 10px;
   border-radius: 999px;
   background: #f3f4f6;
@@ -1629,12 +2086,23 @@ function goToProfessionalForRebook() {
 }
 
 .tag--primary {
-  background: rgba(80,189,189,0.18);
+  background: rgba(80, 189, 189, 0.18);
   color: var(--nura-green);
 }
 
+.sync-badge {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--nura-success);
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: 1px solid rgba(22, 163, 74, 0.18);
+}
+
 .prof-schedule {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 0.93rem;
   color: #374151;
   line-height: 1.45;
@@ -1642,8 +2110,9 @@ function goToProfessionalForRebook() {
 
 .prof-bio {
   margin: 8px 0 0;
-  font-size: 1rem;
+  font-size: 0.98rem;
   color: #4b5563;
+  line-height: 1.55;
 }
 
 .prof-actions {
@@ -1660,15 +2129,20 @@ function goToProfessionalForRebook() {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: #50bdbd;
+  background: var(--nura-green);
   color: #fff;
   border: none;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 
 .content-btn:hover {
-  background: #3ea9a9;
+  background: var(--nura-green-dark);
   transform: translateY(-1px);
 }
+
+/* ================= MODALS ================= */
 
 .modal-backdrop {
   position: fixed;
@@ -1685,17 +2159,26 @@ function goToProfessionalForRebook() {
 .modal-card {
   background: #fff;
   border-radius: 22px;
-  width: 60%;
-  max-height: 75%;
-  padding: 24px 28px;
+  width: min(760px, 96%);
+  max-height: 88vh;
+  padding: 0;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 36px rgba(30, 41, 59, 0.22);
   overflow: hidden;
 }
 
+.modal-appointment-wide {
+  width: min(92vw, 1180px);
+  max-width: 1180px;
+}
+
+.modal-appointment {
+  max-height: min(88vh, 920px);
+}
+
 .modal-header {
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid #eef2f7;
   display: flex;
   align-items: center;
@@ -1705,9 +2188,21 @@ function goToProfessionalForRebook() {
 
 .modal-title {
   font-size: 1.15rem;
-  font-weight: 650;
+  font-weight: 700;
   margin: 0;
   color: #0f172a;
+}
+
+.modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--nura-muted);
+}
+
+.modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .modal-close {
@@ -1717,14 +2212,18 @@ function goToProfessionalForRebook() {
   background: #f0f4f8;
   border: none;
   font-size: 1.1rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000000ff;
+  color: #000;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  background: #e7edf3;
 }
 
 .modal-body {
@@ -1736,6 +2235,7 @@ function goToProfessionalForRebook() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-footer {
@@ -1751,12 +2251,11 @@ function goToProfessionalForRebook() {
   font-size: 0.95rem;
   color: #4b5563;
   margin: 0 0 10px;
+  line-height: 1.5;
 }
 
-.modal-error {
-  margin: 10px 0 0;
-  color: #b91c1c;
-  font-weight: 600;
+.modal-note--clash {
+  margin: 0;
 }
 
 .hint {
@@ -1766,6 +2265,379 @@ function goToProfessionalForRebook() {
   color: #64748b;
 }
 
+/* ================= POLICY ================= */
+
+.policy-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #4b5563;
+}
+
+.policy-list li {
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.policy-list li::marker {
+  content: '✓ ';
+  color: var(--nura-green);
+  font-weight: 900;
+}
+
+/* ================= SUMMARY ================= */
+
+.booking-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.prof-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.prof-summary-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.prof-summary-name {
+  margin: 0;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.prof-summary-type {
+  margin: 4px 0 0;
+  color: #475569;
+  line-height: 1.3;
+}
+
+.sync-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.sync-btn {
+  white-space: nowrap;
+}
+
+/* ================= BOOKING LAYOUT ================= */
+
+.booking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  margin-top: 10px;
+  align-items: start;
+}
+
+/* ===== panel izquierdo ===== */
+
+.calendar-panel {
+  background: #f4fbfb;
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid #cfeeee;
+}
+
+.calendar-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.calendar-kicker {
+  margin: 0 0 4px;
+  font-size: 0.76rem;
+  color: #475569;
+  font-weight: 700;
+}
+
+.calendar-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* ===== flechas ===== */
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.calendar-nav-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid #b9e7e7;
+  background: #ecfbfb;
+  color: #168b8b;
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.calendar-nav-btn:hover:not(:disabled) {
+  background: #d8f6f6;
+  border-color: #8ed9d9;
+  transform: translateY(-1px);
+}
+
+.calendar-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ===== días ===== */
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.day-card,
+.day-card-skeleton {
+  min-height: 104px;
+  border-radius: 14px;
+}
+
+.day-card {
+  padding: 10px 8px;
+  background: #ffffff;
+  border: 1px solid #d8ecec;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.day-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: #9ddddd;
+}
+
+.day-card--active {
+  background: #50bdbd;
+  border-color: #50bdbd;
+  color: #ffffff;
+}
+
+.day-card--active .day-card-count,
+.day-card--active .day-card-status,
+.day-card--active .day-card-label {
+  color: #ffffff;
+}
+
+.day-card--today {
+  border-width: 2px;
+  border-color: #50bdbd;
+}
+
+.day-card--muted {
+  opacity: 0.72;
+}
+
+.day-card--past {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.day-card--past .day-card-status,
+.day-card--past .day-card-count,
+.day-card--past .day-card-label {
+  color: #94a3b8;
+}
+
+.day-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.day-card-label {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #334155;
+  line-height: 1.2;
+}
+
+.day-card-status {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.day-card-count {
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.day-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #50bdbd;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.day-card--active .day-chip {
+  background: #ffffff;
+  color: #168b8b;
+}
+
+/* ===== skeleton ===== */
+
+.week-grid--skeleton .day-card-skeleton,
+.slots-grid--skeleton .slot-skeleton {
+  background: linear-gradient(90deg, #edf7f7 25%, #f8fcfc 37%, #edf7f7 63%);
+  background-size: 400% 100%;
+  animation: nuraShimmer 1.2s infinite linear;
+  border: 1px solid #e1f1f1;
+}
+
+.slot-skeleton {
+  height: 48px;
+  border-radius: 12px;
+}
+
+@keyframes nuraShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* ===== panel derecho ===== */
+
+.slots-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.slots-kicker {
+  margin: 0 0 4px;
+  font-size: 0.76rem;
+  color: #475569;
+  font-weight: 700;
+}
+
+.slots-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.slots-note {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+/* ===== horarios ===== */
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.slot-btn {
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #50bdbd;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.96rem;
+  line-height: 1;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.slot-btn:hover {
+  background: #85b6e0;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.14);
+}
+
+.slot-btn--active {
+  background: #50bdbd;
+  color: #ffffff;
+  border-color: #50bdbd;
+  box-shadow: 0 10px 22px rgba(80, 189, 189, 0.22);
+}
+
+.slots-empty {
+  text-align: center;
+  padding: 18px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.slots-empty p {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.slots-empty small {
+  color: #64748b;
+}
+
+/* ===== campos ===== */
+
 .modal-field {
   display: flex;
   flex-direction: column;
@@ -1774,60 +2646,66 @@ function goToProfessionalForRebook() {
 }
 
 .modal-field label {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 800;
-  color: #50bdbd;
-  letter-spacing: 0.04em;
+  color: #0f766e;
+  letter-spacing: 0.02em;
 }
 
 .modal-field input,
 .modal-field select {
   width: 100%;
+  min-height: 46px;
   border-radius: 14px;
-  border: 1px solid #e5e7eb;
-  padding: 10px 12px;
-  background: #d0f5f5ff;
-  font-size: 0.95rem;
+  border: 1px solid #cbd5e1;
+  padding: 0 14px;
+  background: #f8ffff;
+  font-size: 0.96rem;
   color: #0f172a;
+}
+
+.modal-field input::placeholder {
+  color: #64748b;
 }
 
 .modal-readonly-pill {
   width: 100%;
-  padding: 10px 12px;
+  min-height: 46px;
+  padding: 12px 14px;
   border-radius: 14px;
-  background: #d0f5f5ff;
+  background: #eefcfc;
+  border: 1px solid #cfeeee;
   color: #0f172a;
+  font-weight: 600;
 }
 
 .mp-button {
   width: 100%;
   justify-content: center;
-  font-weight: 550;
+  font-weight: 700;
 }
 
-.prof-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+.modal-success {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ecfdf3;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-weight: 700;
 }
 
-.prof-summary-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
+.modal-error {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-weight: 700;
 }
 
-.prof-summary-name {
-  margin: 0;
-  font-weight: 800;
-}
-
-.prof-summary-type {
-  margin: 2px 0 0;
-  color: #64748b;
-}
+/* ================= APPOINTMENTS ================= */
 
 .appt-list {
   list-style: none;
@@ -1841,7 +2719,7 @@ function goToProfessionalForRebook() {
   width: 100%;
   background: #fff;
   border-radius: 16px;
-  padding: 12px 12px;
+  padding: 12px;
   border: 1px solid #eef2f7;
   display: flex;
   justify-content: space-between;
@@ -1857,46 +2735,55 @@ function goToProfessionalForRebook() {
 .appt-title {
   margin: 0 0 4px;
   font-weight: 700;
+  color: var(--nura-text);
 }
 
 .appt-meta {
   margin: 0;
   color: #475569;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .appt-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .link-btn {
-  border: 2px solid #50bdbd;
+  border: 2px solid var(--nura-green);
   border-radius: 999px;
   padding: 6px 12px;
   background: transparent;
-  color: #50bdbd;
-  font-weight: 650;
+  color: var(--nura-green);
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    color 0.15s ease;
 }
 
 .link-btn:hover {
   background: #85b5e046;
   border-color: #85b6e0;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .link-btn.danger {
-  color: #ef4444;
-  border-color: #ef4444;
-  font-size: medium;
+  color: var(--nura-danger);
+  border-color: var(--nura-danger);
 }
 
 .link-btn.danger:hover {
   background: #ff1c1c20;
   border-color: #c20808;
-  transform: translateY(-2px);
+  color: #c20808;
+  transform: translateY(-1px);
 }
+
+/* ================= TOAST ================= */
 
 .turno-confirmado {
   position: fixed;
@@ -1904,52 +2791,68 @@ function goToProfessionalForRebook() {
   right: 12px;
   bottom: 90px;
   width: fit-content;
+  max-width: calc(100vw - 24px);
   z-index: 2000;
-  background: #50bdbd;
+  background: var(--nura-green);
   color: #ffffff;
   display: flex;
   align-items: center;
   gap: 12px;
   border-radius: 16px;
   padding: 12px 14px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.15);
+}
+
+.turno-text p {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.check {
+  font-size: 1.2rem;
+  font-weight: 900;
 }
 
 @media (min-width: 768px) {
   .turno-confirmado {
     left: auto;
     right: 18px;
-    width: 160px;
+    width: auto;
   }
 }
 
-.policy-list {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  color: #4b5563;
-}
-
-.policy-list li {
-  margin-bottom: 6px;
-}
-
-.policy-list li::marker {
-  content: '✓ ';
-  color: #50bdbd;
-  font-weight: 900;
-}
+/* ================= ALERT MODALS ================= */
 
 .modal-badge-alert {
   width: 34px;
   height: 34px;
   border-radius: 50%;
   background: #fee2e2;
-  color: #ef4444;
+  color: var(--nura-danger);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 900;
 }
+
+.modal-header--clash {
+  border-bottom: 1px solid #fee2e2;
+}
+
+.modal-body--clash {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.modal-footer--clash {
+  justify-content: flex-end;
+}
+
+.pill--clash {
+  min-width: 120px;
+}
+
+/* ================= DATE INPUT ================= */
 
 :global(.modal-field .nura-date-input),
 :global(.modal-field input.nura-date-input),
@@ -1958,22 +2861,23 @@ function goToProfessionalForRebook() {
   border-radius: 14px;
   border: 1px solid #e5e7eb;
   padding: 13px 12px;
-  background: #d0f5f5ff;
+  background: #d0f5f5;
   color: #0f172a;
   font-size: 0.95rem;
   letter-spacing: 0.04em;
 }
 
-.modal-field select#booking-mode {
+.modal-field select#booking-mode,
+.modal-field select#booking-time {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
   width: 100%;
-  height: 44px;
+  min-height: 44px;
   border-radius: 14px;
   border: 1px solid #e5e7eb;
   padding: 0 44px 0 12px;
-  background-color: #d0f5f5ff;
+  background-color: #d0f5f5;
   font-size: 0.95rem;
   color: #0f172a;
   background-image: url("data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 10L12 14L16 10' stroke='%23000000' stroke-opacity='0.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -1983,7 +2887,221 @@ function goToProfessionalForRebook() {
   cursor: pointer;
 }
 
-.modal-field select#booking-mode::-ms-expand {
+.modal-field select#booking-mode::-ms-expand,
+.modal-field select#booking-time::-ms-expand {
   display: none;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 1024px) {
+  .modal-appointment-wide {
+    width: min(96vw, 980px);
+  }
+
+  .booking-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .week-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .slots-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .modal-card {
+    width: 92%;
+    max-height: 90vh;
+  }
+
+  .page-head {
+    align-items: stretch;
+  }
+
+  .prof-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  .prof-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sync-badge {
+    align-self: flex-start;
+  }
+
+  .appt-item {
+    align-items: flex-start;
+  }
+
+  .appt-actions {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-card {
+    width: 75%;
+    max-width: 80%;
+    max-height: 80%;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .modal-appointment-wide {
+    max-width: 80%;
+    max-height: 80%;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .modal-body-scroll {
+    padding: 14px 16px 20px;
+    max-height: calc(100dvh - 138px);
+  }
+
+  .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+    line-height: 1.2;
+    padding-right: 8px;
+  }
+
+  .booking-topbar {
+    align-items: stretch;
+  }
+
+  .prof-summary {
+    flex: 1 1 100%;
+  }
+
+  .sync-actions,
+  .sync-btn {
+    width: 100%;
+  }
+
+  .week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .day-card,
+  .day-card-skeleton {
+    min-height: 96px;
+    padding: 10px 8px;
+  }
+
+  .day-card-label {
+    font-size: 0.8rem;
+  }
+
+  .day-card-status {
+    font-size: 0.78rem;
+  }
+
+  .day-card-count {
+    font-size: 0.72rem;
+  }
+
+  .slots-title {
+    font-size: 1rem;
+  }
+
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slot-btn,
+  .modal-field input,
+  .modal-field select,
+  .modal-readonly-pill {
+    min-height: 50px;
+  }
+
+  .modal-footer .pill {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+  }
+}
+
+@media (max-width: 500px) {
+  .contenido {
+    padding: 18px 14px 42px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .calendar-panel,
+  .slots-empty {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .calendar-nav-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .modal-body-scroll {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .modal-footer .pill {
+    flex: 1 1 100%;
+  }
+}
+
+/* ================= ANIMATIONS ================= */
+
+.animate-fade-in {
+  animation: fadeInSoft 0.2s ease;
+}
+
+@keyframes fadeInSoft {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>

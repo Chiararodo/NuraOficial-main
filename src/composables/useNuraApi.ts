@@ -8,6 +8,15 @@ const API_BASE = normalizeBase(
   import.meta.env.VITE_NURA_API_URL || 'https://backend-nura.onrender.com/api'
 )
 
+type CrearTurnoPayload = {
+  especialistaId: string
+  pacienteNombre: string
+  pacienteEmail: string
+  start: string
+  end: string
+  notes?: string
+}
+
 export function useNuraApi() {
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -52,5 +61,87 @@ export function useNuraApi() {
     return json.data ?? json
   }
 
-  return { API_BASE, loading, error, fetchEspecialistas, fetchEspecialidades }
+  async function fetchTurnosByEspecialista(especialistaId: string) {
+    const res = await fetch(`${API_BASE}/turnos/especialista/${especialistaId}`)
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || `Error ${res.status}`)
+    }
+
+    return Array.isArray(json) ? json : json?.data ?? []
+  }
+
+  async function crearTurno(payload: CrearTurnoPayload) {
+    const res = await fetch(`${API_BASE}/turnos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || 'No se pudo crear el turno')
+    }
+
+    return json
+  }
+
+  async function editarTurno(turnoId: string, payload: Partial<CrearTurnoPayload>) {
+    const res = await fetch(`${API_BASE}/turnos/${turnoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || 'No se pudo editar el turno')
+    }
+
+    return json
+  }
+
+  async function cancelarTurno(turnoId: string) {
+    const res = await fetch(`${API_BASE}/turnos/${turnoId}/cancelar`, {
+      method: 'PATCH'
+    })
+
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || 'No se pudo cancelar el turno')
+    }
+
+    return json
+  }
+
+  async function syncGoogleCalendar(especialistaId: string) {
+    const res = await fetch(`${API_BASE}/google-sync/${especialistaId}/sync`, {
+      method: 'POST'
+    })
+
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || 'No se pudo sincronizar Google Calendar')
+    }
+
+    return json
+  }
+
+  return {
+    API_BASE,
+    loading,
+    error,
+    fetchEspecialistas,
+    fetchEspecialidades,
+    fetchTurnosByEspecialista,
+    crearTurno,
+    editarTurno,
+    cancelarTurno,
+    syncGoogleCalendar
+  }
 }
