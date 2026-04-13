@@ -2220,8 +2220,8 @@ onMounted(async () => {
 }
 
 .modal-card {
-  background: #fff;
-  border-radius: 22px;
+  background: #ffffff;
+  border-radius: 999px;
   width: min(760px, 96%);
   max-height: 88vh;
   padding: 0;
@@ -2980,6 +2980,7 @@ onMounted(async () => {
   .modal-card {
     width: 92%;
     max-height: 90vh;
+     border-radius: 999px;
   }
 
   .page-head {
