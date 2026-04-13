@@ -14,7 +14,17 @@ const MP_DEPOSIT_URL = 'https://mpago.la/2b1Jhzj'
 const prefs = useNotificationSettings()
 const IMAGE_BASE_URL = 'https://backend-nura.onrender.com'
 const CANCEL_LIMIT_HOURS = 48
-const API_BASE = (import.meta.env.VITE_NURA_API_URL || 'https://backend-nura.onrender.com/api').replace(/\/+$/, '')
+
+const {
+  fetchEspecialistas,
+  fetchTurnosByEspecialista,
+  fetchDisponibilidad,
+  crearTurno,
+  editarTurno,
+  cancelarTurno,
+  syncGoogleCalendar,
+  getGoogleConnectUrl
+} = useNuraApi()
 
 type Contact = {
   email?: string
@@ -56,10 +66,26 @@ type Profesional = {
   horarios?: Horarios
   sessionDuration?: number
   googleCalendarConnected?: boolean
+  googleCalendar?: {
+    connected?: boolean
+  }
+}
+
+type ApiTurno = {
+  _id: string
+  especialistaId: string
+  pacienteNombre?: string
+  pacienteEmail?: string
+  start: string
+  end: string
+  status?: string
+  notes?: string
+  source?: string
 }
 
 type AppointmentRow = {
   id: string
+  turnoApiId?: string | null
   on_date: string
   at_time: string | null
   title: string
@@ -87,8 +113,6 @@ const filterSpecialty = ref('')
 const filterCity = ref('')
 const filterModality = ref('')
 const filterInsurance = ref('')
-
-const { fetchEspecialistas } = useNuraApi()
 
 const DIAS = [
   { key: 'lunes', label: 'Lunes' },
@@ -260,19 +284,28 @@ async function loadProfesionales() {
 
   try {
     const arr = await fetchEspecialistas()
-    if (Array.isArray(arr) && arr.length) {
-      profesionales.value = arr
+    if (Array.isArray(arr)) {
+      profesionales.value = arr.map((p: any) => ({
+        ...p,
+        googleCalendarConnected: Boolean(
+          p.googleCalendar?.connected ?? p.googleCalendarConnected
+        )
+      }))
       return
     }
-  } catch {
-    //
+  } catch (err) {
+    console.error(err)
   } finally {
     loading.value = false
   }
 
   loading.value = true
   try {
-    const { data, error } = await supabase.from('professionals').select('*').order('name', { ascending: true })
+    const { data, error } = await supabase
+      .from('professionals')
+      .select('*')
+      .order('name', { ascending: true })
+
     if (error) throw error
 
     profesionales.value = (data ?? []).map((r: any) => ({
@@ -294,7 +327,9 @@ async function loadProfesionales() {
       googleCalendarConnected: Boolean(r.google_calendar_connected),
       modality:
         r.modality ||
-        (typeof r.is_virtual === 'boolean' ? (r.is_virtual ? 'Virtual' : 'Presencial') : '')
+        (typeof r.is_virtual === 'boolean'
+          ? (r.is_virtual ? 'virtual' : 'presencial')
+          : '')
     }))
   } catch (err) {
     console.error(err)
@@ -535,26 +570,36 @@ function getWeekRange() {
 async function loadOccupiedSlotsForDay(pro: Profesional | null, dateStr: string): Promise<string[]> {
   if (!pro || !dateStr) return []
 
-  const professionalLabel = getProfessionalLabel(pro)
+  const professionalId = String(pro._id || pro.id || '')
+  if (!professionalId) return []
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .select('id, at_time, professional')
-    .eq('on_date', dateStr)
-    .eq('professional', professionalLabel)
+  const from = `${dateStr}T00:00:00.000-03:00`
+  const to = `${dateStr}T23:59:59.999-03:00`
 
-  if (error) {
-    console.error(error)
+  try {
+    const disponibilidad = await fetchDisponibilidad(professionalId, from, to)
+    const ocupados = Array.isArray(disponibilidad?.ocupados) ? disponibilidad.ocupados : []
+
+    return ocupados
+      .filter((item: any) => {
+        if (
+          editingAppointmentId.value &&
+          item?.turnoId &&
+          String(item.turnoId) === String(editingAppointmentId.value)
+        ) {
+          return false
+        }
+        return true
+      })
+      .map((item: any) => {
+        const dt = new Date(item.start)
+        return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`
+      })
+      .filter(Boolean)
+  } catch (err) {
+    console.error(err)
     return []
   }
-
-  return (data || [])
-    .filter((row: any) => {
-      if (editingAppointmentId.value && row.id === editingAppointmentId.value) return false
-      return true
-    })
-    .map((row: any) => normalizeTimeToHHMM(row.at_time))
-    .filter(Boolean)
 }
 
 async function loadWeeklyAvailability() {
@@ -818,7 +863,7 @@ const googleSyncLoading = ref(false)
 const googleSyncError = ref('')
 const googleSyncSuccess = ref('')
 
-async function syncGoogleCalendar() {
+async function syncGoogleCalendarAction() {
   googleSyncError.value = ''
   googleSyncSuccess.value = ''
 
@@ -827,37 +872,42 @@ async function syncGoogleCalendar() {
     return
   }
 
+  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
+  if (!professionalId) {
+    googleSyncError.value = 'No se pudo identificar al profesional.'
+    return
+  }
+
   googleSyncLoading.value = true
 
   try {
-    const professionalId = selectedPro.value._id || selectedPro.value.id
-
-    if (!professionalId) {
-      googleSyncError.value = 'No se pudo identificar al profesional.'
-      return
-    }
-
-    const res = await fetch(`${API_BASE}/google/auth-url?professionalId=${professionalId}`, {
-      credentials: 'include'
-    })
-
-    if (!res.ok) {
-      throw new Error('No se pudo obtener la URL de autorización.')
-    }
-
-    const data = await res.json()
-
-    if (!data?.url) {
-      throw new Error('La respuesta no incluyó URL de Google.')
-    }
-
-    window.location.href = data.url
+    await syncGoogleCalendar(professionalId)
+    await loadOccupiedSlotsForSelected()
+    await loadWeeklyAvailability()
+    googleSyncSuccess.value = 'Agenda sincronizada correctamente.'
   } catch (err) {
     console.error(err)
-    googleSyncError.value = 'No se pudo iniciar la sincronización con Google.'
+    googleSyncError.value = 'No se pudo sincronizar Google Calendar.'
   } finally {
     googleSyncLoading.value = false
   }
+}
+
+function connectGoogleCalendarForSelected() {
+  googleSyncError.value = ''
+
+  if (!selectedPro.value) {
+    googleSyncError.value = 'Primero seleccioná un profesional.'
+    return
+  }
+
+  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
+  if (!professionalId) {
+    googleSyncError.value = 'No se pudo identificar al profesional.'
+    return
+  }
+
+  window.location.href = getGoogleConnectUrl(professionalId)
 }
 
 /* PAGO SEÑA */
@@ -887,23 +937,6 @@ async function payDepositWithMercadoPago() {
   mpLoading.value = true
 
   try {
-    const details = [
-      `Modalidad: ${bookingMode.value}`,
-      `Email: ${bookingEmail.value}`,
-      `Seña: Iniciada`,
-      `MP: ${MP_DEPOSIT_URL}`
-    ].join(' · ')
-
-    await supabase.from('appointments').insert({
-      user_id: auth.user?.id,
-      on_date: bookingDate.value,
-      at_time: normalizeTimeToHHMMSS(bookingTime.value),
-      title: `Seña (pendiente) – ${selectedPro.value.name ?? 'Profesional'}`,
-      details,
-      professional: getProfessionalLabel(selectedPro.value),
-      modality: bookingMode.value
-    })
-
     window.open(MP_DEPOSIT_URL, '_blank', 'noopener,noreferrer')
   } catch (e) {
     console.error(e)
@@ -915,23 +948,53 @@ async function payDepositWithMercadoPago() {
 
 async function loadAppointments() {
   if (!auth.user) return
+
   loadingAppointments.value = true
+  appointments.value = []
 
   try {
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('id,on_date,at_time,title,details,modality,professional')
-      .eq('user_id', auth.user.id)
-      .order('on_date')
-      .order('at_time')
+    for (const pro of profesionales.value) {
+      const profesionalId = String(pro._id || pro.id || '')
+      if (!profesionalId) continue
 
-    if (error) throw error
+      const turnos = await fetchTurnosByEspecialista(profesionalId)
+
+      for (const t of turnos as ApiTurno[]) {
+        if (t.status === 'cancelled') continue
+
+        const pacienteEmail = String(t.pacienteEmail || '').trim().toLowerCase()
+        const authEmail = String(auth.user?.email || '').trim().toLowerCase()
+
+        if (!authEmail || pacienteEmail !== authEmail) continue
+
+        const notes = String(t.notes || '')
+        const modality = notes.includes('Virtual') ? 'Virtual' : 'Presencial'
+
+        appointments.value.push({
+          id: String(t._id),
+          turnoApiId: String(t._id),
+          on_date: new Date(t.start).toISOString().slice(0, 10),
+          at_time: new Date(t.start).toISOString().slice(11, 19),
+          title: `Turno – ${pro.name ?? 'Profesional'}`,
+          details: notes,
+          modality,
+          professional: getProfessionalLabel(pro)
+        })
+      }
+    }
 
     const now = Date.now()
-    appointments.value = (data || []).filter((a: any) => {
-      const dt = makeApptDateTime(a.on_date, a.at_time)
-      return dt ? dt.getTime() >= now : false
-    })
+
+    appointments.value = appointments.value
+      .filter((a) => {
+        const dt = makeApptDateTime(a.on_date, a.at_time)
+        return dt ? dt.getTime() >= now : false
+      })
+      .sort((a, b) => {
+        const da = makeApptDateTime(a.on_date, a.at_time)?.getTime() || 0
+        const db = makeApptDateTime(b.on_date, b.at_time)?.getTime() || 0
+        return da - db
+      })
   } catch (err) {
     console.error(err)
   } finally {
@@ -1010,38 +1073,31 @@ async function saveAppointment() {
     return
   }
 
-  const timeHHMMSS = normalizeTimeToHHMMSS(bookingTime.value)
-
-  const sameSlot = appointments.value.find((a) => {
-    const same = a.on_date === bookingDate.value && normalizeTimeToHHMM(a.at_time || '') === bookingTime.value
-    if (!same) return false
-    if (editingAppointmentId.value && a.id === editingAppointmentId.value) return false
-    return true
-  })
-
-  if (sameSlot) {
-    showClash(`Ya tenés un turno el ${formatDate(bookingDate.value)} a las ${formatTime(timeHHMMSS)}.`)
+  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
+  if (!professionalId) {
+    bookingError.value = 'No se pudo identificar al profesional.'
     return
   }
+
+  const duration = getSessionDuration(selectedPro.value)
+  const start = new Date(`${bookingDate.value}T${bookingTime.value}:00-03:00`)
+  const end = new Date(start.getTime() + duration * 60000)
 
   bookingSaving.value = true
   try {
     const payload = {
-      user_id: auth.user.id,
-      on_date: bookingDate.value,
-      at_time: timeHHMMSS,
-      title: `Turno – ${selectedPro.value.name ?? 'Profesional'}`,
-      details: `Modalidad: ${bookingMode.value} · Email: ${bookingEmail.value}`,
-      professional: getProfessionalLabel(selectedPro.value),
-      modality: bookingMode.value
+      especialistaId: professionalId,
+      pacienteNombre: auth.user?.email || 'Paciente',
+      pacienteEmail: bookingEmail.value,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      notes: `Modalidad: ${bookingMode.value}`
     }
 
     if (editingAppointmentId.value) {
-      const { error } = await supabase.from('appointments').update(payload).eq('id', editingAppointmentId.value)
-      if (error) throw error
+      await editarTurno(editingAppointmentId.value, payload)
     } else {
-      const { error } = await supabase.from('appointments').insert(payload)
-      if (error) throw error
+      await crearTurno(payload)
     }
 
     await loadAppointments()
@@ -1057,9 +1113,9 @@ async function saveAppointment() {
       body: `Tu turno con ${selectedPro.value.name ?? 'el profesional'} fue guardado correctamente.`,
       type: 'appointment'
     })
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
-    bookingError.value = 'No se pudo guardar el turno. Probá de nuevo.'
+    bookingError.value = e?.message || 'No se pudo guardar el turno. Probá de nuevo.'
   } finally {
     bookingSaving.value = false
   }
@@ -1134,8 +1190,7 @@ async function confirmDeleteAppointmentAction() {
   }
 
   try {
-    const { error } = await supabase.from('appointments').delete().eq('id', a.id)
-    if (error) throw error
+    await cancelarTurno(a.id)
     confirmDeleteAppt.value = null
     await loadAppointments()
     await loadOccupiedSlotsForSelected()
@@ -1410,8 +1465,16 @@ onMounted(async () => {
               <button
                 type="button"
                 class="pill pill--outline sync-btn"
+                @click="connectGoogleCalendarForSelected"
+              >
+                Conectar Google Calendar
+              </button>
+
+              <button
+                type="button"
+                class="pill pill--outline sync-btn"
                 :disabled="googleSyncLoading"
-                @click="syncGoogleCalendar"
+                @click="syncGoogleCalendarAction"
               >
                 {{ googleSyncLoading ? 'Sincronizando…' : 'Sincronizar agenda' }}
               </button>
@@ -2952,13 +3015,14 @@ onMounted(async () => {
     width: 75%;
     max-width: 80%;
     max-height: 80%;
-    border-radius: 0;
+    border-radius: 5%;
     padding: 0;
   }
 
   .modal-appointment-wide {
     max-width: 80%;
     max-height: 80%;
+     border-radius: 5%;
   }
 
   .modal-header,

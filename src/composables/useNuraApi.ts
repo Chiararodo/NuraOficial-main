@@ -69,7 +69,19 @@ export function useNuraApi() {
       throw new Error(json?.message || `Error ${res.status}`)
     }
 
-    return Array.isArray(json) ? json : json?.data ?? []
+    return json?.data ?? []
+  }
+
+  async function fetchDisponibilidad(especialistaId: string, from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    const res = await fetch(`${API_BASE}/turnos/disponibilidad/${especialistaId}?${params.toString()}`)
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      throw new Error(json?.message || 'No se pudo obtener la disponibilidad')
+    }
+
+    return json?.data ?? { ocupados: [] }
   }
 
   async function crearTurno(payload: CrearTurnoPayload) {
@@ -85,7 +97,7 @@ export function useNuraApi() {
       throw new Error(json?.message || 'No se pudo crear el turno')
     }
 
-    return json
+    return json?.data ?? json
   }
 
   async function editarTurno(turnoId: string, payload: Partial<CrearTurnoPayload>) {
@@ -101,7 +113,7 @@ export function useNuraApi() {
       throw new Error(json?.message || 'No se pudo editar el turno')
     }
 
-    return json
+    return json?.data ?? json
   }
 
   async function cancelarTurno(turnoId: string) {
@@ -115,7 +127,7 @@ export function useNuraApi() {
       throw new Error(json?.message || 'No se pudo cancelar el turno')
     }
 
-    return json
+    return json?.data ?? json
   }
 
   async function syncGoogleCalendar(especialistaId: string) {
@@ -129,7 +141,11 @@ export function useNuraApi() {
       throw new Error(json?.message || 'No se pudo sincronizar Google Calendar')
     }
 
-    return json
+    return json?.data ?? json
+  }
+
+  function getGoogleConnectUrl(especialistaId: string) {
+    return `${API_BASE}/google/connect/${especialistaId}`
   }
 
   return {
@@ -139,9 +155,11 @@ export function useNuraApi() {
     fetchEspecialistas,
     fetchEspecialidades,
     fetchTurnosByEspecialista,
+    fetchDisponibilidad,
     crearTurno,
     editarTurno,
     cancelarTurno,
-    syncGoogleCalendar
+    syncGoogleCalendar,
+    getGoogleConnectUrl
   }
 }
