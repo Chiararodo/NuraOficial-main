@@ -21,9 +21,7 @@ const {
   fetchDisponibilidad,
   crearTurno,
   editarTurno,
-  cancelarTurno,
-  syncGoogleCalendar,
-  getGoogleConnectUrl
+  cancelarTurno
 } = useNuraApi()
 
 type Contact = {
@@ -858,58 +856,6 @@ function closeBookingModal() {
   bookingTime.value = ''
 }
 
-/* ================= GOOGLE CALENDAR ================= */
-const googleSyncLoading = ref(false)
-const googleSyncError = ref('')
-const googleSyncSuccess = ref('')
-
-async function syncGoogleCalendarAction() {
-  googleSyncError.value = ''
-  googleSyncSuccess.value = ''
-
-  if (!selectedPro.value) {
-    googleSyncError.value = 'Primero seleccioná un profesional.'
-    return
-  }
-
-  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
-  if (!professionalId) {
-    googleSyncError.value = 'No se pudo identificar al profesional.'
-    return
-  }
-
-  googleSyncLoading.value = true
-
-  try {
-    await syncGoogleCalendar(professionalId)
-    await loadOccupiedSlotsForSelected()
-    await loadWeeklyAvailability()
-    googleSyncSuccess.value = 'Agenda sincronizada correctamente.'
-  } catch (err) {
-    console.error(err)
-    googleSyncError.value = 'No se pudo sincronizar Google Calendar.'
-  } finally {
-    googleSyncLoading.value = false
-  }
-}
-
-function connectGoogleCalendarForSelected() {
-  googleSyncError.value = ''
-
-  if (!selectedPro.value) {
-    googleSyncError.value = 'Primero seleccioná un profesional.'
-    return
-  }
-
-  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
-  if (!professionalId) {
-    googleSyncError.value = 'No se pudo identificar al profesional.'
-    return
-  }
-
-  window.location.href = getGoogleConnectUrl(professionalId)
-}
-
 /* PAGO SEÑA */
 const mpLoading = ref(false)
 const mpError = ref('')
@@ -1446,48 +1392,21 @@ onMounted(async () => {
 
         <section class="modal-body modal-body-scroll">
           <div class="booking-topbar">
-            <div class="prof-summary">
-              <img
-                v-if="selectedPro && getAvatarUrl(selectedPro)"
-                :src="getAvatarUrl(selectedPro as any)"
-                class="prof-summary-avatar"
-                alt=""
-              />
-              <div>
-                <p class="prof-summary-name">{{ selectedPro?.name }}</p>
-                <p class="prof-summary-type">
-                  {{ selectedPro?.specialty || selectedPro?.type }}
-                </p>
-              </div>
-            </div>
-
-            <div class="sync-actions">
-              <button
-                type="button"
-                class="pill pill--outline sync-btn"
-                @click="connectGoogleCalendarForSelected"
-              >
-                Conectar Google Calendar
-              </button>
-
-              <button
-                type="button"
-                class="pill pill--outline sync-btn"
-                :disabled="googleSyncLoading"
-                @click="syncGoogleCalendarAction"
-              >
-                {{ googleSyncLoading ? 'Sincronizando…' : 'Sincronizar agenda' }}
-              </button>
-            </div>
-          </div>
-
-          <p v-if="googleSyncSuccess" class="modal-success">
-            {{ googleSyncSuccess }}
-          </p>
-
-          <p v-if="googleSyncError" class="modal-error">
-            {{ googleSyncError }}
-          </p>
+  <div class="prof-summary">
+    <img
+      v-if="selectedPro && getAvatarUrl(selectedPro)"
+      :src="getAvatarUrl(selectedPro as any)"
+      class="prof-summary-avatar"
+      alt=""
+    />
+    <div>
+      <p class="prof-summary-name">{{ selectedPro?.name }}</p>
+      <p class="prof-summary-type">
+        {{ selectedPro?.specialty || selectedPro?.type }}
+      </p>
+    </div>
+  </div>
+</div>
 
           <div class="booking-layout">
             <section class="calendar-panel">
@@ -2221,10 +2140,10 @@ onMounted(async () => {
 
 .modal-card {
   background: #ffffff;
-  border-radius: 999px;
   width: min(760px, 96%);
   max-height: 88vh;
-  padding: 0;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 36px rgba(30, 41, 59, 0.22);
@@ -2385,17 +2304,6 @@ onMounted(async () => {
   margin: 4px 0 0;
   color: #475569;
   line-height: 1.3;
-}
-
-.sync-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
-}
-
-.sync-btn {
-  white-space: nowrap;
 }
 
 /* ================= BOOKING LAYOUT ================= */
@@ -2980,7 +2888,7 @@ onMounted(async () => {
   .modal-card {
     width: 92%;
     max-height: 90vh;
-     border-radius: 999px;
+    
   }
 
   .page-head {
@@ -3012,24 +2920,29 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 8px;
+  }
+
   .modal-card {
-    width: 75%;
-    max-width: 80%;
-    max-height: 80%;
-    border-radius: 5%;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px;
     padding: 0;
   }
 
   .modal-appointment-wide {
-    max-width: 80%;
-    max-height: 80%;
-     border-radius: 5%;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px;
   }
 
   .modal-header,
   .modal-footer {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
   .modal-header {
@@ -3038,13 +2951,17 @@ onMounted(async () => {
     z-index: 6;
     background: #ffffff;
     border-bottom: 1px solid #e5e7eb;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .modal-body {
+    padding: 12px;
   }
 
   .modal-body-scroll {
-    padding: 14px 16px 20px;
-    max-height: calc(100dvh - 138px);
+    padding: 12px 14px 18px;
+    max-height: calc(92dvh - 132px);
   }
 
   .modal-footer {
@@ -3053,27 +2970,23 @@ onMounted(async () => {
     z-index: 6;
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .modal-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
     line-height: 1.2;
     padding-right: 8px;
   }
 
   .booking-topbar {
     align-items: stretch;
+    margin-bottom: 10px;
   }
 
   .prof-summary {
     flex: 1 1 100%;
-  }
-
-  .sync-actions,
-  .sync-btn {
-    width: 100%;
   }
 
   .week-grid {
@@ -3083,40 +2996,52 @@ onMounted(async () => {
 
   .day-card,
   .day-card-skeleton {
-    min-height: 96px;
-    padding: 10px 8px;
+    min-height: 92px;
+    padding: 9px 8px;
   }
 
   .day-card-label {
-    font-size: 0.8rem;
-  }
-
-  .day-card-status {
     font-size: 0.78rem;
   }
 
+  .day-card-status {
+    font-size: 0.76rem;
+  }
+
   .day-card-count {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
   }
 
   .slots-title {
-    font-size: 1rem;
+    font-size: 0.98rem;
+  }
+
+  .slots-note {
+    font-size: 0.84rem;
   }
 
   .slots-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 
-  .slot-btn,
+  .slot-btn {
+    min-height: 46px;
+    font-size: 0.92rem;
+    padding: 10px 12px;
+  }
+
   .modal-field input,
   .modal-field select,
   .modal-readonly-pill {
-    min-height: 50px;
+    min-height: 46px;
+    font-size: 0.92rem;
   }
 
   .modal-footer .pill {
     flex: 1 1 calc(50% - 6px);
     justify-content: center;
+    min-height: 42px;
   }
 }
 
@@ -3167,6 +3092,59 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .contenido {
+    padding: 16px 12px 36px;
+  }
+
+  .page-head h2 {
+    font-size: 1.35rem;
+  }
+
+  .page-sub {
+    font-size: 0.84rem;
+  }
+
+  .prof-name {
+    font-size: 1.2rem;
+  }
+
+  .prof-specialty {
+    font-size: 0.92rem;
+  }
+
+  .prof-schedule,
+  .prof-bio {
+    font-size: 0.88rem;
+  }
+
+  .prof-actions {
+    width: 100%;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .prof-actions .pill--primary {
+    flex: 1;
+  }
+
+  .week-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modal-footer .pill {
+    flex: 1 1 100%;
+  }
+
+  .turno-confirmado {
+    left: 10px;
+    right: 10px;
+    bottom: 80px;
+    width: auto;
+    max-width: none;
   }
 }
 </style>
