@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
             :disabled="loading"
             @click="submit"
           >
-            {{ loading ? 'Redirigiendo a Mercado Pago…' : 'Pagar con Mercado Pago' }}
+            {{ loading ? 'Redirigiendo a Mercado Pago…' : 'Pagar Mercado Pago' }}
           </button>
 
           <button
@@ -535,27 +535,30 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 36px;
+  padding: 8px 15px;
   border-radius: 999px;
   border: none;
-  padding: 10px 16px;
-  font-size: 0.96rem;
+  font-size: 0.84rem;
   font-weight: 800;
   cursor: pointer;
   transition:
-    background-color 0.2s ease,
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-  text-decoration: none;
-  box-sizing: border-box;
+    background-color .2s ease,
+    transform .18s ease,
+    box-shadow .2s ease;
 }
 
-.btn-primary {
-  background: #50bdbd;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
-  min-width: 220px;
+.btn-primary{
+  background:#50bdbd;
+  color:#fff;
+  min-width:170px;
+}
+
+.btn-soft{
+  background:#fff;
+  color:#50bdbd;
+  border:1px solid #b6ebe5;
+  min-width:110px;
 }
 
 @media (hover: hover) {
@@ -564,14 +567,6 @@ onBeforeUnmount(() => {
     transform: translateY(-2px);
     box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
   }
-}
-
-.btn-soft {
-  background: #ffffff;
-  color: #50bdbd;
-  border: 1px solid #b6ebe5;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
-  min-width: 140px;
 }
 
 @media (hover: hover) {
@@ -692,17 +687,25 @@ onBeforeUnmount(() => {
     align-items: flex-start;
   }
 
-  .actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
+.actions{
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:8px;
+}
 
-  .actions .btn,
-  .modal-actions .btn {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-  }
+.actions .btn{
+  width:auto;
+  min-width:110px;
+  max-width:180px;
+}
+
+.modal-actions{
+  flex-direction:row;
+}
+
+.modal-actions .btn{
+  flex:1;
+}
 
   .modal {
     max-width: 360px;
@@ -712,6 +715,71 @@ onBeforeUnmount(() => {
   .modal-body {
     max-height: 52vh;
     font-size: 0.9rem;
+  }
+}
+
+@media (max-width:420px){
+
+  .btn{
+    min-height:34px;
+    padding:7px 12px;
+    font-size:.8rem;
+  }
+
+  .btn-primary{
+    min-width:150px;
+  }
+
+  .btn-soft{
+    min-width:95px;
+  }
+}
+
+/* ===== FIX BOTONES CHECKOUT ===== */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.actions .btn {
+  min-height: 42px;
+  padding: 9px 18px;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.actions .btn-primary {
+  min-width: 180px;
+  max-width: 220px;
+}
+
+.actions .btn-soft {
+  min-width: 110px;
+  max-width: 130px;
+}
+
+@media (max-width: 420px) {
+  .actions {
+    gap: 8px;
+  }
+
+  .actions .btn {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+  }
+
+  .actions .btn-primary {
+    min-width: 155px;
+    max-width: 170px;
+  }
+
+  .actions .btn-soft {
+    min-width: 92px;
+    max-width: 105px;
   }
 }
 </style>

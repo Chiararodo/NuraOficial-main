@@ -72,6 +72,18 @@ export function useNuraApi() {
     return json?.data ?? []
   }
 
+  async function fetchTurnosByPaciente(email: string) {
+  const params = new URLSearchParams({ email })
+  const res = await fetch(`${API_BASE}/turnos/paciente?${params.toString()}`)
+  const json = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(json?.message || 'No se pudieron cargar tus turnos')
+  }
+
+  return json?.data ?? []
+}
+
   async function fetchDisponibilidad(especialistaId: string, from: string, to: string) {
     const params = new URLSearchParams({ from, to })
     const res = await fetch(`${API_BASE}/turnos/disponibilidad/${especialistaId}?${params.toString()}`)
@@ -155,6 +167,7 @@ export function useNuraApi() {
     fetchEspecialistas,
     fetchEspecialidades,
     fetchTurnosByEspecialista,
+  fetchTurnosByPaciente,
     fetchDisponibilidad,
     crearTurno,
     editarTurno,

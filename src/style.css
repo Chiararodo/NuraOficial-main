@@ -5,11 +5,29 @@
   --nura-soft: #7bd7d7;
   --nura-bg: #f8fafa;
   --nura-dark: #0a3a3a;
+  --font-main: "Poppins", sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-main);
+}
+
+html,
+body,
+#app {
+  font-family: var(--font-main);
+}
+
+* {
+  font-family: inherit;
 }
 
 body {
   background-color: var(--nura-bg);
-  font-family: 'Inter', sans-serif;
+font-family: var(--font-main);
   color: #333;
 }
 

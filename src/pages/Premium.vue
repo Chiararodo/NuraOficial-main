@@ -970,24 +970,94 @@ onMounted(async () => {
     padding: 16px 14px;
   }
 
+  .kv-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ===== BOTONES PREMIUM RESPONSIVE ===== */
+
+.btn {
+  min-height: 36px;
+  padding: 8px 15px;
+  font-size: 0.84rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.card-actions,
+.plan-actions,
+.bottom-action,
+.modal-actions {
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.card-actions .btn,
+.plan-actions .btn,
+.bottom-action .btn,
+.modal-actions .btn {
+  width: auto;
+  min-width: 120px;
+  max-width: 220px;
+  flex: 0 0 auto;
+}
+
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #0f766e;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.32);
+  }
+
+  .btn-soft:hover:not(:disabled) {
+    background: #e0faf7;
+    color: #0f766e;
+    transform: translateY(-2px);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #ef5350;
+    color: #fff;
+    transform: translateY(-2px);
+  }
+}
+
+@media (max-width: 720px) {
   .card-actions,
   .plan-actions,
   .bottom-action,
   .modal-actions {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
   }
 
   .card-actions .btn,
   .plan-actions .btn,
   .bottom-action .btn,
   .modal-actions .btn {
-    width: 100%;
+    width: auto;
+    min-width: 112px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 420px) {
+  .card-actions .btn,
+  .plan-actions .btn,
+  .bottom-action .btn {
+    min-width: 105px;
+    max-width: 160px;
+    font-size: 0.8rem;
+    padding: 8px 12px;
   }
 
-  .kv-row {
-    flex-direction: column;
-    align-items: flex-start;
+  .modal-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
   }
 }
 </style>

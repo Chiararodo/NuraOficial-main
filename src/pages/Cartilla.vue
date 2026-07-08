@@ -17,7 +17,7 @@ const CANCEL_LIMIT_HOURS = 48
 
 const {
   fetchEspecialistas,
-  fetchTurnosByEspecialista,
+  fetchTurnosByPaciente,
   fetchDisponibilidad,
   crearTurno,
   editarTurno,
@@ -611,36 +611,35 @@ async function loadWeeklyAvailability() {
     const { start } = getWeekRange()
     selectedWeekAnchor.value = formatDateISO(start)
 
-    const days: WeeklyAvailabilityDay[] = []
+    const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
+  const current = new Date(start)
+  current.setDate(start.getDate() + i)
 
-    for (let i = 0; i < 7; i++) {
-      const current = new Date(start)
-      current.setDate(start.getDate() + i)
+  const dateStr = formatDateISO(current)
+  const rawSlots = buildRawSlots(selectedPro.value, dateStr)
+  const occupied = new Set(await loadOccupiedSlotsForDay(selectedPro.value, dateStr))
 
-      const dateStr = formatDateISO(current)
-      const rawSlots = buildRawSlots(selectedPro.value, dateStr)
-      const occupied = new Set(await loadOccupiedSlotsForDay(selectedPro.value, dateStr))
+  const filteredSlots = rawSlots.filter((slot) => {
+    if (occupied.has(slot)) return false
+    if (isPastTimeToday(dateStr, slot)) return false
+    return true
+  })
 
-      const filteredSlots = rawSlots.filter((slot) => {
-        if (occupied.has(slot)) return false
-        if (isPastTimeToday(dateStr, slot)) return false
-        return true
-      })
+  const past = isPastDate(dateStr)
 
-      const past = isPastDate(dateStr)
+  return {
+    date: dateStr,
+    label: formatDayLabel(current),
+    shortLabel: formatShortDayLabel(current),
+    slots: past ? [] : filteredSlots,
+    available: !past && filteredSlots.length > 0,
+    isToday: dateStr === getTodayDateISO(),
+    isPast: past
+  } as WeeklyAvailabilityDay
+})
 
-      days.push({
-        date: dateStr,
-        label: formatDayLabel(current),
-        shortLabel: formatShortDayLabel(current),
-        slots: past ? [] : filteredSlots,
-        available: !past && filteredSlots.length > 0,
-        isToday: dateStr === getTodayDateISO(),
-        isPast: past
-      })
-    }
-
-    weeklyAvailability.value = days
+const days = await Promise.all(dayPromises)
+weeklyAvailability.value = days
 
     const dayStillValid = days.find((d) => d.date === bookingDate.value)
     const currentTimeStillValid =
@@ -893,30 +892,24 @@ async function payDepositWithMercadoPago() {
 }
 
 async function loadAppointments() {
-  if (!auth.user) return
+  if (!auth.user?.email) return
 
   loadingAppointments.value = true
   appointments.value = []
 
   try {
-    for (const pro of profesionales.value) {
-      const profesionalId = String(pro._id || pro.id || '')
-      if (!profesionalId) continue
+    const turnos = await fetchTurnosByPaciente(auth.user.email)
 
-      const turnos = await fetchTurnosByEspecialista(profesionalId)
+    const now = Date.now()
 
-      for (const t of turnos as ApiTurno[]) {
-        if (t.status === 'cancelled') continue
-
-        const pacienteEmail = String(t.pacienteEmail || '').trim().toLowerCase()
-        const authEmail = String(auth.user?.email || '').trim().toLowerCase()
-
-        if (!authEmail || pacienteEmail !== authEmail) continue
-
+    appointments.value = (turnos as ApiTurno[])
+      .filter((t) => t.status !== 'cancelled')
+      .map((t: any) => {
+        const pro = t.especialistaId || {}
         const notes = String(t.notes || '')
         const modality = notes.includes('Virtual') ? 'Virtual' : 'Presencial'
 
-        appointments.value.push({
+        return {
           id: String(t._id),
           turnoApiId: String(t._id),
           on_date: new Date(t.start).toISOString().slice(0, 10),
@@ -924,14 +917,9 @@ async function loadAppointments() {
           title: `Turno – ${pro.name ?? 'Profesional'}`,
           details: notes,
           modality,
-          professional: getProfessionalLabel(pro)
-        })
-      }
-    }
-
-    const now = Date.now()
-
-    appointments.value = appointments.value
+          professional: `${pro.name ?? ''} – ${pro.type ?? ''}`.trim()
+        }
+      })
       .filter((a) => {
         const dt = makeApptDateTime(a.on_date, a.at_time)
         return dt ? dt.getTime() >= now : false
@@ -1046,9 +1034,10 @@ async function saveAppointment() {
       await crearTurno(payload)
     }
 
-    await loadAppointments()
-    await loadOccupiedSlotsForSelected()
-    await loadWeeklyAvailability()
+await Promise.all([
+  loadAppointments(),
+  loadWeeklyAvailability()
+])
 
     showBookingModal.value = false
     turnoConfirmado.value = true
@@ -1723,7 +1712,7 @@ onMounted(async () => {
   padding: 24px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: 'Inter', sans-serif;
+font-family: var(--font-main);
 }
 
 .visually-hidden {
@@ -1779,13 +1768,6 @@ onMounted(async () => {
 .filters-row {
   display: grid;
   gap: 12px;
-}
-
-@media (min-width: 900px) {
-  .filters-row {
-    grid-template-columns: 1.15fr repeat(4, minmax(0, 1fr));
-    align-items: end;
-  }
 }
 
 .field {
@@ -2865,7 +2847,7 @@ onMounted(async () => {
 
 /* ================= RESPONSIVE ================= */
 
-@media (max-width: 1024px) {
+@media (max-width: 2024px) {
   .modal-appointment-wide {
     width: min(96vw, 980px);
   }
@@ -2888,7 +2870,6 @@ onMounted(async () => {
   .modal-card {
     width: 92%;
     max-height: 90vh;
-    
   }
 
   .page-head {
@@ -2900,6 +2881,12 @@ onMounted(async () => {
   }
 }
 
+@media (min-width: 900px) {
+  .filters-row {
+    grid-template-columns: 1.15fr repeat(4, minmax(0, 1fr));
+    align-items: end;
+  }
+}
 @media (max-width: 680px) {
   .prof-top {
     flex-direction: column;
@@ -3037,11 +3024,18 @@ onMounted(async () => {
     min-height: 46px;
     font-size: 0.92rem;
   }
+  
+.pill--primary {
+  font-size: 0.9rem;
+  font-weight: 650;
+  background: #50bdbd;
+}
 
-  .modal-footer .pill {
-    flex: 1 1 calc(50% - 6px);
-    justify-content: center;
-    min-height: 42px;
+  .modal-footer .pill--danger {
+     background: var(--nura-danger);
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.35);
+  font-size: 0.9rem;
+  font-weight: 650;
   }
 }
 
@@ -3073,8 +3067,15 @@ onMounted(async () => {
     padding-right: 12px;
   }
 
-  .modal-footer .pill {
-    flex: 1 1 100%;
+  .pill--primary {
+  font-size: 0.9rem;
+  font-weight: 650;
+  background: #50bdbd;
+}
+  .modal-footer .pill--danger {
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.35);
+  font-size: 0.9rem;
+  font-weight: 650;
   }
 }
 
@@ -3135,9 +3136,7 @@ onMounted(async () => {
     grid-template-columns: 1fr 1fr;
   }
 
-  .modal-footer .pill {
-    flex: 1 1 100%;
-  }
+
 
   .turno-confirmado {
     left: 10px;
@@ -3147,4 +3146,6 @@ onMounted(async () => {
     max-width: none;
   }
 }
+
+
 </style>

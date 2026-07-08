@@ -512,30 +512,106 @@ function goPremiumArea() {
   color: #64748b;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  border-radius: 999px;
-  border: none;
-  padding: 10px 16px;
-  font-size: 0.96rem;
-  font-weight: 800;
-  cursor: pointer;
-  box-sizing: border-box;
-  transition:
-    background-color 0.2s ease,
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+/* ===== BOTONES ===== */
+
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+
+  min-height:38px;
+  padding:8px 18px;
+
+  border-radius:999px;
+  border:none;
+  cursor:pointer;
+
+  font-size:.86rem;
+  font-weight:700;
+  line-height:1;
+
+  transition:.22s;
 }
 
-.btn-primary {
-  background: #50bdbd;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+.btn-primary{
+  background:#50bdbd;
+  color:#fff;
+  box-shadow:0 8px 18px rgba(80,189,189,.22);
+}
+
+.btn-primary:hover:not(:disabled){
+  background:#3caeae;
+  transform:translateY(-2px);
+  box-shadow:0 12px 24px rgba(80,189,189,.30);
+}
+
+.btn-soft{
+  background:#fff;
+  color:#50bdbd;
+  border:1.5px solid #50bdbd;
+}
+
+.btn-soft:hover:not(:disabled){
+  background:#eafafa;
+  transform:translateY(-2px);
+}
+
+.btn:disabled{
+  opacity:.65;
+  cursor:not-allowed;
+}
+
+/* Botón inferior */
+
+.bottom{
+  display:flex;
+  justify-content:flex-start;
+  margin-top:6px;
+}
+
+.btn-cta{
+  min-width:220px;
+  max-width:280px;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width:680px){
+
+  .actions{
+    display:flex;
+    flex-direction:row;
+    gap:10px;
+  }
+
+  .actions .btn{
+    flex:1;
+    width:auto;
+    min-width:0;
+  }
+
+  .bottom{
+    justify-content:stretch;
+  }
+
+  .btn-cta{
+    width:100%;
+    max-width:none;
+  }
+}
+
+@media (max-width:420px){
+
+  .btn{
+    min-height:36px;
+    padding:8px 14px;
+    font-size:.82rem;
+  }
+
+  .actions{
+    gap:8px;
+  }
 }
 
 @media (hover: hover) {
@@ -544,13 +620,6 @@ function goPremiumArea() {
     transform: translateY(-2px);
     box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
   }
-}
-
-.btn-soft {
-  background: #ffffff;
-  color: #50bdbd;
-  border: 1px solid #b6ebe5;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
 }
 
 @media (hover: hover) {
@@ -570,17 +639,6 @@ function goPremiumArea() {
   cursor: not-allowed;
 }
 
-.bottom {
-  padding-top: 4px;
-  display: flex;
-  justify-content: flex-start;
-}
-
-.btn-cta {
-  width: auto;
-  min-width: 220px;
-  max-width: 320px;
-}
 
 .visually-hidden {
   position: absolute;

@@ -1014,7 +1014,7 @@ function mmss(total: number) {
   padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: 'Inter', sans-serif;
+font-family: var(--font-main);
 }
 
 .page-head {

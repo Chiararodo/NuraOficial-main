@@ -9,12 +9,13 @@ function goBack() {
 </script>
 
 <template>
+    <h1 class="visually-hidden">Privacidad y Términos</h1>
   <main class="page">
     <header class="top">
       <button class="back-link" type="button" @click="goBack">
         <span class="arrow">←</span>
       </button>
-      <h1 class="title">Privacidad y Términos</h1>
+      <h2 class="title">Privacidad y Términos</h2>
     </header>
 
     <section class="card">

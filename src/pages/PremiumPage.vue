@@ -368,6 +368,9 @@ function goPerfil() {
     border-color 0.22s ease;
 }
 
+.card feature{
+ background: #b90909; }
+
 @media (hover: hover) {
   .card:hover {
     transform: translateY(-4px);
@@ -481,7 +484,7 @@ function goPerfil() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 160px;
+  min-height: 120px;
   transition:
     transform 0.18s ease,
     box-shadow 0.2s ease,
@@ -604,38 +607,6 @@ function goPerfil() {
   color: #6b7280;
 }
 
-.actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-}
-
-.btn {
-  border-radius: 999px;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 750;
-  cursor: pointer;
-  padding: 10px 16px;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease;
-  text-decoration: none;
-  box-sizing: border-box;
-}
-
-.btn-primary {
-  background: #50bdbd;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
-}
 
 @media (hover: hover) {
   .btn-primary:hover:not(:disabled) {
@@ -645,12 +616,6 @@ function goPerfil() {
   }
 }
 
-.btn-soft {
-  background: #ffffff;
-  color: #50bdbd;
-  border: 1px solid #b6ebe5;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
-}
 
 @media (hover: hover) {
   .btn-soft:hover:not(:disabled) {
@@ -664,11 +629,7 @@ function goPerfil() {
   transform: scale(0.98);
 }
 
-.small {
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  min-height: 40px;
-}
+
 
 .locked .section-title {
   margin-bottom: 8px;
@@ -683,47 +644,159 @@ function goPerfil() {
   overflow: hidden;
 }
 
-@media (max-width: 720px) {
-  .page {
-    padding: 16px 12px 96px;
+/* ===== BOTONES ===== */
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:14px;
+}
+
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:38px;
+  padding:8px 18px;
+  border-radius:999px;
+  border:none;
+  font-size:.85rem;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  transition:.22s;
+}
+
+.btn-primary{
+  background:#50bdbd;
+  color:#fff;
+  box-shadow:0 8px 18px rgba(80,189,189,.22);
+}
+
+.btn-primary:hover:not(:disabled){
+  background:#3caeae;
+  transform:translateY(-2px);
+  box-shadow:0 12px 24px rgba(80,189,189,.30);
+}
+
+.btn-soft{
+  background:#fff;
+  color:#50bdbd;
+  border:1.5px solid #50bdbd;
+}
+
+.btn-soft:hover:not(:disabled){
+  background:#eafafa;
+  transform:translateY(-2px);
+}
+
+.small{
+  min-height:34px;
+  padding:7px 14px;
+  font-size:.8rem;
+}
+
+.btn:active{
+  transform:scale(.98);
+}
+
+@media (max-width:720px){
+
+  .page{
+    padding:16px 12px 96px;
   }
 
-  .page-head {
-    flex-direction: column;
-    align-items: flex-start;
+  .page-head{
+    flex-direction:column;
+    align-items:flex-start;
   }
 
-  .page-title {
-    font-size: 1.4rem;
+  .page-title{
+    font-size:1.4rem;
   }
 
-  .hero {
-    flex-direction: column;
+  .hero{
+    flex-direction:column;
   }
 
-  .hero-aside {
-    width: 100%;
-    justify-content: flex-start;
+  .hero-aside{
+    width:100%;
+    justify-content:flex-start;
   }
 
-  .row-between {
-    flex-direction: column;
-    align-items: flex-start;
+  .row-between{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:12px;
   }
 
-  .session-item {
-    flex-direction: column;
-    align-items: flex-start;
+  .session-item{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:10px;
   }
 
-  .session-item .btn,
-  .actions .btn,
-  .row-between .btn {
-    width: 100%;
+  .card{
+    padding:16px 14px;
   }
 
-  .card {
-    padding: 16px 14px;
+  .actions{
+    flex-direction:row;
+  }
+
+
+}
+
+@media (max-width:480px){
+
+  .actions{
+    flex-direction:column;
+  }
+
+  .btn{
+    min-height:36px;
+    font-size:.82rem;
+    padding:8px 14px;
+  }
+
+  .small{
+    min-height:34px;
+    font-size:.8rem;
+  }
+}
+
+/* FIX botones de Accesos rápidos */
+.quick-card {
+  align-items: flex-start;
+}
+
+.quick-card .btn {
+  width: auto !important;
+  align-self: flex-start !important;
+  flex: 0 0 auto;
+  width: 185px;
+  max-width: 255px;
+  white-space: nowrap;
+}
+
+/* botones de próximos encuentros */
+.session-item .btn {
+  width: auto !important;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  min-width: 130px;
+  max-width: 175px;
+}
+
+/* en celular recién ahí que ocupen todo */
+@media (max-width: 480px) {
+  .quick-card .btn,
+  .session-item .btn {
+    width: 75% !important;
+    max-width: none;
+    min-width: 0;
   }
 }
 </style>

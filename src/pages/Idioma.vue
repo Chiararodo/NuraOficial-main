@@ -42,7 +42,8 @@ watch(
 </script>
 
 <template>
-  <h1 class="visually-hidden">{{ t('language.title') }}</h1>
+
+    <h1 class="visually-hidden">Idioma</h1>
 
   <main class="page">
     <header class="top">

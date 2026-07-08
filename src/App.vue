@@ -59,7 +59,7 @@ watch(
 
 /* Fuente global */
 body {
-  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  font-family: 'Poppins';
   margin: 0;
   background-color: var(--nura-bg);
   color: var(--nura-text);

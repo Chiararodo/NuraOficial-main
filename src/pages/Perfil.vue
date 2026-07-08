@@ -325,7 +325,7 @@ const avatarInitial = computed(() => fallbackInitial())
 </script>
 
 <template>
-  <h1 class="visually-hidden">{{ $t('profile.title') }}</h1>
+  <h1 class="visually-hidden">Perfil</h1>
 
   <main class="contenido">
     <header class="page-head">
@@ -444,25 +444,31 @@ const avatarInitial = computed(() => fallbackInitial())
           </button>
         </div>
 
-        <div class="card">
-          <h2 class="section-title">{{ $t('profile.diary.title') }}</h2>
+       <div class="card">
+  <h2 class="section-title">{{ $t('profile.diary.title') }}</h2>
 
-          <ul v-if="diaryPreview.length" class="diary-list">
-            <li v-for="d in diaryPreview" :key="d.date">
-              <span class="date">{{ d.date }}</span>
-              <span class="mood-pill">{{ $t(`profile.moods.${d.mood}`) }}</span>
-              <span class="snippet">{{ d.snippet }}</span>
-            </li>
-          </ul>
+  <p class="muted">
+    Registrá cómo te sentís.
+  </p>
 
-          <p v-else class="muted small">{{ $t('profile.diary.emptyPreview') }}</p>
+  <ul v-if="diaryPreview.length" class="diary-list">
+    ...
+  </ul>
 
-          <div class="row between">
-            <button class="btn btn-full btn-ghost" type="button" @click="goDiaryList">
-              {{ $t('profile.diary.viewAll') }}
-            </button>
-          </div>
-        </div>
+  <p v-else class="muted small">
+    {{ $t('profile.diary.emptyPreview') }}
+  </p>
+
+  <div class="row between">
+    <button
+      class="btn btn-full btn-ghost"
+      type="button"
+      @click="goDiaryList"
+    >
+      {{ $t('profile.diary.viewAll') }}
+    </button>
+  </div>
+</div>
 
         <div class="card">
           <h2 class="section-title">{{ $t('profile.settings.helpChatTitle') }}</h2>
@@ -479,7 +485,7 @@ const avatarInitial = computed(() => fallbackInitial())
         </div>
       </section>
 
-      <section class="col">
+      <section class="col col-settings">
         <div class="card aside-card">
           <h2 class="aside-title">{{ $t('profile.settings.title') }}</h2>
           <p class="aside-subtitle">{{ $t('profile.settings.subtitle') }}</p>
@@ -566,21 +572,67 @@ const avatarInitial = computed(() => fallbackInitial())
 }
 
 .grid {
-  display: grid;
+  display: flex;
   gap: 24px;
+  align-items: flex-start;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-@media (min-width: 980px) {
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.col:first-child {
+  flex: 1.15;
+}
+
+.col-settings {
+  flex: 0.85;
+  gap: 14px;
+}
+
+.col-settings .card {
+  padding: 16px 18px;
+}
+
+/* tablets: una columna abajo de la otra */
+@media (max-width: 900px) {
   .grid {
-    grid-template-columns: 1.15fr 0.85fr;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .col,
+  .col:first-child,
+  .col-settings {
+    width: 100%;
+    flex: none;
+  }
+
+  .col,
+  .col-settings {
+    gap: 16px;
   }
 }
 
-.col {
-  display: grid;
-  gap: 20px;
+/* celulares */
+@media (max-width: 520px) {
+  .grid {
+    gap: 14px;
+  }
+
+  .col,
+  .col-settings {
+    gap: 14px;
+  }
+
+  .col-settings .card {
+    padding: 14px 16px;
+  }
 }
 
 .card {
@@ -588,8 +640,10 @@ const avatarInitial = computed(() => fallbackInitial())
   height: fit-content;
   box-sizing: border-box;
   background: #ffffff;
-  border-radius: 18px;
-  padding: 16px 18px;
+  
+    padding: 18px 20px;
+    border-radius: 16px;
+
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
   transition:
     transform 0.22s ease,
@@ -712,7 +766,7 @@ const avatarInitial = computed(() => fallbackInitial())
   border-radius: 999px;
   padding: 10px 16px;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   text-decoration: none;
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
@@ -725,28 +779,30 @@ const avatarInitial = computed(() => fallbackInitial())
   box-sizing: border-box;
 }
 
-@media (hover: hover) {
+
   .btn:hover {
-    background: #3daaaa;
+    background: #0f766e;
+    color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
+    box-shadow: 0 10px 24px rgba(80, 189, 189, 0.35);
   }
-}
+
 
 .btn:active {
   transform: scale(0.98);
-}
-
-.btn-full {
-  width: auto;
-  min-width: 160px;
-  max-width: 170px;
 }
 
 .btn-danger {
   background: #ef5350;
   box-shadow: 0 8px 18px rgba(239, 83, 80, 0.24);
 }
+
+  .btn-danger:hover {
+    background: #751c1acb;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(80, 189, 189, 0.35);
+  }
 
 @media (hover: hover) {
   .btn-danger:hover {
@@ -781,16 +837,6 @@ const avatarInitial = computed(() => fallbackInitial())
   margin-bottom: 6px;
 }
 
-@media (max-width: 520px) {
-  .premium-head-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .btn-full {
-    width: 35%;
-  }
-}
 
 .premium-pill {
   display: inline-flex;
@@ -801,7 +847,7 @@ const avatarInitial = computed(() => fallbackInitial())
   border: 1.5px solid #50bdbd;
   background: #e0faf7;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #0f766e;
   white-space: nowrap;
 }
@@ -998,6 +1044,96 @@ const avatarInitial = computed(() => fallbackInitial())
   .modal-actions .btn {
     font-size: 0.85rem;
     padding: 9px 10px;
+  }
+}
+
+/* ===== BOTONES PERFIL RESPONSIVE ===== */
+
+.card .btn-full {
+  margin-top: 12px;
+  align-self: flex-start;
+}
+
+.btn {
+  min-height: 36px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.btn-full {
+  width: fit-content;
+  min-width: 112px;
+  max-width: 170px;
+}
+
+.row.end,
+.row.between {
+  justify-content: flex-start;
+}
+
+@media (hover: hover) {
+  .btn:hover {
+    background: #0f766e;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(80, 189, 189, 0.35);
+  }
+
+  .btn-danger:hover {
+    background: #e53935;
+    color: #fff;
+    box-shadow: 0 14px 28px rgba(239, 83, 80, 0.32);
+  }
+}
+
+@media (max-width: 900px) {
+  .grid {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .col,
+  .col:first-child,
+  .col-settings {
+    width: 100%;
+    flex: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .btn-full {
+    width: auto;
+    min-width: 110px;
+    max-width: 150px;
+  }
+
+  .profile-head .btn-full {
+    min-width: 145px;
+  }
+
+  .row,
+  .row.end,
+  .row.between {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .premium-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modal-actions {
+    flex-direction: row;
+  }
+
+  .modal-actions .btn {
+    width: auto;
+    flex: 1;
+    max-width: none;
   }
 }
 </style>

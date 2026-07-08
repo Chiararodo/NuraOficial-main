@@ -1033,9 +1033,7 @@ function goWriteNew() {
     text-align: center;
   }
 
-  .btn-main {
-    width: 100%;
-  }
+  
 
   .form-message {
     margin-left: 0;
