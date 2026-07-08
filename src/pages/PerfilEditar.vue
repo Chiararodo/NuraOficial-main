@@ -374,13 +374,12 @@ onMounted(() => {
 
           <div class="actions-row">
             <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="pwdSending"
-              @click="sendPasswordResetEmail"
-            >
-              {{ pwdSending ? 'Enviando…' : 'Enviar email para cambiar contraseña' }}
-            </button>
+  class="btn btn-primary btn-password"
+  :disabled="pwdSending"
+  @click="sendPasswordResetEmail"
+>
+  {{ pwdSending ? 'Enviando…' : 'Enviar email' }}
+</button>
           </div>
         </section>
       </section>
@@ -644,10 +643,16 @@ onMounted(() => {
 
 .btn-primary {
   background: #50bdbd;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
-  min-width: 180px;
-  max-width: 320px;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(80,189,189,.22);
+  width: fit-content;
+  min-width: 170px;
+  max-width: 240px;
+}
+
+.btn-password {
+  min-width: 210px;
+  max-width: 270px;
 }
 
 @media (hover: hover) {
@@ -729,13 +734,19 @@ onMounted(() => {
 
 @media (max-width: 520px) {
   .actions-row {
-    justify-content: stretch;
+    justify-content: flex-start;
+  }
+
+  .btn {
+    min-height: 36px;
+    padding: 8px 16px;
+    font-size: .84rem;
   }
 
   .btn-primary {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: 170px;
+    max-width: 240px;
   }
 }
 </style>

@@ -724,11 +724,6 @@ function countFor(id: string) {
   .premium-inline__btn {
     width: 100%;
   }
-
-  .btn-primary {
-    width: 100%;
-    max-width: 320px;
-  }
 }
 
 @media (max-width: 640px) {
@@ -747,6 +742,94 @@ function countFor(id: string) {
 
   .count {
     margin-left: auto;
+  }
+}
+
+/* ===== BOTONES FORO RESPONSIVE ===== */
+
+.pill,
+.btn-primary,
+.premium-inline__btn,
+.modal-btn {
+  min-height: 36px;
+  padding: 8px 15px;
+  font-size: 0.84rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.filters {
+  gap: 8px;
+}
+
+.cta {
+  justify-content: flex-start;
+}
+
+.cta .btn-primary {
+  width: auto;
+  min-width: 130px;
+  max-width: 180px;
+}
+
+.premium-inline__btn {
+  width: auto;
+  min-width: 125px;
+  max-width: 170px;
+}
+
+.admin-actions .pill {
+  width: auto;
+  min-width: 135px;
+  max-width: 190px;
+}
+
+@media (max-width: 768px) {
+  .premium-inline {
+    align-items: flex-start;
+  }
+
+  .premium-inline__btn {
+    width: auto;
+    min-width: 120px;
+    max-width: 170px;
+  }
+
+  .cta .btn-primary {
+    width: auto;
+    min-width: 125px;
+    max-width: 170px;
+  }
+}
+
+@media (max-width: 420px) {
+  .filters {
+    gap: 7px;
+  }
+
+  .pill {
+    min-height: 34px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+  }
+
+  .cta .btn-primary {
+    width: 100%;
+    max-width: none;
+  }
+
+  .premium-inline__btn {
+    width: 100%;
+    max-width: none;
+  }
+
+  .modal-actions {
+    flex-direction: row;
+  }
+
+  .modal-actions .modal-btn {
+    width: auto;
+    flex: 1;
   }
 }
 </style>

@@ -20,6 +20,21 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const showPremiumModal = ref(false)
 
+const toastMsg = ref('')
+const toastType = ref<'error' | 'success'>('error')
+let toastTimer: number | undefined
+
+function showToast(message: string, type: 'error' | 'success' = 'error') {
+  toastMsg.value = message
+  toastType.value = type
+
+  if (toastTimer) window.clearTimeout(toastTimer)
+
+  toastTimer = window.setTimeout(() => {
+    toastMsg.value = ''
+  }, 3200)
+}
+
 function clearMessages() {
   errorMsg.value = ''
   successMsg.value = ''
@@ -57,8 +72,10 @@ const canSubmit = computed(() => {
 function validateForm() {
   clearMessages()
 
+  const faltantes: string[] = []
+
   if (!auth.user) {
-    errorMsg.value = 'Tenés que iniciar sesión para crear un foro.'
+    showToast('Tenés que iniciar sesión para publicar.', 'error')
     return false
   }
 
@@ -68,27 +85,25 @@ function validateForm() {
   }
 
   if (!category.value) {
-    errorMsg.value = 'Seleccioná una categoría.'
-    return false
+    faltantes.push('categoría')
   }
 
   if (!title.value.trim()) {
-    errorMsg.value = 'Escribí un título para tu foro.'
-    return false
-  }
-
-  if (title.value.trim().length < 5) {
-    errorMsg.value = 'El título debe tener al menos 5 caracteres.'
-    return false
+    faltantes.push('título')
+  } else if (title.value.trim().length < 5) {
+    faltantes.push('título de al menos 5 caracteres')
   }
 
   if (!body.value.trim()) {
-    errorMsg.value = 'Escribí el contenido de tu foro.'
-    return false
+    faltantes.push('contenido')
+  } else if (countRealWords(body.value) < 5) {
+    faltantes.push('contenido de al menos 5 palabras')
   }
 
-  if (countRealWords(body.value) < 5) {
-    errorMsg.value = 'El contenido debe tener al menos 5 palabras.'
+  if (faltantes.length) {
+    const msg = `Para publicar te falta: ${faltantes.join(', ')}.`
+    errorMsg.value = msg
+    showToast(msg, 'error')
     return false
   }
 
@@ -134,7 +149,7 @@ async function submitForum() {
 
     if (error) throw error
 
-    successMsg.value = 'Tu foro fue publicado correctamente.'
+    showToast('¡Foro publicado correctamente!', 'success')
 
     title.value = ''
     body.value = ''
@@ -162,6 +177,13 @@ onMounted(async () => {
 
 <template>
   <main class="page">
+    <div
+  v-if="toastMsg"
+  class="toast"
+  :class="toastType === 'success' ? 'toast-success' : 'toast-error'"
+>
+  {{ toastMsg }}
+</div>
     <header class="page-head">
       <button class="back-link" type="button" @click="goBack" aria-label="Volver">
         <span class="arrow">←</span>
@@ -239,13 +261,9 @@ onMounted(async () => {
         </p>
       </div>
 
-      <p v-if="errorMsg" class="form-message error" role="alert">
-        {{ errorMsg }}
-      </p>
-
-      <p v-if="successMsg" class="form-message success" role="status">
-        {{ successMsg }}
-      </p>
+     <p v-if="errorMsg && !toastMsg" class="form-message error" role="alert">
+  {{ errorMsg }}
+</p>
 
       <div class="form-actions">
         <button class="btn-soft" type="button" @click="goBack">
@@ -253,11 +271,11 @@ onMounted(async () => {
         </button>
 
         <button
-          class="btn-primary"
-          type="button"
-          :disabled="!canSubmit"
-          @click="submitForum"
-        >
+  class="btn-primary"
+  type="button"
+  :disabled="loading"
+  @click="submitForum"
+>
           {{ loading ? 'Publicando…' : 'Publicar foro' }}
         </button>
       </div>
@@ -717,5 +735,139 @@ onMounted(async () => {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* ===== BOTONES MÁS CHICOS + TOAST ===== */
+
+.btn-primary,
+.btn-soft,
+.modal-btn,
+.premium-inline__btn {
+  min-height: 36px;
+  padding: 8px 15px;
+  font-size: 0.84rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.form-actions {
+  align-items: center;
+}
+
+.form-actions .btn-primary,
+.form-actions .btn-soft {
+  width: auto;
+  min-width: 115px;
+  max-width: 180px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  z-index: 80;
+  width: min(92vw, 430px);
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  animation: toastIn 0.22s ease;
+}
+
+.toast-error {
+  background: #fff1f2;
+  color: #b42318;
+  border: 1px solid #fecdd3;
+}
+
+.toast-success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #abefc6;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 520px) {
+  .form-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .form-actions .btn-primary,
+  .form-actions .btn-soft {
+    width: auto;
+    min-width: 110px;
+    max-width: 160px;
+  }
+
+  .modal-actions {
+    flex-direction: row;
+  }
+
+  .modal-actions .modal-btn {
+    width: auto;
+    flex: 1;
+  }
+}
+
+/* ===== SELECT CATEGORÍA PROLIJO ===== */
+
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  width: 100%;
+  max-width: 100%;
+
+  padding-right: 42px;
+
+  background-image:
+    linear-gradient(45deg, transparent 50%, #50bdbd 50%),
+    linear-gradient(135deg, #50bdbd 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) 50%,
+    calc(100% - 16px) 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+}
+
+.field {
+  min-width: 0;
+}
+
+.form-card {
+  overflow: hidden;
+}
+
+@media (max-width: 520px) {
+  select.input {
+    font-size: 0.88rem;
+    padding-right: 38px;
+    background-position:
+      calc(100% - 20px) 50%,
+      calc(100% - 14px) 50%;
+  }
+}
+
+.input,
+.textarea {
+  padding-left: 14px;
 }
 </style>

@@ -350,7 +350,7 @@ onMounted(async () => {
 
             <div class="card-actions">
               <button class="btn btn-primary" type="button" @click="goPremiumArea">
-                Ir a mi espacio Premium
+                Ir espacio Premium
               </button>
 
               <button class="btn btn-soft" type="button" @click="goPerfil">
@@ -528,10 +528,6 @@ onMounted(async () => {
   max-width: 78ch;
 }
 
-.loading-text {
-  margin-top: 8px;
-}
-
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -574,18 +570,13 @@ onMounted(async () => {
   padding: 22px 22px 20px;
   border: 1px solid #e2edf7;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-  transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease,
-    background-color 0.22s ease,
-    border-color 0.22s ease;
+  transition: 0.22s ease;
 }
 
 @media (hover: hover) {
   .card:hover {
     transform: translateY(-4px);
     box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
-    background: #ffffff;
   }
 }
 
@@ -668,6 +659,7 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
   margin-top: 18px;
 }
 
@@ -690,11 +682,7 @@ onMounted(async () => {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   display: grid;
   gap: 12px;
-  transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease,
-    background-color 0.22s ease,
-    border-color 0.22s ease;
+  transition: 0.22s ease;
 }
 
 @media (hover: hover) {
@@ -749,24 +737,23 @@ onMounted(async () => {
   justify-content: flex-start;
 }
 
+/* ===== BOTONES UNIFICADOS ===== */
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 10px 18px;
+  min-height: 36px;
+  padding: 8px 15px;
   border-radius: 999px;
   border: none;
-  font-size: 0.96rem;
+  font-size: 0.84rem;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
   text-decoration: none;
   box-sizing: border-box;
+  transition: 0.22s ease;
 }
 
 .btn-primary {
@@ -775,41 +762,38 @@ onMounted(async () => {
   box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
 }
 
-@media (hover: hover) {
-  .btn-primary:hover:not(:disabled) {
-    background: #3daaaa;
-    transform: translateY(-2px);
-    box-shadow: 0 14px 28px rgba(80, 189, 189, 0.3);
-  }
-}
-
 .btn-soft {
   background: #ffffff;
   color: #50bdbd;
-  border: 1px solid #b6ebe5;
+  border: 1.5px solid #50bdbd;
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.14);
-}
-
-@media (hover: hover) {
-  .btn-soft:hover:not(:disabled) {
-    background: #e0faf7;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
-  }
 }
 
 .btn-danger {
   background: #ffffff;
   color: #ef5350;
-  border: 1px solid rgba(239, 83, 80, 0.55);
+  border: 1.5px solid rgba(239, 83, 80, 0.55);
   box-shadow: 0 4px 12px rgba(239, 83, 80, 0.16);
 }
 
 @media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: #0f766e;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.32);
+  }
+
+  .btn-soft:hover:not(:disabled) {
+    background: #e0faf7;
+    color: #0f766e;
+    transform: translateY(-2px);
+  }
+
   .btn-danger:hover:not(:disabled) {
-    background: rgba(229, 57, 53, 0.08);
-    transform: translateY(-1px);
-    box-shadow: 0 10px 18px rgba(239, 83, 80, 0.18);
+    background: #ef5350;
+    color: #fff;
+    transform: translateY(-2px);
   }
 }
 
@@ -821,6 +805,33 @@ onMounted(async () => {
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+/* 3 botones de estado */
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.card-actions .btn {
+  width: 100%;
+  max-width: none;
+}
+
+.card-actions .btn:first-child {
+  grid-column: 1 / -1;
+}
+
+/* otros botones */
+.plan-actions .btn,
+.bottom-action .btn,
+.modal-actions .btn {
+  width: auto;
+  min-width: 115px;
+  max-width: 220px;
+}
+
+/* ===== ACCESOS RÁPIDOS ===== */
 
 .shortcuts {
   display: grid;
@@ -835,33 +846,58 @@ onMounted(async () => {
 
 @media (min-width: 1200px) {
   .shortcuts {
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
 .shortcut {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   text-align: left;
-  border: 1px solid #e2edf7;
-  background: rgba(182, 235, 229, 0.45);
+  border: 1.5px solid #b6ebe5;
+  background: #f2fbfa;
   border-radius: 16px;
   padding: 16px 16px 14px;
   cursor: pointer;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    background-color 0.2s ease;
+  transition: 0.22s ease;
   min-height: 130px;
+}
+
+.shortcut::after {
+  content: "Abrir";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 84px;
+  margin-top: auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
 }
 
 @media (hover: hover) {
   .shortcut:hover {
     transform: translateY(-3px);
-    border-color: #9be9e0;
-    background: rgba(155, 233, 224, 0.5);
+    border-color: #50bdbd;
+    background: #e8fbf8;
     box-shadow: 0 16px 34px rgba(80, 189, 189, 0.18);
   }
+
+  .shortcut:hover::after {
+    background: #0f766e;
+  }
+}
+
+.shortcut:active {
+  transform: scale(0.98);
 }
 
 .shortcut-top {
@@ -884,6 +920,8 @@ onMounted(async () => {
   font-size: 0.92rem;
   line-height: 1.4;
 }
+
+/* ===== MODALES ===== */
 
 .modal-backdrop {
   position: fixed;
@@ -921,10 +959,6 @@ onMounted(async () => {
   line-height: 1.45;
 }
 
-.modal-text.extra {
-  margin-top: 0;
-}
-
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -945,6 +979,8 @@ onMounted(async () => {
   height: 1px;
   overflow: hidden;
 }
+
+/* ===== RESPONSIVE ===== */
 
 @media (max-width: 720px) {
   .premium-page {
@@ -976,87 +1012,23 @@ onMounted(async () => {
   }
 }
 
-/* ===== BOTONES PREMIUM RESPONSIVE ===== */
-
-.btn {
-  min-height: 36px;
-  padding: 8px 15px;
-  font-size: 0.84rem;
-  line-height: 1;
-  border-radius: 999px;
-}
-
-.card-actions,
-.plan-actions,
-.bottom-action,
-.modal-actions {
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.card-actions .btn,
-.plan-actions .btn,
-.bottom-action .btn,
-.modal-actions .btn {
-  width: auto;
-  min-width: 120px;
-  max-width: 220px;
-  flex: 0 0 auto;
-}
-
-@media (hover: hover) {
-  .btn-primary:hover:not(:disabled) {
-    background: #0f766e;
-    transform: translateY(-2px);
-    box-shadow: 0 12px 24px rgba(80, 189, 189, 0.32);
+@media (max-width: 420px) {
+  .card-actions {
+    grid-template-columns: 1fr;
   }
 
-  .btn-soft:hover:not(:disabled) {
-    background: #e0faf7;
-    color: #0f766e;
-    transform: translateY(-2px);
+  .shortcut {
+    min-height: auto;
   }
 
-  .btn-danger:hover:not(:disabled) {
-    background: #ef5350;
-    color: #fff;
-    transform: translateY(-2px);
-  }
-}
-
-@media (max-width: 720px) {
-  .card-actions,
-  .plan-actions,
-  .bottom-action,
-  .modal-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
+  .shortcut::after {
+    width: 30%;
   }
 
-  .card-actions .btn,
   .plan-actions .btn,
   .bottom-action .btn,
   .modal-actions .btn {
-    width: auto;
-    min-width: 112px;
-    max-width: 180px;
-  }
-}
-
-@media (max-width: 420px) {
-  .card-actions .btn,
-  .plan-actions .btn,
-  .bottom-action .btn {
-    min-width: 105px;
-    max-width: 160px;
-    font-size: 0.8rem;
-    padding: 8px 12px;
-  }
-
-  .modal-actions .btn {
-    flex: 1 1 0;
-    min-width: 0;
+    width: 100%;
     max-width: none;
   }
 }
