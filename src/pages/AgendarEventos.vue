@@ -449,7 +449,7 @@ onMounted(async () => {
   padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
-font-family: var(--font-main);
+  font-family: var(--font-main);
 }
 
 .page-head {
@@ -792,6 +792,19 @@ font-family: var(--font-main);
   white-space: nowrap;
 }
 
+/* ===== RESPONSIVE EVENTOS ===== */
+
+@media (max-width: 900px) {
+  .lista {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card {
+    min-height: 175px;
+  }
+}
+
 @media (max-width: 700px) {
   .agendar-sub {
     padding: 16px 12px 96px;
@@ -801,83 +814,174 @@ font-family: var(--font-main);
     font-size: 1.35rem;
   }
 
+  .page-sub {
+    font-size: 0.9rem;
+  }
+
+  .tabs-row {
+    gap: 8px;
+  }
+
+  .tab-pill {
+    min-height: 34px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+  }
+
   .card {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
-    padding: 16px 14px;
-    min-height: auto;
+    gap: 14px;
+    padding: 14px;
+    min-height: 160px;
+    border-radius: 16px;
   }
 
   .card-img {
-    flex: none;
-    width: 100%;
-    height: 180px;
+    flex: 0 0 110px;
+    width: 110px;
+    height: 110px;
+    border-radius: 14px;
   }
 
-  .card-img img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .card-body {
+    gap: 7px;
   }
 
   .title {
-    font-size: 1.05rem;
+    font-size: 1rem;
+  }
+
+  .meta {
+    font-size: 0.82rem;
+    line-height: 1.35;
   }
 
   .desc {
-    font-size: 0.92rem;
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 2px;
+  }
+
+  .action-btn {
+    width: auto;
+    min-width: 120px;
+    max-width: 165px;
+    min-height: 34px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
   }
 }
 
 @media (max-width: 520px) {
+  .card {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .card-img {
+    flex: 0 0 92px;
+    width: 92px;
+    height: 92px;
+    border-radius: 12px;
+  }
+
+  .title {
+    font-size: 0.92rem;
+  }
+
+  .meta {
+    font-size: 0.76rem;
+  }
+
+  .desc {
+    font-size: 0.78rem;
+  }
+
   .actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
   }
 
   .action-btn {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: 105px;
+    max-width: 145px;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
   }
 
   .tabs-row {
     flex-wrap: nowrap;
-    gap: 10px;
   }
 
   .tab-pill {
-    width: 50%;
+    width: auto;
+    min-width: 100px;
+    padding: 7px 12px;
     text-align: center;
   }
 
   .modal-actions {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
   }
 
   .modal-actions .action-btn,
   .modal-btn {
+    width: auto;
+    min-width: 110px;
+    max-width: 160px;
+  }
+}
+
+@media (max-width: 390px) {
+  .card {
+    flex-direction: column;
+  }
+
+  .card-img {
     width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    height: 135px;
+    flex: none;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .action-btn {
+    min-width: 105px;
+    max-width: 145px;
   }
 }
 
 @media (max-width: 360px) {
   .tab-pill {
-    padding: 8px 10px;
-    font-size: 0.85rem;
+    min-width: 92px;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+  }
+
+  .action-btn {
+    min-width: 96px;
+    max-width: 135px;
+    padding: 6px 9px;
+    font-size: 0.68rem;
   }
 
   .modal-actions {
-    gap: 8px;
-  }
-
-  .modal-actions .action-btn {
-    font-size: 0.85rem;
-    padding: 9px 10px;
+    gap: 7px;
   }
 }
 </style>

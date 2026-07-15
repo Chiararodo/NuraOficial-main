@@ -116,7 +116,13 @@ function goBack() {
 }
 
 function editEntry(entry: Entry) {
-  router.push({ path: '/app/diario', query: { date: entry.on_date } })
+  router.push({
+    path: '/app/diario',
+    query: {
+      edit: String(entry.id),
+      date: entry.on_date
+    }
+  })
 }
 
 async function toggleArchive(entry: Entry) {
@@ -1033,8 +1039,6 @@ function goWriteNew() {
     text-align: center;
   }
 
-  
-
   .form-message {
     margin-left: 0;
     max-width: 100%;
@@ -1079,31 +1083,65 @@ function goWriteNew() {
 }
 
 @media (max-width: 520px) {
-  .actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .entry-card {
+    padding: 12px;
+  }
+
+  .entry-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .left {
+    width: 100%;
+    justify-content: space-between;
     gap: 8px;
   }
 
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
   .link-btn {
-    width: 100%;
+    width: auto;
+    min-width: 72px;
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    line-height: 1;
     justify-content: center;
+    flex: 0 0 auto;
   }
 
-  .modal-footer {
-    flex-direction: column;
-    align-items: stretch;
+  .date {
+    font-size: 0.86rem;
   }
 
-  .pill--ghost,
-  .pill--danger {
-    width: 100%;
+  .mood-pill {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+  }
+
+  .text {
+    margin: 8px 0 0;
+    font-size: 0.86rem;
+    line-height: 1.4;
   }
 }
 
 @media (max-width: 360px) {
   .actions {
-    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .link-btn {
+    min-width: 65px;
+    padding: 5px 8px;
+    font-size: 0.66rem;
   }
 }
 

@@ -794,7 +794,7 @@ function goPerfil() {
 @media (max-width: 480px) {
   .quick-card .btn,
   .session-item .btn {
-    width: 75% !important;
+    width: 60% !important;
     max-width: none;
     min-width: 0;
   }

@@ -41,8 +41,14 @@ const showLimitModal = ref(false)
 let tick: number | null = null
 
 onMounted(async () => {
-  const param = route.query.date as string | undefined
-  if (param) selectedDate.value = new Date(param)
+  const dateParam = route.query.date as string | undefined
+
+  if (dateParam) {
+    const [year, month, day] = dateParam.split('-').map(Number)
+
+    selectedDate.value = new Date(year, month - 1, day)
+    viewDate.value = new Date(year, month - 1, 1)
+  }
 
   await gate.reloadPremium()
   await gate.refresh()
@@ -1220,17 +1226,20 @@ function dayStyle(day: number) {
 
 @media (max-width: 520px) {
   .actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-    gap: 10px;
+    display: flex;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .btn-primary,
   .actions .btn-soft {
-    width: 100%;
-    padding: 9px 10px;
-    font-size: 0.82rem;
+    width: auto;
+    min-width: 125px;
+    min-height: 34px;
+    padding: 7px 14px;
+    font-size: .8rem;
+    border-radius: 999px;
   }
 
   .limit-actions {
@@ -1253,6 +1262,22 @@ function dayStyle(day: number) {
   }
 }
 
+@media (max-width: 380px) {
+
+  .actions {
+    gap: 6px;
+  }
+
+  .btn-primary,
+  .actions .btn-soft {
+    min-width: 110px;
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: .75rem;
+  }
+
+}
+
 @media (max-width: 360px) {
   .actions {
     grid-template-columns: 1fr;
@@ -1267,5 +1292,36 @@ function dayStyle(day: number) {
   .toast {
     bottom: calc(90px + env(safe-area-inset-bottom));
   }
+}
+
+/* ===== EMOCIONES RESPONSIVE ===== */
+
+@media (max-width: 520px) {
+
+  .mood-btn{
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: .78rem;
+    border-radius: 999px;
+  }
+
+}
+
+@media (max-width:520px){
+
+  .moods{
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+  }
+
+}
+@media (max-width: 380px){
+
+  .mood-btn{
+    min-height: 32px;
+    padding: 6px 8px;
+    font-size: .72rem;
+  }
+
 }
 </style>

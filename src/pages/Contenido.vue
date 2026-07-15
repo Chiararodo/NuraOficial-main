@@ -1014,7 +1014,7 @@ function mmss(total: number) {
   padding: 20px 18px 48px;
   max-width: 1400px;
   margin: 0 auto;
-font-family: var(--font-main);
+  font-family: var(--font-main);
 }
 
 .page-head {
@@ -1675,104 +1675,369 @@ font-family: var(--font-main);
   overflow: hidden;
 }
 
-@media (max-width: 768px) {
+/* ===== RESPONSIVE CONTENIDO ===== */
+
+@media (max-width: 900px) {
   .contenido {
-    padding: 16px 12px 96px;
+    padding: 16px 14px 88px;
   }
 
-  .page-title {
-    font-size: 1.35rem;
+  .content-row {
+    flex-direction: column-reverse;
+    gap: 16px;
+  }
+
+  .abm-box {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
 
   .card {
     padding: 12px;
   }
 
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  .page-title {
+    font-size: 1.4rem;
   }
 
   .tab {
-    font-size: 0.9rem;
-    padding: 9px 14px;
+    min-height: 36px;
+    padding: 8px 14px;
+    font-size: 0.84rem;
+  }
+
+  .btn,
+  .abm-btn,
+  .upload-btn,
+  .pill {
+    min-height: 34px;
+    padding: 7px 13px;
+    font-size: 0.8rem;
+  }
+
+  .small-actions,
+  .abm-actions,
+  .edit-footer,
+  .confirm-actions {
+    gap: 8px;
   }
 
   .article-card {
-    grid-template-columns: 80px 1fr;
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .art-cover {
-    width: 80px;
-    height: 80px;
+    width: 82px;
+    height: 82px;
   }
 
-  .edit-footer,
-  .confirm-actions,
-  .abm-actions {
-    flex-direction: column;
-    align-items: stretch;
+  .modal-card {
+    width: min(94vw, 760px);
   }
 
-  .edit-footer .pill,
-  .confirm-actions .pill,
-  .abm-actions .pill {
-    width: 100%;
+  .pdf {
+    height: 68vh;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .contenido {
+    padding: 16px 12px 88px;
+  }
+
+  .page-head {
+    gap: 10px;
+  }
+
+  .page-title {
+    font-size: 1.3rem;
+  }
+
+  .tabs {
+    flex-wrap: nowrap;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    min-width: 94px;
+    min-height: 34px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+  }
+
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .media-card {
+    padding: 9px;
+    border-radius: 14px;
+  }
+
+  .thumb {
+    border-radius: 11px;
+  }
+
+  .thumb-video {
+    aspect-ratio: 16 / 10;
   }
 
   .thumb-book,
   .thumb-guide {
-    aspect-ratio: 16 / 10;
-  }
-
-  .thumb-book img,
-  .thumb-guide img {
-    object-fit: contain;
-    padding: 6px;
-    background: #ffffff;
+    aspect-ratio: 4 / 5;
   }
 
   .card-title {
-    font-size: 0.92rem;
+    margin: 8px 2px 5px;
+    font-size: 0.84rem;
+    line-height: 1.25;
   }
 
   .guide-summary {
-    font-size: 0.82rem;
+    margin: 0 2px;
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+
+  .guide-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 0 2px 2px;
   }
 
   .guide-actions .btn {
+    width: auto;
+    min-width: 100px;
+    max-width: 145px;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+
+  .progress-wrap {
     width: 100%;
   }
 
-  .tabs {
-    gap: 8px;
+  .small-actions {
+    gap: 6px;
+    margin-top: 7px;
   }
 
-  .tab {
-    flex: 1 1 auto;
+  .abm-btn {
+    width: auto;
+    min-width: 64px;
+    min-height: 30px;
+    padding: 5px 9px;
+    font-size: 0.7rem;
+  }
+
+  .abm {
+    gap: 11px;
+  }
+
+  .abm-title {
+    font-size: 1rem;
+  }
+
+  .abm-grid {
+    gap: 10px;
+  }
+
+  .field input,
+  .field textarea {
+    padding: 8px 10px;
+    font-size: 0.84rem;
+  }
+
+  .upload-row {
+    align-items: flex-start;
+  }
+
+  .upload-btn {
+    width: auto;
+    min-width: 112px;
+    max-width: 155px;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+
+  .abm-actions,
+  .edit-footer,
+  .confirm-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .abm-actions .pill,
+  .edit-footer .pill,
+  .confirm-actions .pill {
+    width: auto;
+    min-width: 100px;
+    max-width: 155px;
+    min-height: 32px;
+    padding: 6px 11px;
+    font-size: 0.74rem;
+  }
+
+  .article-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .art-cover {
+    width: 72px;
+    height: 72px;
+  }
+
+  .art-title {
+    font-size: 0.88rem;
+  }
+
+  .art-summary {
+    font-size: 0.78rem;
+    line-height: 1.3;
+  }
+
+  .modal-card {
+    width: calc(100vw - 24px);
+    max-height: 90vh;
+  }
+
+  .modal-copy {
+    padding: 12px 14px 14px;
+  }
+
+  .modal-title,
+  .edit-title,
+  .confirm-title {
+    font-size: 1rem;
+  }
+
+  .close,
+  .edit-close {
+    width: 30px;
+    height: 30px;
+    font-size: 1rem;
+  }
+
+  .pdf {
+    height: 65vh;
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 82px;
     text-align: center;
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 420px) {
   .contenido {
-    padding: 16px 10px 36px;
+    padding: 14px 10px 80px;
   }
 
-  .tab {
-    font-size: 0.82rem;
-    padding: 8px 10px;
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .media-card {
+    padding: 8px;
+  }
+
+  .card-title {
+    font-size: 0.78rem;
+  }
+
+  .duration {
+    right: 5px;
+    bottom: 5px;
+    padding: 3px 5px;
+    font-size: 0.66rem;
+  }
+
+  .guide-summary {
+    font-size: 0.7rem;
+  }
+
+  .guide-actions .btn {
+    min-width: 88px;
+    max-width: 125px;
+    min-height: 30px;
+    padding: 5px 8px;
+    font-size: 0.66rem;
   }
 
   .abm-btn {
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    min-width: 58px;
+    padding: 5px 8px;
+    font-size: 0.66rem;
+  }
+
+  .article-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .art-cover {
+    width: 64px;
+    height: 64px;
+  }
+
+  .abm-actions .pill,
+  .edit-footer .pill,
+  .confirm-actions .pill {
+    min-width: 92px;
+    max-width: 135px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 350px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .thumb-book,
+  .thumb-guide {
+    aspect-ratio: 16 / 9;
+  }
+
+  .guide-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tabs {
+    gap: 6px;
+  }
+
+  .tab {
+    min-width: 86px;
+    padding: 6px 9px;
+    font-size: 0.72rem;
   }
 }
 </style>

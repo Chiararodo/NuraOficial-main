@@ -807,19 +807,17 @@ onMounted(async () => {
 }
 
 /* 3 botones de estado */
-.card-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.card-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:18px;
 }
 
-.card-actions .btn {
-  width: 100%;
-  max-width: none;
-}
-
-.card-actions .btn:first-child {
-  grid-column: 1 / -1;
+.card-actions .btn{
+  flex:1;
+  min-width:170px;
+  max-width:220px;
 }
 
 /* otros botones */
@@ -1012,24 +1010,5 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 420px) {
-  .card-actions {
-    grid-template-columns: 1fr;
-  }
 
-  .shortcut {
-    min-height: auto;
-  }
-
-  .shortcut::after {
-    width: 30%;
-  }
-
-  .plan-actions .btn,
-  .bottom-action .btn,
-  .modal-actions .btn {
-    width: 100%;
-    max-width: none;
-  }
-}
 </style>

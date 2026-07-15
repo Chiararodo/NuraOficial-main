@@ -748,5 +748,10 @@ onMounted(() => {
     min-width: 170px;
     max-width: 240px;
   }
+
+  .upload-btn {
+  width: 120px;
+  height: auto;
+}
 }
 </style>

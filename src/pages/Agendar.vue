@@ -263,6 +263,19 @@ font-family: var(--font-main);}
   background: #50bdbd;
 }
 
+/* ===== RESPONSIVE AGENDAR ===== */
+
+@media (max-width: 900px) {
+  .lista {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card {
+    min-height: 175px;
+  }
+}
+
 @media (max-width: 700px) {
   .contenido {
     padding: 16px 12px 96px;
@@ -272,39 +285,101 @@ font-family: var(--font-main);}
     font-size: 1.35rem;
   }
 
+  .page-sub {
+    font-size: 0.9rem;
+  }
+
   .card {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 16px 14px;
-    min-height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    min-height: 150px;
+    border-radius: 16px;
   }
 
   .card-img {
-    flex: none;
-    width: 100%;
-    height: 180px;
+    flex: 0 0 105px;
+    width: 105px;
+    height: 105px;
+    border-radius: 14px;
   }
 
-  .card-img img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .card-body {
+    gap: 7px;
   }
 
   .title {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
 
   .desc {
-    font-size: 0.92rem;
+    font-size: 0.86rem;
+    line-height: 1.35;
+  }
+
+  .actions {
+    margin-top: 2px;
+  }
+
+  .action-btn {
+    width: auto;
+    min-width: 135px;
+    max-width: 190px;
+    min-height: 34px;
+    padding: 7px 13px;
+    font-size: 0.8rem;
   }
 }
 
 @media (max-width: 520px) {
+  .card {
+    gap: 12px;
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .card-img {
+    flex: 0 0 92px;
+    width: 92px;
+    height: 92px;
+    border-radius: 12px;
+  }
+
+  .title {
+    font-size: 0.94rem;
+  }
+
+  .desc {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
   .action-btn {
+    width: auto;
+    min-width: 120px;
+    max-width: 165px;
+    min-height: 32px;
+    padding: 6px 11px;
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .card {
+    flex-direction: column;
+  }
+
+  .card-img {
     width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    height: 135px;
+    flex: none;
+  }
+
+  .action-btn {
+    width: auto;
+    min-width: 115px;
+    max-width: 155px;
   }
 }
 </style>
