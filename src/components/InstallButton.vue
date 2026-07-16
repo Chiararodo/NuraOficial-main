@@ -400,7 +400,7 @@ onBeforeUnmount(() => {
   padding: 7px 32px 7px 8px;
   border: 1px solid rgba(80, 189, 189, 0.2);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.644);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow:
@@ -409,25 +409,23 @@ onBeforeUnmount(() => {
 }
 
 .install-banner__icon {
-  width: 38px;
-  height: 38px;
-
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   display: grid;
   place-items: center;
-
   overflow: hidden;
-
   border-radius: 50%;
-  background: rgba(216, 240, 236, 0.76);
+  background: rgba(216, 240, 236, 0.72);
 }
 
 .install-banner__icon img {
-  width: 34px;
-  height: 34px;
-
+  width: 48px;
+  height: 48px;
+  max-width: none;
   display: block;
   object-fit: contain;
-
+  transform: scale(1.45);
   animation: nuri-install-float 2.8s ease-in-out infinite;
 }
 
@@ -511,72 +509,51 @@ onBeforeUnmount(() => {
 .install-modal-backdrop {
   position: fixed;
   inset: 0;
-
   z-index: 2000;
-
   display: grid;
   place-items: center;
-
   padding: 16px;
-
   background: rgba(15, 23, 42, 0.52);
-
   backdrop-filter: blur(4px);
 }
 
 .install-modal {
   position: relative;
-
-  width: min(430px, 100%);
-
-  padding: 24px;
-
+  width: min(330px, calc(100vw - 32px));
+  padding: 20px;
   border: 1px solid #e2edf7;
-  border-radius: 22px;
-
+  border-radius: 18px;
   background: #ffffff;
-
-  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
 }
 
 .install-modal__close {
   position: absolute;
   top: 10px;
   right: 10px;
-
   width: 32px;
   height: 32px;
-
   display: grid;
   place-items: center;
-
   padding: 0;
-
   border: none;
   border-radius: 50%;
-
   background: #f1f5f9;
   color: #475569;
-
   font-size: 1.2rem;
   line-height: 1;
-
   cursor: pointer;
 }
 
 .install-modal__icon {
   width: 54px;
   height: 54px;
-
   display: grid;
   place-items: center;
-
   margin-bottom: 14px;
-
   overflow: hidden;
   border-radius: 18px;
-
-  background: #dff7f4;
+  border: 1px solid rgba(80, 189, 189, 0.2);
 }
 
 .install-modal__icon img {
@@ -586,19 +563,14 @@ onBeforeUnmount(() => {
 }
 
 .install-modal__title {
-  margin: 0 36px 10px 0;
-
-  color: #0f172a;
-
-  font-size: 1.2rem;
+  margin: 0 34px 8px 0;
+  font-size: 1rem;
   font-weight: 800;
 }
 
 .install-modal__body {
-  color: #475569;
-
-  font-size: 0.87rem;
-  line-height: 1.55;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .install-modal__body p {
@@ -620,20 +592,19 @@ onBeforeUnmount(() => {
 
 .install-modal__ok {
   min-height: 36px;
-
   margin-top: 20px;
   padding: 8px 16px;
-
   border: none;
   border-radius: 999px;
-
   background: #50bdbd;
   color: #ffffff;
-
   font-size: 0.8rem;
   font-weight: 700;
-
   cursor: pointer;
+}
+
+.install-modal__ok:hover {
+  background: #50bdbda8;
 }
 
 /* =====================================================
@@ -672,15 +643,11 @@ onBeforeUnmount(() => {
     right: auto;
     left: 8px;
     bottom: calc(72px + env(safe-area-inset-bottom));
-
     width: min(220px, calc(100vw - 16px));
     min-height: 50px;
-
     padding: 7px 30px 7px 7px;
-
     grid-template-columns: 34px minmax(0, 1fr) auto;
     gap: 6px;
-
     border-radius: 14px;
   }
 
