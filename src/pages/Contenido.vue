@@ -951,11 +951,14 @@ function mmss(total: number) {
 
             <div class="field">
               <label>
-                {{ $t('content.fields.file') }}
-                <span v-if="editModal.type === 'video'">{{ $t('content.video.fileLabelSuffix') }}</span>
-                <span v-else>{{ $t('content.pdf.fileLabelSuffix') }}</span>
-                (file_path)
-              </label>
+  {{ $t('content.fields.file') }}
+  <span v-if="editModal.type === 'video'">
+    {{ $t('content.video.fileLabelSuffix') }}
+  </span>
+  <span v-else>
+    {{ $t('content.pdf.fileLabelSuffix') }}
+  </span>
+</label>
               <input v-model="editModal.file_path" type="text" />
             </div>
 

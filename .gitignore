@@ -22,6 +22,8 @@ coverage/
 .env.*.local
 .env.local
 *.local
+.env.seed
+scripts/.env
 
 
 # Archivos temporales de Vite / cache

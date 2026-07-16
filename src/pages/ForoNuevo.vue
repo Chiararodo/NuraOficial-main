@@ -216,9 +216,13 @@ onMounted(async () => {
 
     <section class="form-card" aria-labelledby="forum-form-title">
       <h2 id="forum-form-title" class="section-title">Escribí tu publicación</h2>
-
+      <p class="required-note">
+  <span>*</span> Campos obligatorios
+</p>
       <div class="field">
-        <label class="label" for="forum-category">Categoría</label>
+        <label class="label" for="forum-category">
+  Categoría <span class="required">*</span>
+</label>
         <select
           id="forum-category"
           v-model="category"
@@ -231,7 +235,9 @@ onMounted(async () => {
       </div>
 
       <div class="field">
-        <label class="label" for="forum-title">Título</label>
+        <label class="label" for="forum-title">
+  Título <span class="required">*</span>
+</label>
         <input
           id="forum-title"
           v-model="title"
@@ -247,7 +253,9 @@ onMounted(async () => {
       </div>
 
       <div class="field">
-        <label class="label" for="forum-body">Contenido</label>
+        <label class="label" for="forum-body">
+  Contenido <span class="required">*</span>
+</label>
         <textarea
           id="forum-body"
           v-model="body"
@@ -537,6 +545,24 @@ onMounted(async () => {
   margin: 0;
   color: #6b7280;
   font-size: 0.84rem;
+}
+
+.required-note{
+  margin:-6px 0 18px;
+  font-size:.82rem;
+  color:#64748b;
+}
+
+.required-note span{
+  color:#50bdbd;
+  font-weight:700;
+}
+
+.required{
+  color:#50bdbd;
+  margin-left:2px;
+  font-weight:800;
+  font-size: medium;
 }
 
 .form-message {

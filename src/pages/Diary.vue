@@ -808,37 +808,6 @@ function dayStyle(day: number) {
   cursor: not-allowed;
 }
 
-.btn-soft {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8px;
-  padding: 10px 16px;
-  min-height: 42px;
-  background: #ffffff;
-  color: #50bdbd;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-align: center;
-  text-decoration: none;
-  transition:
-    background-color 0.2s ease,
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-  border: 1px solid #b6ebe5;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
-}
-
-@media (hover: hover) {
-  .btn-soft:hover {
-    background: #e0faf7;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
-  }
-}
 
 .chips {
   display: flex;
@@ -953,11 +922,43 @@ function dayStyle(day: number) {
   margin-top: 12px;
   flex-wrap: wrap;
 }
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  padding: 10px 16px;
+  min-height: 42px;  
+  background: #ffffff;
+  color: #50bdbd;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  border: 1px solid #b6ebe5;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
+}
+
+@media (hover: hover) {
+  .btn-soft:hover {
+    background: #e0faf7;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(80, 189, 189, 0.12);
+  }
+}
 
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+   margin-top: 8px;
   padding: 10px 16px;
   min-height: 42px;
   background: #50bdbd;
@@ -971,7 +972,7 @@ function dayStyle(day: number) {
     box-shadow 0.2s ease;
   border: none;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.22);
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.16);
 }
 
 @media (hover: hover) {

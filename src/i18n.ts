@@ -203,111 +203,138 @@ const messages = {
       }
     },
 
-    content: {
-      pageSrTitle: 'Contenido educativo',
-      pageTitle: 'Contenido educativo',
-      tabsAria: 'Secciones de contenido',
-      tabs: {
-        videos: 'Videos',
-        library: 'Biblioteca',
-        guides: 'Guías'
-      },
+   content: {
+  pageSrTitle: 'Contenido educativo',
+  pageTitle: 'Contenido educativo',
+  tabsAria: 'Secciones de contenido',
 
-      loadingVideos: 'Cargando videos…',
-      emptyVideos: 'Aún no hay videos.',
-      loadingLibrary: 'Cargando biblioteca…',
-      emptyBooks: 'Aún no hay libros recomendados.',
-      loadingGuides: 'Cargando guías…',
-      emptyGuides: 'Aún no hay guías.',
+  tabs: {
+    videos: 'Videos',
+    library: 'Biblioteca',
+    guides: 'Guías'
+  },
 
-      actions: {
-        edit: 'Editar',
-        delete: 'Borrar',
-        clear: 'Limpiar',
-        cancel: 'Cancelar',
-        save: 'Guardar cambios',
-        continue: 'Continuar'
-      },
+  loadingVideos: 'Cargando videos…',
+  emptyVideos: 'Aún no hay videos.',
 
-      fields: {
-        title: 'Título',
-        description: 'Descripción',
-        coverPath: 'Portada (cover_path)',
-        file: 'Archivo'
-      },
+  loadingLibrary: 'Cargando biblioteca…',
+  emptyBooks: 'Aún no hay libros recomendados.',
 
-      video: {
-        newTitle: 'Nuevo video',
-        filePath: 'Archivo de video (file_path)',
-        duration: 'Duración (segundos)',
-        create: 'Crear video',
-        fileLabelSuffix: 'de video'
-      },
+  loadingGuides: 'Cargando guías…',
+  emptyGuides: 'Aún no hay guías.',
 
-      book: {
-        newTitle: 'Nuevo libro',
-        filePath: 'Archivo PDF (file_path)',
-        filePlaceholder: 'Ruta en Supabase (opcional si subís un PDF)',
-        create: 'Crear libro'
-      },
+  actions: {
+    edit: 'Editar',
+    delete: 'Eliminar',
+    clear: 'Limpiar',
+    cancel: 'Cancelar',
+    save: 'Guardar cambios',
+    continue: 'Abrir'
+  },
 
-      guide: {
-        newTitle: 'Nueva guía',
-        filePath: 'Archivo PDF (file_path)',
-        filePlaceholder: 'Ruta en Supabase (opcional si subís un PDF)',
-        create: 'Crear guía'
-      },
+  fields: {
+    title: 'Título',
+    description: 'Descripción',
+    coverPath: 'Ruta de la portada',
+    file: 'Archivo'
+  },
 
-      pdf: {
-        orUpload: 'O subí un PDF',
-        select: 'Seleccionar PDF',
-        iframeTitle: 'Documento',
-        fileLabelSuffix: 'PDF'
-      },
+  video: {
+    newTitle: 'Nuevo video',
+    filePath: 'Ruta del archivo de video',
+    duration: 'Duración en segundos',
+    create: 'Crear video',
+    fileLabelSuffix: 'de video'
+  },
 
-      articles: {
-        title: 'Artículos destacados',
-        reading: 'Lectura {m}m'
-      },
+  book: {
+    newTitle: 'Nuevo libro',
+    filePath: 'Ruta del archivo PDF',
+    filePlaceholder:
+      'Pegá la ruta del archivo o seleccioná un PDF debajo',
+    create: 'Crear libro'
+  },
 
-      edit: {
-        video: 'Editar video',
-        book: 'Editar libro',
-        guide: 'Editar guía'
-      },
+  guide: {
+    newTitle: 'Nueva guía',
+    filePath: 'Ruta del archivo PDF',
+    filePlaceholder:
+      'Pegá la ruta del archivo o seleccioná un PDF debajo',
+    create: 'Crear guía'
+  },
 
-      delete: {
-        title: 'Eliminar {item}',
-        text: '¿Seguro que querés borrar',
-        labels: {
-          video: 'video',
-          book: 'libro',
-          guide: 'guía'
-        }
-      },
+  pdf: {
+    orUpload: 'O seleccioná un archivo PDF',
+    select: 'Seleccionar PDF',
+    iframeTitle: 'Documento PDF',
+    fileLabelSuffix: 'PDF'
+  },
 
-      toasts: {
-        uploadPdfError: 'Error al subir el PDF.',
-        loadVideosError: 'Error al cargar videos.',
-        loadLibraryError: 'Error al cargar la biblioteca.',
-        loadGuidesError: 'Error al cargar las guías.',
-        videoRequired: 'Título y archivo de video son obligatorios.',
-        videoCreateError: 'Hubo un problema al crear el video.',
-        videoCreated: 'Video creado correctamente.',
-        bookRequired: 'Título y archivo del libro (ruta o PDF) son obligatorios.',
-        bookCreateError: 'Hubo un problema al crear el libro.',
-        bookCreated: 'Libro creado correctamente.',
-        guideRequired: 'Título y archivo de la guía (ruta o PDF) son obligatorios.',
-        guideCreateError: 'Hubo un problema al crear la guía.',
-        guideCreated: 'Guía creada correctamente.',
-        editRequired: 'Título y archivo son obligatorios.',
-        videoEdited: 'Video editado correctamente.',
-        bookEdited: 'Libro editado correctamente.',
-        guideEdited: 'Guía editado correctamente.',
-        saveError: 'Error al guardar los cambios.',
-        deleted: 'Contenido borrado correctamente.'
-      }
+  articles: {
+    title: 'Artículos destacados',
+    reading: 'Lectura de {m} min'
+  },
+
+  edit: {
+    video: 'Editar video',
+    book: 'Editar libro',
+    guide: 'Editar guía'
+  },
+
+  delete: {
+    title: 'Eliminar {item}',
+    text: '¿Seguro que querés eliminar',
+    labels: {
+      video: 'el video',
+      book: 'el libro',
+      guide: 'la guía'
     }
+  },
+
+  toasts: {
+    uploadPdfError: 'No se pudo subir el archivo PDF.',
+    loadVideosError: 'No se pudieron cargar los videos.',
+    loadLibraryError: 'No se pudo cargar la biblioteca.',
+    loadGuidesError: 'No se pudieron cargar las guías.',
+
+    videoRequired:
+      'El título y el archivo de video son obligatorios.',
+    videoCreateError:
+      'Hubo un problema al crear el video.',
+    videoCreated:
+      'Video creado correctamente.',
+
+    bookRequired:
+      'El título y el archivo del libro son obligatorios.',
+    bookCreateError:
+      'Hubo un problema al crear el libro.',
+    bookCreated:
+      'Libro creado correctamente.',
+
+    guideRequired:
+      'El título y el archivo de la guía son obligatorios.',
+    guideCreateError:
+      'Hubo un problema al crear la guía.',
+    guideCreated:
+      'Guía creada correctamente.',
+
+    editRequired:
+      'El título y el archivo son obligatorios.',
+
+    videoEdited:
+      'Video editado correctamente.',
+    bookEdited:
+      'Libro editado correctamente.',
+    guideEdited:
+      'Guía editada correctamente.',
+
+    saveError:
+      'No se pudieron guardar los cambios.',
+
+    deleted:
+      'Contenido eliminado correctamente.'
+  }
+}
   },
 
   en: {

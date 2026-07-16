@@ -475,21 +475,25 @@ function goPerfil() {
   }
 }
 
+.quick-desc {
+  margin: 10px 0 18px;
+  color: #4b5563;
+  font-size: .9rem;
+  line-height: 1.45;
+  flex: 1;          
+}
+
 .quick-card {
   border: 1px solid #e2edf7;
   border-radius: 16px;
-  padding: 14px 14px 12px;
-  background: #ffffff;
+  padding: 18px;
+  background: #fff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 120px;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    background-color 0.2s ease;
+  align-items: flex-start;
+  min-height: 50%;      
+  transition: .2s;
 }
 
 @media (hover: hover) {
@@ -507,11 +511,11 @@ function goPerfil() {
   color: #0f172a;
 }
 
-.quick-desc {
-  margin: 0;
-  color: #4b5563;
-  font-size: 0.9rem;
-  line-height: 1.35;
+.quick-card .btn {
+  margin-top: auto;      
+  align-self: flex-start;
+  width: 190px;
+  max-width: 100%;
 }
 
 .features-grid {
@@ -746,6 +750,13 @@ function goPerfil() {
     flex-direction:row;
   }
 
+  .quick-card{
+    min-height:auto;
+  }
+
+  .quick-card .btn{
+    width:100%;
+  }
 
 }
 

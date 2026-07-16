@@ -203,7 +203,7 @@ function countFor(id: string) {
 
    <div v-if="isAdmin" class="admin-actions">
   <button class="pill pill-soft" @click="router.push('/app/admin/usuarios')">
-    Manejar usuarios
+    Administrar usuarios
   </button>
 </div>
 

@@ -1279,10 +1279,6 @@ onMounted(async () => {
               <h3 class="prof-name">{{ p.name }}</h3>
               <p class="prof-specialty">{{ p.specialty || p.type }}</p>
             </div>
-
-            <span v-if="p.googleCalendarConnected" class="sync-badge">
-              Agenda sincronizada
-            </span>
           </div>
 
           <p v-if="p.city || p.province" class="prof-location">
