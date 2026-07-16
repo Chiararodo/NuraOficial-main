@@ -1,313 +1,748 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+  userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed'
+    platform: string
+  }>
 }
 
 const deferredPrompt = ref<BeforeInstallPromptEvent | null>(null)
 
-// UI state
-const showInstallBtn = ref(false) // muestra el botón (si NO está instalada y es pantalla chica)
-const showHelpModal = ref(false)  // modal (solo en pantalla chica)
 const isIOS = ref(false)
+const isInstalled = ref(false)
+const isSmallScreen = ref(false)
 
-//  Solo mobile/tablet (ajustá el valor si querés)
-const MAX_WIDTH_FOR_INSTALL_UI = 1024
-let mqSmall: MediaQueryList | null = null
+const showHelpModal = ref(false)
+const installing = ref(false)
+const dismissed = ref(false)
 
-function isInstalled() {
+const MAX_WIDTH = 1024
+
+let screenMediaQuery: MediaQueryList | null = null
+let displayModeMediaQuery: MediaQueryList | null = null
+
+const showInstallBanner = computed(() => {
+  return (
+    !isInstalled.value &&
+    isSmallScreen.value &&
+    !dismissed.value
+  )
+})
+
+const installButtonText = computed(() => {
+  if (installing.value) return 'Abriendo…'
+  if (isIOS.value) return 'Agregar a inicio'
+  return 'Instalar'
+})
+
+const installDescription = computed(() => {
+  if (isIOS.value) {
+    return 'Agregá Nura a tu pantalla de inicio.'
+  }
+
+  if (deferredPrompt.value) {
+    return 'Instalá Nura para abrirla más rápido.'
+  }
+
+  return 'Guardá Nura como una app en tu dispositivo.'
+})
+
+function detectInstalledMode() {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true // iOS standalone
+    (window.navigator as Navigator & {
+      standalone?: boolean
+    }).standalone === true
   )
 }
 
-function isIOSDevice() {
-  const ua = navigator.userAgent.toLowerCase()
-  const isiOS = /iphone|ipad|ipod/.test(ua)
-  const isIPadOS =
-    navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1
-  return isiOS || isIPadOS
+function detectIOS() {
+  const userAgent = navigator.userAgent.toLowerCase()
+
+  const regularIOS = /iphone|ipad|ipod/.test(userAgent)
+
+  const iPadOS =
+    navigator.platform === 'MacIntel' &&
+    navigator.maxTouchPoints > 1
+
+  return regularIOS || iPadOS
 }
 
-function isSmallScreen() {
-  // matchMedia es mejor que window.innerWidth (responde a cambios reales)
-  return window.matchMedia(`(max-width: ${MAX_WIDTH_FOR_INSTALL_UI}px)`).matches
-}
+function refreshState() {
+  isIOS.value = detectIOS()
+  isInstalled.value = detectInstalledMode()
+  isSmallScreen.value = window.matchMedia(
+    `(max-width: ${MAX_WIDTH}px)`
+  ).matches
 
-function refreshVisibility() {
-  const installed = isInstalled()
-  isIOS.value = isIOSDevice()
-  const small = isSmallScreen()
-
-  //  Botón visible SOLO si:
-  // - NO está instalada
-  // - es pantalla chica
-  showInstallBtn.value = !installed && small
-
-  //  Si no es pantalla chica, cerramos UI de instalación
-  if (!small) {
-    showHelpModal.value = false
-  }
-
-  //  Si se instaló, cerramos todo
-  if (installed) {
-    showHelpModal.value = false
+  if (isInstalled.value) {
     deferredPrompt.value = null
+    showHelpModal.value = false
+    dismissed.value = true
+  }
+
+  if (!isSmallScreen.value) {
+    showHelpModal.value = false
   }
 }
 
-function onBeforeInstallPrompt(e: Event) {
-  // Chrome/Edge/Android: capturamos el evento y habilitamos instalación
-  e.preventDefault()
-  deferredPrompt.value = e as BeforeInstallPromptEvent
-  refreshVisibility()
+function handleBeforeInstallPrompt(event: Event) {
+  event.preventDefault()
+
+  deferredPrompt.value =
+    event as BeforeInstallPromptEvent
+
+  dismissed.value = false
+  refreshState()
 }
 
-function onAppInstalled() {
+function handleAppInstalled() {
   deferredPrompt.value = null
+  installing.value = false
+  isInstalled.value = true
   showHelpModal.value = false
-  refreshVisibility()
+  dismissed.value = true
 }
 
 async function handleInstallClick() {
-  //  Si no es pantalla chica, no hacemos nada
-  if (!isSmallScreen()) return
+  if (installing.value) return
 
-  // iOS: siempre modal
+  /*
+   * iOS no ofrece el prompt automático.
+   * Mostramos instrucciones.
+   */
   if (isIOS.value) {
     showHelpModal.value = true
     return
   }
 
-  // Android/otros: si tenemos prompt nativo, lo usamos
+  /*
+   * Chrome, Edge, Samsung Internet, etc.
+   * Si el navegador emitió beforeinstallprompt,
+   * abrimos el instalador directamente.
+   */
   if (deferredPrompt.value) {
-    await deferredPrompt.value.prompt()
-    const { outcome } = await deferredPrompt.value.userChoice
+    installing.value = true
 
-    if (outcome === 'accepted') {
-      deferredPrompt.value = null
-      refreshVisibility()
+    try {
+      await deferredPrompt.value.prompt()
+
+      const choice =
+        await deferredPrompt.value.userChoice
+
+      if (choice.outcome === 'accepted') {
+        deferredPrompt.value = null
+        dismissed.value = true
+      }
+    } catch (error) {
+      console.error(
+        'No se pudo abrir el instalador:',
+        error
+      )
+
+      showHelpModal.value = true
+    } finally {
+      installing.value = false
+      refreshState()
     }
+
     return
   }
 
-  // Fallback
+  /*
+   * Si todavía no llegó el evento o el navegador
+   * no lo soporta, mostramos ayuda.
+   */
   showHelpModal.value = true
+}
+
+function dismissBanner() {
+  dismissed.value = true
 }
 
 function closeModal() {
   showHelpModal.value = false
 }
 
-// listeners
-let mmDisplayMode: MediaQueryList | null = null
-
-function onDisplayModeChange() {
-  refreshVisibility()
+function handleScreenChange() {
+  refreshState()
 }
 
-function onSmallScreenChange() {
-  refreshVisibility()
+function handleDisplayModeChange() {
+  refreshState()
 }
 
 onMounted(() => {
-  refreshVisibility()
+  refreshState()
 
-  window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt as any)
-  window.addEventListener('appinstalled', onAppInstalled)
+  window.addEventListener(
+    'beforeinstallprompt',
+    handleBeforeInstallPrompt
+  )
 
-  // Mejor que resize: escucha cambios reales
-  mmDisplayMode = window.matchMedia('(display-mode: standalone)')
-  if ('addEventListener' in mmDisplayMode) mmDisplayMode.addEventListener('change', onDisplayModeChange)
-  else (mmDisplayMode as any).addListener(onDisplayModeChange)
+  window.addEventListener(
+    'appinstalled',
+    handleAppInstalled
+  )
 
-  //  escucha cambios de tamaño/rotación con media query
-  mqSmall = window.matchMedia(`(max-width: ${MAX_WIDTH_FOR_INSTALL_UI}px)`)
-  if ('addEventListener' in mqSmall) mqSmall.addEventListener('change', onSmallScreenChange)
-  else (mqSmall as any).addListener(onSmallScreenChange)
+  screenMediaQuery = window.matchMedia(
+    `(max-width: ${MAX_WIDTH}px)`
+  )
+
+  displayModeMediaQuery = window.matchMedia(
+    '(display-mode: standalone)'
+  )
+
+  screenMediaQuery.addEventListener(
+    'change',
+    handleScreenChange
+  )
+
+  displayModeMediaQuery.addEventListener(
+    'change',
+    handleDisplayModeChange
+  )
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt as any)
-  window.removeEventListener('appinstalled', onAppInstalled)
+  window.removeEventListener(
+    'beforeinstallprompt',
+    handleBeforeInstallPrompt
+  )
 
-  if (mmDisplayMode) {
-    if ('removeEventListener' in mmDisplayMode) mmDisplayMode.removeEventListener('change', onDisplayModeChange)
-    else (mmDisplayMode as any).removeListener(onDisplayModeChange)
-  }
+  window.removeEventListener(
+    'appinstalled',
+    handleAppInstalled
+  )
 
-  if (mqSmall) {
-    if ('removeEventListener' in mqSmall) mqSmall.removeEventListener('change', onSmallScreenChange)
-    else (mqSmall as any).removeListener(onSmallScreenChange)
-  }
+  screenMediaQuery?.removeEventListener(
+    'change',
+    handleScreenChange
+  )
+
+  displayModeMediaQuery?.removeEventListener(
+    'change',
+    handleDisplayModeChange
+  )
 })
 </script>
 
 <template>
-  <!-- Botón: solo pantalla chica + NO instalada -->
-  <button
-    v-if="showInstallBtn"
-    class="install-btn"
-    type="button"
-    @click="handleInstallClick"
-  >
-    {{ isIOS ? 'Agregar a inicio' : 'Instalar' }}
-  </button>
+  <Transition name="install-slide">
+    <aside
+      v-if="showInstallBanner"
+      class="install-banner"
+      aria-label="Instalar la aplicación Nura"
+    >
+      <div class="install-banner__icon" aria-hidden="true">
+        N
+      </div>
 
-  <!-- Modal instrucciones (solo si está abierto; en desktop se fuerza cerrado por refreshVisibility) -->
-  <div
-    v-if="showHelpModal"
-    class="install-modal-backdrop"
-    @click.self="closeModal"
-  >
-    <div class="install-modal">
+      <div class="install-banner__copy">
+        <strong>Instalá Nura</strong>
+        <span>{{ installDescription }}</span>
+      </div>
+
       <button
-        class="install-modal-close"
+        class="install-banner__action"
         type="button"
-        @click="closeModal"
-        aria-label="Cerrar"
+        :disabled="installing"
+        @click="handleInstallClick"
       >
-        ✕
+        {{ installButtonText }}
       </button>
 
-      <h3 class="install-modal-title">
-        {{ isIOS ? 'Agregar Nura al inicio' : 'Instalar Nura' }}
-      </h3>
+      <button
+        class="install-banner__close"
+        type="button"
+        aria-label="Ocultar aviso de instalación"
+        @click="dismissBanner"
+      >
+        ×
+      </button>
+    </aside>
+  </Transition>
 
-      <div v-if="isIOS" class="install-modal-body">
-        <p>Seguí estos pasos:</p>
-        <ol>
-          <li>Tocá el botón <b>Compartir</b> (cuadradito con flecha).</li>
-          <li>Elegí <b>“Agregar a pantalla de inicio”</b>.</li>
-          <li>Confirmá con <b>Agregar</b>.</li>
-        </ol>
-        <p class="install-modal-tip">
-          Tip: si no ves la opción, asegurate de estar en <b>Safari</b>.
-        </p>
-      </div>
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div
+        v-if="showHelpModal"
+        class="install-modal-backdrop"
+        @click.self="closeModal"
+      >
+        <section
+          class="install-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="install-modal-title"
+        >
+          <button
+            class="install-modal__close"
+            type="button"
+            aria-label="Cerrar"
+            @click="closeModal"
+          >
+            ×
+          </button>
 
-      <div v-else class="install-modal-body">
-        <p>
-          Tu navegador no habilitó el instalador automático. Probá esto:
-        </p>
-        <ol>
-          <li>Abrí el menú ⋮ del navegador.</li>
-          <li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla de inicio”</b>.</li>
-        </ol>
-      </div>
+          <div class="install-modal__icon" aria-hidden="true">
+            N
+          </div>
 
-      <div class="install-modal-actions">
-        <button class="install-modal-ok" type="button" @click="closeModal">
-          Listo
-        </button>
+          <h2
+            id="install-modal-title"
+            class="install-modal__title"
+          >
+            {{
+              isIOS
+                ? 'Agregar Nura al inicio'
+                : 'Instalar Nura'
+            }}
+          </h2>
+
+          <div
+            v-if="isIOS"
+            class="install-modal__body"
+          >
+            <p>
+              Para usar Nura como una aplicación:
+            </p>
+
+            <ol>
+              <li>
+                Abrí esta página desde
+                <strong>Safari</strong>.
+              </li>
+
+              <li>
+                Tocá el botón
+                <strong>Compartir</strong>.
+              </li>
+
+              <li>
+                Elegí
+                <strong>
+                  Agregar a pantalla de inicio
+                </strong>.
+              </li>
+
+              <li>
+                Confirmá tocando
+                <strong>Agregar</strong>.
+              </li>
+            </ol>
+          </div>
+
+          <div
+            v-else
+            class="install-modal__body"
+          >
+            <p>
+              El instalador automático todavía no está
+              disponible en este navegador.
+            </p>
+
+            <ol>
+              <li>
+                Abrí el menú del navegador
+                <strong>⋮</strong>.
+              </li>
+
+              <li>
+                Elegí
+                <strong>Instalar aplicación</strong>
+                o
+                <strong>
+                  Agregar a pantalla de inicio
+                </strong>.
+              </li>
+            </ol>
+          </div>
+
+          <button
+            class="install-modal__ok"
+            type="button"
+            @click="closeModal"
+          >
+            Entendido
+          </button>
+        </section>
       </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
-.install-btn {
-  position: fixed;
-  bottom: 88px;
-  left: 16px;
-  z-index: 40;
+/* =====================================================
+   BANNER DE INSTALACIÓN
+===================================================== */
 
-  background: #633266;
-  color: #ffffff;
+.install-banner {
+  position: fixed;
+  right: 14px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  left: 14px;
+  z-index: 55;
+  min-height: 64px;
+  max-width: 260px;
+  margin-inline: auto;
+  padding: 9px 42px 9px 10px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(80, 189, 189, 0.32);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow:
+    0 16px 38px rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.install-banner__icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #dff7f4;
+  color: #0f766e;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.install-banner__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.install-banner__copy strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.install-banner__copy span {
+  overflow: hidden;
+  color: #434e5c;
+  font-size: 0.69rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+
+.install-banner__action {
+  min-height: 34px;
+  padding: 7px 13px;
   border: none;
   border-radius: 999px;
-  padding: 8px 18px;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.74rem;
   font-weight: 700;
-  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
-
-  box-shadow: 0 8px 20px rgba(99, 50, 102, 0.35);
+  box-shadow: 0 7px 16px rgba(80, 189, 189, 0.24);
   transition:
     background-color 0.18s ease,
     transform 0.18s ease,
     box-shadow 0.18s ease;
 }
 
-.install-btn:hover {
-  background: #50bdbd;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px rgba(80, 189, 189, 0.45);
+.install-banner__action:hover:not(:disabled) {
+  background: #0f766e;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 10px 20px rgba(80, 189, 189, 0.32);
 }
 
-.install-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 8px 18px rgba(80, 189, 189, 0.3);
+.install-banner__action:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
-/* Modal */
+.install-banner__action:disabled {
+  opacity: 0.62;
+
+  cursor: wait;
+}
+
+.install-banner__close {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+
+  width: 26px;
+  height: 26px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: transparent;
+  color: #64748b;
+
+  font-size: 1.15rem;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.install-banner__close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* =====================================================
+   MODAL
+===================================================== */
+
 .install-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.5);
+
+  z-index: 2000;
+
   display: grid;
   place-items: center;
+
   padding: 16px;
+
+  background: rgba(15, 23, 42, 0.52);
+
+  backdrop-filter: blur(4px);
 }
 
 .install-modal {
-  width: min(520px, 100%);
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 16px 16px 14px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
   position: relative;
+
+  width: min(430px, 100%);
+
+  padding: 24px;
+
+  border: 1px solid #e2edf7;
+  border-radius: 22px;
+
+  background: #ffffff;
+
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
 }
 
-.install-modal-close {
+.install-modal__close {
   position: absolute;
   top: 10px;
   right: 10px;
+
+  width: 32px;
+  height: 32px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
   border: none;
-  background: transparent;
-  font-size: 18px;
+  border-radius: 50%;
+
+  background: #f1f5f9;
+  color: #475569;
+
+  font-size: 1.2rem;
+  line-height: 1;
+
   cursor: pointer;
 }
 
-.install-modal-title {
-  margin: 4px 0 10px;
-  font-size: 1.05rem;
+.install-modal__icon {
+  width: 52px;
+  height: 52px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 15px;
+
+  border-radius: 17px;
+
+  background: #dff7f4;
+  color: #0f766e;
+
+  font-size: 1.45rem;
   font-weight: 800;
-  color: #1f1f1f;
 }
 
-.install-modal-body {
-  font-size: 0.95rem;
-  color: #2b2b2b;
-  line-height: 1.35;
+.install-modal__title {
+  margin: 0 36px 10px 0;
+
+  color: #0f172a;
+
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
-.install-modal-body ol {
-  margin: 10px 0 10px 18px;
+.install-modal__body {
+  color: #475569;
+
+  font-size: 0.87rem;
+  line-height: 1.55;
 }
 
-.install-modal-tip {
-  margin-top: 10px;
-  font-size: 0.9rem;
-  color: #5a5a5a;
+.install-modal__body p {
+  margin: 0 0 12px;
 }
 
-.install-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+.install-modal__body ol {
+  margin: 0;
+  padding-left: 20px;
 }
 
-.install-modal-ok {
-  background: #50bdbd;
-  color: #fff;
+.install-modal__body li + li {
+  margin-top: 8px;
+}
+
+.install-modal__body strong {
+  color: #0f172a;
+}
+
+.install-modal__ok {
+  min-height: 36px;
+
+  margin-top: 20px;
+  padding: 8px 16px;
+
   border: none;
   border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 800;
+
+  background: #50bdbd;
+  color: #ffffff;
+
+  font-size: 0.8rem;
+  font-weight: 700;
+
   cursor: pointer;
+}
+
+/* =====================================================
+   TRANSICIONES
+===================================================== */
+
+.install-slide-enter-active,
+.install-slide-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.install-slide-enter-from,
+.install-slide-leave-to {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 520px) {
+  .install-banner {
+    right: 8px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    left: 8px;
+
+    min-height: 58px;
+
+    padding: 8px 35px 8px 8px;
+
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+
+    gap: 8px;
+
+    border-radius: 15px;
+  }
+
+  .install-banner__icon {
+    width: 36px;
+    height: 36px;
+
+    border-radius: 12px;
+
+    font-size: 1rem;
+  }
+
+  .install-banner__copy strong {
+    font-size: 0.77rem;
+  }
+
+  .install-banner__copy span {
+    font-size: 0.62rem;
+  }
+
+  .install-banner__action {
+    min-height: 31px;
+
+    padding: 6px 10px;
+
+    font-size: 0.68rem;
+  }
+
+  .install-banner__close {
+    top: 3px;
+    right: 4px;
+
+    width: 24px;
+    height: 24px;
+  }
+
+  .install-modal {
+    padding: 20px;
+
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  .install-banner {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .install-banner__action {
+    grid-column: 2;
+
+    width: fit-content;
+
+    justify-self: start;
+  }
+
+  .install-banner__copy span {
+    display: none;
+  }
+}
+
+/* Accesibilidad: desactiva animaciones si el usuario lo pidió */
+@media (prefers-reduced-motion: reduce) {
+  .install-banner,
+  .install-banner *,
+  .install-modal,
+  .install-modal * {
+    transition: none !important;
+  }
 }
 </style>
