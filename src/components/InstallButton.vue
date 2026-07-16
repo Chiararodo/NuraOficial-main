@@ -47,7 +47,7 @@ const installDescription = computed(() => {
     return 'Instalá Nura para abrirla más rápido.'
   }
 
-  return 'Guardá Nura como una app en tu dispositivo.'
+  return 'Guardá Nura como una app.'
 })
 
 function detectInstalledMode() {
@@ -237,9 +237,12 @@ onBeforeUnmount(() => {
       class="install-banner"
       aria-label="Instalar la aplicación Nura"
     >
-      <div class="install-banner__icon" aria-hidden="true">
-        N
-      </div>
+     <div class="install-banner__icon" aria-hidden="true">
+  <img
+    src="/icons/NuriBienvenida.png"
+    alt="Nuri"
+  />
+</div>
 
       <div class="install-banner__copy">
         <strong>Instalá Nura</strong>
@@ -289,8 +292,11 @@ onBeforeUnmount(() => {
           </button>
 
           <div class="install-modal__icon" aria-hidden="true">
-            N
-          </div>
+  <img
+    src="/icons/NuriBienvenida.png"
+    alt="Nuri"
+  />
+</div>
 
           <h2
             id="install-modal-title"
@@ -382,123 +388,120 @@ onBeforeUnmount(() => {
 
 .install-banner {
   position: fixed;
-  right: 14px;
-  bottom: calc(76px + env(safe-area-inset-bottom));
-  left: 14px;
+  left: 10px;
+  bottom: calc(74px + env(safe-area-inset-bottom));
   z-index: 55;
-  min-height: 64px;
-  max-width: 260px;
-  margin-inline: auto;
-  padding: 9px 42px 9px 10px;
+  width: min(230px, calc(100vw - 20px));
+  min-height: 52px;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(80, 189, 189, 0.32);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.97);
+  gap: 8px;
+  padding: 7px 32px 7px 8px;
+  border: 1px solid rgba(80, 189, 189, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   box-shadow:
-    0 16px 38px rgba(15, 23, 42, 0.18),
-    0 4px 12px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(12px);
+    0 10px 26px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .install-banner__icon {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
+
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: #dff7f4;
-  color: #0f766e;
-  font-size: 1.2rem;
-  font-weight: 800;
+
+  overflow: hidden;
+
+  border-radius: 50%;
+  background: rgba(216, 240, 236, 0.76);
+}
+
+.install-banner__icon img {
+  width: 34px;
+  height: 34px;
+
+  display: block;
+  object-fit: contain;
+
+  animation: nuri-install-float 2.8s ease-in-out infinite;
 }
 
 .install-banner__copy {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .install-banner__copy strong {
   color: #0f172a;
-  font-size: 0.84rem;
-  line-height: 1.2;
+  font-size: 0.72rem;
+  line-height: 1.15;
 }
 
 .install-banner__copy span {
   overflow: hidden;
-  color: #434e5c;
-  font-size: 0.69rem;
-  line-height: 1.3;
+
+  color: #475569;
+  font-size: 0.58rem;
+  line-height: 1.25;
+
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .install-banner__action {
-  min-height: 34px;
-  padding: 7px 13px;
+  min-height: 28px;
+  padding: 5px 10px;
+
   border: none;
   border-radius: 999px;
+
   background: #50bdbd;
-  color: #ffffff;
-  font-size: 0.74rem;
+  color: #fff;
+
+  font-size: 0.64rem;
   font-weight: 700;
   line-height: 1;
+
   cursor: pointer;
-  box-shadow: 0 7px 16px rgba(80, 189, 189, 0.24);
-  transition:
-    background-color 0.18s ease,
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.install-banner__action:hover:not(:disabled) {
-  background: #0f766e;
-
-  transform: translateY(-1px);
-
-  box-shadow: 0 10px 20px rgba(80, 189, 189, 0.32);
-}
-
-.install-banner__action:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.install-banner__action:disabled {
-  opacity: 0.62;
-
-  cursor: wait;
 }
 
 .install-banner__close {
   position: absolute;
-  top: 7px;
-  right: 9px;
+  top: 3px;
+  right: 4px;
 
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 
   display: grid;
   place-items: center;
 
   padding: 0;
-
   border: none;
   border-radius: 50%;
 
   background: transparent;
   color: #64748b;
 
-  font-size: 1.15rem;
-  line-height: 1;
-
+  font-size: 1rem;
   cursor: pointer;
 }
 
-.install-banner__close:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+@keyframes nuri-install-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+
+  50% {
+    transform: translateY(-3px) rotate(-2deg);
+  }
 }
 
 /* =====================================================
@@ -562,21 +565,24 @@ onBeforeUnmount(() => {
 }
 
 .install-modal__icon {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
 
   display: grid;
   place-items: center;
 
-  margin-bottom: 15px;
+  margin-bottom: 14px;
 
-  border-radius: 17px;
+  overflow: hidden;
+  border-radius: 18px;
 
   background: #dff7f4;
-  color: #0f766e;
+}
 
-  font-size: 1.45rem;
-  font-weight: 800;
+.install-modal__icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .install-modal__title {
@@ -663,72 +669,71 @@ onBeforeUnmount(() => {
 
 @media (max-width: 520px) {
   .install-banner {
-    right: 8px;
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    right: auto;
     left: 8px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
 
-    min-height: 58px;
+    width: min(220px, calc(100vw - 16px));
+    min-height: 50px;
 
-    padding: 8px 35px 8px 8px;
+    padding: 7px 30px 7px 7px;
 
-    grid-template-columns: 36px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 6px;
 
-    gap: 8px;
-
-    border-radius: 15px;
+    border-radius: 14px;
   }
 
   .install-banner__icon {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
+  }
 
-    border-radius: 12px;
-
-    font-size: 1rem;
+  .install-banner__icon img {
+    width: 31px;
+    height: 31px;
   }
 
   .install-banner__copy strong {
-    font-size: 0.77rem;
+    font-size: 0.7rem;
   }
 
   .install-banner__copy span {
-    font-size: 0.62rem;
+    font-size: 0.55rem;
   }
 
   .install-banner__action {
-    min-height: 31px;
-
-    padding: 6px 10px;
-
-    font-size: 0.68rem;
-  }
-
-  .install-banner__close {
-    top: 3px;
-    right: 4px;
-
-    width: 24px;
-    height: 24px;
-  }
-
-  .install-modal {
-    padding: 20px;
-
-    border-radius: 18px;
+    min-height: 27px;
+    padding: 5px 8px;
+    font-size: 0.61rem;
   }
 }
 
 @media (max-width: 360px) {
   .install-banner {
+    width: min(210px, calc(100vw - 16px));
+    left: 8px;
+
     grid-template-columns: 34px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .install-banner__icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .install-banner__icon img {
+    width: 30px;
+    height: 30px;
   }
 
   .install-banner__action {
     grid-column: 2;
-
-    width: fit-content;
-
     justify-self: start;
+
+    min-height: 26px;
+    padding: 5px 9px;
   }
 
   .install-banner__copy span {

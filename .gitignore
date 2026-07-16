@@ -13,6 +13,7 @@ node_modules/
 # Builds y distribuciones
 dist/
 dist-ssr/
+dev-dist/
 build/
 coverage/
 
@@ -21,6 +22,7 @@ coverage/
 .env.*.local
 .env.local
 *.local
+
 
 # Archivos temporales de Vite / cache
 .vite

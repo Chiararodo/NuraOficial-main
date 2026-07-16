@@ -9,7 +9,6 @@ export default defineConfig({
 
     VitePWA({
       registerType: 'autoUpdate',
-
       injectRegister: 'auto',
 
       includeAssets: [
@@ -32,20 +31,16 @@ export default defineConfig({
         background_color: '#f8fafa',
 
         display: 'standalone',
-        display_override: ['window-controls-overlay', 'standalone'],
-
         start_url: '/',
         scope: '/',
-
         orientation: 'portrait-primary',
+        lang: 'es-AR',
 
         categories: [
           'health',
           'lifestyle',
           'social'
         ],
-
-        lang: 'es-AR',
 
         icons: [
           {
@@ -71,11 +66,21 @@ export default defineConfig({
 
       workbox: {
         cleanupOutdatedCaches: true,
-
         navigateFallback: '/index.html',
 
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'
+        ],
+
+        /*
+         * Estas imágenes pesan más de 2 MB.
+         * Se siguen viendo en la app, pero no se precargan
+         * en el service worker.
+         */
+        globIgnores: [
+          '**/covers/palabras-importan.png',
+          '**/covers/guia-autoayuda.png',
+          '**/covers/guia-TCA.png'
         ]
       },
 

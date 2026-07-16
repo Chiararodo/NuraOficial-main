@@ -350,8 +350,7 @@ function dayStyle(day: number) {
     return {
       background: '#50bdbd',
       color: 'white',
-      border: 'none',
-      boxShadow: '0 0 0 2px rgba(80,189,189,0.25)'
+      border: 'none'
     }
   }
 
@@ -927,7 +926,7 @@ function dayStyle(day: number) {
 
 .area:focus {
   border-color: #50bdbd;
-  boxShadow: 0 0 0 3px rgba(80, 189, 189, 0.18);
+  box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.18);
 }
 
 .err {

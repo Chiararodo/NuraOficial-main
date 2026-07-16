@@ -107,6 +107,7 @@ h2 {
 .btn:hover{
   background: #3ea9a9;
   transform: translateY(-1px);
+
   box-shadow: 0 12px 26px rgba(80, 189, 189, 0.4);
 }
 
