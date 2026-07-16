@@ -415,7 +415,6 @@ onBeforeUnmount(() => {
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: rgba(216, 240, 236, 0.72);
 }
 
 .install-banner__icon img {
