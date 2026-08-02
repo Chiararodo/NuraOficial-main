@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 7px 32px 7px 8px;
-  border: 1px solid rgba(80, 189, 189, 0.2);
+  border: 1px solid rgba(26, 23, 228, 0.2);
   border-radius: 16px;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -557,7 +557,7 @@ onBeforeUnmount(() => {
 
 .install-modal {
   position: relative;
-  width: min(360px, calc(100vw - 32px));
+  width: 75%;
   padding: 20px;
   border: 1px solid #e2edf7;
   border-radius: 18px;
@@ -716,10 +716,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 360px) {
   .install-banner {
-     width: min(200px, calc(100vw - 16px));
+    width: min(130px, calc(100vw - 16px));
     left: 8px;
     grid-template-columns: 32px minmax(0, 1fr);
     gap: 6px;
+  
   }
 
   .install-banner__icon {
