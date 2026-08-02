@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 type NuraLocale = 'es-AR' | 'en'
 
+const title = 'Idioma'
 const router = useRouter()
 const { locale, t } = useI18n()
 
@@ -25,11 +26,6 @@ function setLanguage(next: NuraLocale) {
   applyLanguage(next)
 }
 
-/**
- * Blindaje:
- * si el locale cambia por cualquier otra razón (otra pantalla, init async, etc),
- * igual mantenemos localStorage + lang sincronizados.
- */
 watch(
   () => locale.value,
   (next) => {
@@ -45,12 +41,14 @@ watch(
 
     <h1 class="visually-hidden">Idioma</h1>
 
-  <main class="page">
+     <main class="page">
     <header class="top">
-      <button class="back-link" type="button" @click="goBack" aria-label="Volver">
+      <button class="back-link" type="button" @click="goBack">
         <span class="arrow">←</span>
       </button>
-      <h1 class="title">{{ t('language.title') }}</h1>
+      <div class="top-text">
+        <h2 class="title">{{ title }}</h2>
+      </div>
     </header>
 
     <section class="card">
@@ -121,27 +119,44 @@ watch(
   margin-bottom: 14px;
 }
 
+
 .title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
 }
 
 .back-link {
+  width: 42px;
+  height: 42px;
   border: none;
-  background: transparent;
+  border-radius: 999px;
+  background: #e8fbf8;
+  color: #50bdbd;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 0;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
 }
 
 .arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
+  font-size: 1.35rem;
+  line-height: 1;
 }
+
 
 .card {
   width: 90%;

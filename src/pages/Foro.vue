@@ -177,29 +177,38 @@ function goNewForum() {
 function countFor(id: string) {
   return commentCount.value.get(id) ?? 0
 }
+
+function goBack() {
+  router.back()
+}
 </script>
 
 <template>
   <main class="foro">
-    <header class="page-head">
-      <h1 class="visually-hidden">Foro Nura</h1>
-      <h2 class="page-title">Foro</h2>
-      <p class="subtitle">Compartí experiencias, dudas y recursos con la comunidad.</p>
+   <header class="page-head">
 
-      <div v-if="showPremiumCta" class="premium-inline">
-        <div class="premium-inline__left">
-          <div class="premium-inline__top">
-            <span class="premium-badge">Gratis</span>
-          </div>
-          <h2 class="premium-inline__title">{{ ctaTitle }}</h2>
-          <p class="premium-inline__desc">{{ ctaText }}</p>
-        </div>
+  <div class="top">
 
-        <button type="button" class="premium-inline__btn" @click="goPremium">
-          Pasar a Premium
-        </button>
-      </div>
-    </header>
+    <button
+      class="back-link"
+      type="button"
+      @click="goBack"
+      aria-label="Volver"
+    >
+      <span class="arrow">←</span>
+    </button>
+
+   <div class="top-text">
+  <h1 class="page-title">Foro</h1>
+
+  <p class="page-subtitle">
+    Compartí experiencias y encontrá apoyo en la comunidad.
+  </p>
+</div>
+
+  </div>
+
+</header>
 
    <div v-if="isAdmin" class="admin-actions">
   <button class="pill pill-soft" @click="router.push('/app/admin/usuarios')">
@@ -270,7 +279,7 @@ function countFor(id: string) {
     <ul v-else class="forum-list">
       <li v-for="f in filtered" :key="f.id" class="forum-item" @click="openForum(f)">
         <span class="dot"></span>
-        <span class="title">{{ f.title }}</span>
+        <span class="forum-title">{{ f.title }}</span>
         <small class="count">({{ countFor(f.id) }})</small>
       </li>
     </ul>
@@ -324,18 +333,64 @@ function countFor(id: string) {
   margin-bottom: 14px;
 }
 
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.top-text {
+  min-width: 0;
+  flex: 1;
+
+  display: grid;
+  gap: 4px;
+}
+
 .page-title {
   margin: 0;
   color: #50bdbd;
+
   font-size: 1.5rem;
   font-weight: 800;
+  line-height: 1.15;
 }
 
-.subtitle {
+.page-subtitle {
   margin: 0;
+  max-width: 620px;
+
+  color: #64748b;
   font-size: 0.95rem;
-  color: #6b7280;
-  line-height: 1.4;
+  line-height: 1.45;
+
+  overflow-wrap: break-word;
+}
+
+.back-link{
+  width:42px;
+  height:42px;
+  border:none;
+  border-radius:999px;
+  background:#e8fbf8;
+  color:#50bdbd;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:.2s;
+  flex: 0 0 42px;
+}
+
+.back-link:hover{
+  background:#d8f6f1;
+  transform:translateY(-1px);
+  box-shadow:0 8px 16px rgba(80,189,189,.14);
+}
+
+.arrow{
+  font-size:1.35rem;
+  line-height:1;
 }
 
 .premium-inline {
@@ -523,6 +578,18 @@ function countFor(id: string) {
   }
 }
 
+.forum-title {
+  flex: 1;
+  min-width: 0;
+
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.35;
+
+  overflow-wrap: break-word;
+}
+
 .forum-list {
   list-style: none;
   padding: 0;
@@ -565,12 +632,7 @@ function countFor(id: string) {
   flex: 0 0 auto;
 }
 
-.title {
-  flex: 1;
-  color: #111827;
-  font-size: 0.95rem;
-  line-height: 1.35;
-}
+
 
 .count {
   opacity: 0.75;
@@ -712,9 +774,18 @@ function countFor(id: string) {
     padding: 16px 12px 96px;
   }
 
-  .page-title {
-    font-size: 1.35rem;
+   .top{
+    gap:10px;
+    margin-bottom:14px;
   }
+
+.page-title {
+  font-size: 1.3rem;
+}
+
+.page-subtitle {
+  font-size: 0.88rem;
+}
 
   .premium-inline {
     flex-direction: column;
@@ -830,6 +901,25 @@ function countFor(id: string) {
   .modal-actions .modal-btn {
     width: auto;
     flex: 1;
+  }
+
+   .top {
+    gap: 9px;
+  }
+
+  .back-link {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .page-title {
+    font-size: 1.2rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.82rem;
+    line-height: 1.4;
   }
 }
 </style>

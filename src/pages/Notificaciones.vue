@@ -46,15 +46,12 @@ function goBack() {
 
 <template>
   <h1 class="visually-hidden">Notificaciones</h1>
-
   <main class="page">
     <header class="top">
-      <button class="back-link" type="button" @click="goBack" aria-label="Volver">
+      <button class="back-link" type="button" @click="goBack">
         <span class="arrow">←</span>
       </button>
-
       <div class="top-text">
-        <p class="kicker">Preferencias</p>
         <h2 class="title">{{ title }}</h2>
       </div>
     </header>

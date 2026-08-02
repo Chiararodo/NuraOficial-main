@@ -8,6 +8,7 @@ import { useFeatureGate } from '@/composables/useFeatureGate'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const title = 'Diario emocional'
 
 const gate = useFeatureGate('diary')
 
@@ -356,15 +357,34 @@ function dayStyle(day: number) {
 
   return {}
 }
+
+function goBack() {
+  router.back()
+}
 </script>
 
 <template>
   <main class="contenido">
-    <header class="page-head">
-      <h1 class="visually-hidden">Diario emocional</h1>
-      <h2 class="page-title">Diario emocional</h2>
-      <p class="subtitle">Registrá tu estado día por día.</p>
 
+   <header class="page-head">
+
+  <div class="top">
+    <button
+      class="back-link"
+      type="button"
+      @click="goBack"
+      aria-label="Volver"
+    >
+      <span class="arrow">←</span>
+    </button>
+
+    <div class="top-text">
+      <h1 class="title">{{ title }}</h1>
+      <p class="subtitle">
+        Registrá tu estado día por día.
+      </p>
+    </div>
+  </div>
       <section v-if="showPremiumCta" class="premium-cta" aria-labelledby="premium-cta-title">
         <div class="premium-cta__left">
           <div class="premium-cta__top">
@@ -550,18 +570,60 @@ function dayStyle(day: number) {
   margin-bottom: 18px;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 1.55rem;
-  font-weight: 800;
-  color: #50bdbd;
+.top{
+  display:flex;
+  align-items:center;
+  gap:12px;
 }
 
-.subtitle {
-  margin: 0;
-  color: #5c6a75;
-  font-size: 0.98rem;
-  line-height: 1.45;
+.top-text{
+  display:flex;
+  flex-direction:column;
+}
+
+.title{
+  margin:0;
+  font-size:1.55rem;
+  font-weight:800;
+  color:#50bdbd;
+  line-height:1.1;
+}
+
+.subtitle{
+  margin:4px 0 0;
+  color:#64748b;
+  font-size:.95rem;
+}
+
+
+.back-link {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 999px;
+  background: #e8fbf8;
+  color: #50bdbd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
+}
+
+.arrow {
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .premium-cta {
@@ -1154,13 +1216,17 @@ function dayStyle(day: number) {
     padding: 16px 12px 72px;
   }
 
-  .page-title {
-    font-size: 1.4rem;
-  }
+.top{
+  gap:10px;
+}
 
-  .subtitle {
-    font-size: 0.9rem;
-  }
+.title{
+  font-size:1.35rem;
+}
+
+.subtitle{
+  font-size:.9rem;
+}
 
   .premium-cta {
     flex-direction: column;

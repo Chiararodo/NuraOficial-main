@@ -17,19 +17,25 @@ const isSmallScreen = ref(false)
 
 const showHelpModal = ref(false)
 const installing = ref(false)
-const dismissed = ref(false)
 
+const collapsed = ref(
+  sessionStorage.getItem('nura-install-collapsed') === 'true'
+)
 const MAX_WIDTH = 1024
 
 let screenMediaQuery: MediaQueryList | null = null
 let displayModeMediaQuery: MediaQueryList | null = null
 
+const showInstallUI = computed(() => {
+  return !isInstalled.value && isSmallScreen.value
+})
+
 const showInstallBanner = computed(() => {
-  return (
-    !isInstalled.value &&
-    isSmallScreen.value &&
-    !dismissed.value
-  )
+  return showInstallUI.value && !collapsed.value
+})
+
+const showInstallBubble = computed(() => {
+  return showInstallUI.value && collapsed.value
 })
 
 const installButtonText = computed(() => {
@@ -78,11 +84,13 @@ function refreshState() {
     `(max-width: ${MAX_WIDTH}px)`
   ).matches
 
-  if (isInstalled.value) {
-    deferredPrompt.value = null
-    showHelpModal.value = false
-    dismissed.value = true
-  }
+ if (isInstalled.value) {
+  deferredPrompt.value = null
+  showHelpModal.value = false
+  collapsed.value = false
+
+  sessionStorage.removeItem('nura-install-collapsed')
+}
 
   if (!isSmallScreen.value) {
     showHelpModal.value = false
@@ -95,7 +103,6 @@ function handleBeforeInstallPrompt(event: Event) {
   deferredPrompt.value =
     event as BeforeInstallPromptEvent
 
-  dismissed.value = false
   refreshState()
 }
 
@@ -104,8 +111,11 @@ function handleAppInstalled() {
   installing.value = false
   isInstalled.value = true
   showHelpModal.value = false
-  dismissed.value = true
+  collapsed.value = false
+
+  sessionStorage.removeItem('nura-install-collapsed')
 }
+
 
 async function handleInstallClick() {
   if (installing.value) return
@@ -134,9 +144,9 @@ async function handleInstallClick() {
         await deferredPrompt.value.userChoice
 
       if (choice.outcome === 'accepted') {
-        deferredPrompt.value = null
-        dismissed.value = true
-      }
+  deferredPrompt.value = null
+  collapsed.value = false
+}
     } catch (error) {
       console.error(
         'No se pudo abrir el instalador:',
@@ -159,10 +169,19 @@ async function handleInstallClick() {
   showHelpModal.value = true
 }
 
-function dismissBanner() {
-  dismissed.value = true
+function collapseBanner() {
+  collapsed.value = true
+  sessionStorage.setItem('nura-install-collapsed', 'true')
 }
 
+async function openInstallHelp() {
+  if (deferredPrompt.value && !isIOS.value) {
+    await handleInstallClick()
+    return
+  }
+
+  showHelpModal.value = true
+}
 function closeModal() {
   showHelpModal.value = false
 }
@@ -240,7 +259,7 @@ onBeforeUnmount(() => {
      <div class="install-banner__icon" aria-hidden="true">
   <img
     src="/icons/NuriBienvenida.png"
-    alt="Nuri"
+    alt=""
   />
 </div>
 
@@ -259,15 +278,36 @@ onBeforeUnmount(() => {
       </button>
 
       <button
-        class="install-banner__close"
-        type="button"
-        aria-label="Ocultar aviso de instalación"
-        @click="dismissBanner"
-      >
-        ×
-      </button>
+  class="install-banner__close"
+  type="button"
+  aria-label="Minimizar aviso de instalación"
+  @click="collapseBanner"
+>
+  ×
+</button>
     </aside>
   </Transition>
+
+<Transition name="install-bubble">
+  <button
+    v-if="showInstallBubble"
+    class="install-bubble"
+    type="button"
+    aria-label="Ver cómo instalar Nura"
+    title="Instalar Nura"
+    @click="openInstallHelp"
+  >
+    <img
+      src="/icons/NuriBienvenida.png"
+      alt=""
+      aria-hidden="true"
+    />
+
+    <span class="install-bubble__badge" aria-hidden="true">
+      +
+    </span>
+  </button>
+</Transition>
 
   <Teleport to="body">
     <Transition name="modal-fade">
@@ -294,7 +334,7 @@ onBeforeUnmount(() => {
           <div class="install-modal__icon" aria-hidden="true">
   <img
     src="/icons/NuriBienvenida.png"
-    alt="Nuri"
+    alt=""
   />
 </div>
 
@@ -492,11 +532,11 @@ onBeforeUnmount(() => {
 @keyframes nuri-install-float {
   0%,
   100% {
-    transform: translateY(0) rotate(0);
+    transform: scale(1.45) translateY(0) rotate(0deg);
   }
 
   50% {
-    transform: translateY(-3px) rotate(-2deg);
+    transform: scale(1.45) translateY(-3px) rotate(-2deg);
   }
 }
 
@@ -517,7 +557,7 @@ onBeforeUnmount(() => {
 
 .install-modal {
   position: relative;
-  width: 80%;
+  width: min(360px, calc(100vw - 32px));
   padding: 20px;
   border: 1px solid #e2edf7;
   border-radius: 18px;
@@ -676,9 +716,9 @@ onBeforeUnmount(() => {
 
 @media (max-width: 360px) {
   .install-banner {
-    width: 35%;
+     width: min(200px, calc(100vw - 16px));
     left: 8px;
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: 6px;
   }
 
@@ -712,6 +752,149 @@ onBeforeUnmount(() => {
   .install-modal,
   .install-modal * {
     transition: none !important;
+  }
+}
+
+/* =====================================================
+   BOTÓN MINIATURA DE NURI
+===================================================== */
+
+.install-bubble {
+  position: fixed;
+  left: 12px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  z-index: 55;
+
+  width: 52px;
+  height: 52px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 1px solid rgba(80, 189, 189, 0.32);
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.76);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.15),
+    0 3px 8px rgba(15, 23, 42, 0.08);
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.install-bubble img {
+  width: 44px;
+  height: 44px;
+
+  display: block;
+  object-fit: contain;
+
+  animation: nuri-bubble-float 2.8s ease-in-out infinite;
+}
+
+.install-bubble__badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+
+  width: 19px;
+  height: 19px;
+
+  display: grid;
+  place-items: center;
+
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+
+  background: #50bdbd;
+  color: #ffffff;
+
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .install-bubble:hover {
+    transform: translateY(-3px) scale(1.04);
+
+    background: rgba(255, 255, 255, 0.92);
+
+    box-shadow:
+      0 15px 30px rgba(80, 189, 189, 0.22),
+      0 4px 10px rgba(15, 23, 42, 0.08);
+  }
+}
+
+.install-bubble:active {
+  transform: scale(0.96);
+}
+
+@keyframes nuri-bubble-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-4px) rotate(-3deg);
+  }
+}
+
+.install-bubble-enter-active,
+.install-bubble-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.install-bubble-enter-from,
+.install-bubble-leave-to {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+@media (max-width: 520px) {
+  .install-bubble {
+    left: 9px;
+    bottom: calc(73px + env(safe-area-inset-bottom));
+
+    width: 46px;
+    height: 46px;
+  }
+
+  .install-bubble img {
+    width: 39px;
+    height: 39px;
+  }
+
+  .install-bubble__badge {
+    width: 18px;
+    height: 18px;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .install-bubble {
+    width: 42px;
+    height: 42px;
+  }
+
+  .install-bubble img {
+    width: 36px;
+    height: 36px;
   }
 }
 </style>

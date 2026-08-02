@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { useNotificationSettings } from '@/composables/useNotificationSettings'
 
 const auth = useAuthStore()
+const title = 'Medicamentos'
 const router = useRouter()
 
 const prefs = useNotificationSettings()
@@ -304,7 +305,9 @@ onMounted(async () => {
       <button class="back-link" type="button" @click="goBack">
         <span class="arrow">←</span>
       </button>
-      <h1 class="page-title">Mis medicaciones</h1>
+      <div class="top-text">
+        <h2 class="title">{{ title }}</h2>
+      </div>
     </header>
 
     <section class="card">
@@ -464,8 +467,43 @@ onMounted(async () => {
 .meds-page{background:#f4f9fb;padding:24px 18px 48px;}
 .page-head{max-width:900px;margin:0 auto 14px;display:flex;align-items:center;gap:10px;}
 .page-title{margin:0;font-size:1.5rem;font-weight:700;color:#111827;}
-.back-link{border:none;background:transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:0;}
-.arrow{font-size:1.5rem;color:#46bdbd;}
+
+.title {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
+}
+.back-link {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 999px;
+  background: #e8fbf8;
+  color: #50bdbd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
+}
+
+.arrow {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
 .card{max-width:900px;margin:0 auto;background:#fff;border-radius:20px;padding:18px 20px 20px;box-shadow:0 12px 30px rgba(15,23,42,.08);border:1px solid #e5e7eb;}
 .intro{margin:0 0 14px;font-size:.95rem;color:#4b5563;}
 .form-card{padding:14px 0 10px;border-bottom:1px solid #e5e7eb;margin-bottom:14px;}

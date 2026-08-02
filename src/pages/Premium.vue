@@ -225,6 +225,11 @@ function goTo(path: string) {
   router.push(path)
 }
 
+function goBack() {
+  router.back()
+}
+
+
 onMounted(async () => {
   loadAdminToggle()
   await loadStatus()
@@ -238,23 +243,31 @@ onMounted(async () => {
   <main class="premium-page">
     <section class="container">
       <header class="page-head">
-        <div class="head-left">
-          <p class="kicker">{{ isPremium ? 'Plan activo' : 'Planes' }}</p>
-          <h2 class="page-title">{{ isPremium ? 'Nura Premium' : 'Elegí tu plan' }}</h2>
-          <p class="page-sub">
-            {{
-              isPremium
-                ? 'Revisá tu estado de suscripción, accesos y beneficios incluidos.'
-                : 'Podés empezar con el Plan Gratuito y pasar a Premium cuando quieras.'
-            }}
-          </p>
-        </div>
+  <button class="back-link" type="button" @click="goBack">
+    <span class="arrow">←</span>
+  </button>
 
-        <div v-if="isPremium" class="status-pill">
-          <span class="dot"></span>
-          <span>Plan activo</span>
-        </div>
-      </header>
+  <div class="head-left">
+    <p class="kicker">{{ isPremium ? 'Plan activo' : 'Planes' }}</p>
+
+    <h2 class="page-title">
+      {{ isPremium ? 'Nura Premium' : 'Elegí tu plan' }}
+    </h2>
+
+    <p class="page-sub">
+      {{
+        isPremium
+          ? 'Revisá tu estado de suscripción, accesos y beneficios incluidos.'
+          : 'Podés empezar con el Plan Gratuito y pasar a Premium cuando quieras.'
+      }}
+    </p>
+  </div>
+
+  <div v-if="isPremium" class="status-pill">
+    <span class="dot"></span>
+    <span>Plan activo</span>
+  </div>
+</header>
 
       <p v-if="loading" class="page-sub loading-text">Cargando…</p>
 
@@ -498,11 +511,49 @@ onMounted(async () => {
   gap: 18px;
 }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
+.page-head{
+  display:flex;
+  align-items:flex-start;
+  gap:16px;
+  margin-bottom:18px;
+}
+
+.head-left{
+  flex:1;
+}
+
+.back-link{
+  width:42px;
+  height:42px;
+  flex-shrink:0;
+
+  border:none;
+  border-radius:999px;
+
+  background:#e8fbf8;
+  color:#50bdbd;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  cursor:pointer;
+
+  transition:
+    background-color .2s,
+    transform .18s,
+    box-shadow .2s;
+}
+
+.back-link:hover{
+  background:#d8f6f1;
+  transform:translateY(-1px);
+  box-shadow:0 8px 16px rgba(80,189,189,.14);
+}
+
+.arrow{
+  font-size:1.35rem;
+  line-height:1;
 }
 
 .kicker {
@@ -985,10 +1036,15 @@ onMounted(async () => {
     padding: 16px 12px 96px;
   }
 
-  .page-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.page-head{
+  display:grid;
+  grid-template-columns:42px 1fr;
+  gap:14px;
+}
+
+.status-pill{
+  grid-column:2;
+}
 
   .page-title {
     font-size: 1.4rem;

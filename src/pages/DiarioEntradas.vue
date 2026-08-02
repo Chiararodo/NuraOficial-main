@@ -112,7 +112,7 @@ const visibleEntries = computed(() => entries.value.filter((e) => !e.archived))
 const archivedEntries = computed(() => entries.value.filter((e) => e.archived))
 
 function goBack() {
-  router.push('/app/diario')
+  router.back()
 }
 
 function editEntry(entry: Entry) {

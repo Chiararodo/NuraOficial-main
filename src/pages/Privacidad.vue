@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
+const title = 'Privacidad y Términos'
 const router = useRouter()
 
 function goBack() {
@@ -10,12 +11,14 @@ function goBack() {
 
 <template>
     <h1 class="visually-hidden">Privacidad y Términos</h1>
-  <main class="page">
+      <main class="page">
     <header class="top">
       <button class="back-link" type="button" @click="goBack">
         <span class="arrow">←</span>
       </button>
-      <h2 class="title">Privacidad y Términos</h2>
+      <div class="top-text">
+        <h2 class="title">{{ title }}</h2>
+      </div>
     </header>
 
     <section class="card">
@@ -82,34 +85,43 @@ function goBack() {
   align-items: center;
 }
 
-
-/* Header */
-.sub-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 1100px;
-  margin: 0 auto 14px;
-}
-.sub-header h1 {
+.title {
   margin: 0;
-  font-size: 1.4rem;
-  color: #46bdbd;
-  font-weight: 700;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #50bdbd;
 }
+
 .back-link {
+  width: 42px;
+  height: 42px;
   border: none;
-  background: transparent;
+  border-radius: 999px;
+  background: #e8fbf8;
+  color: #50bdbd;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   cursor: pointer;
-  padding: 0;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
+  }
+}
+
 .arrow {
-  font-size: 1.5rem;
-  color: #46bdbd;
+  font-size: 1.35rem;
+  line-height: 1;
 }
+
 
 .top {
   width: 100%;
@@ -118,13 +130,6 @@ function goBack() {
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #0f172a;
 }
 
 .back-btn {

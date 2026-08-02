@@ -65,6 +65,10 @@ function goPremium() {
   router.push('/app/premium')
 }
 
+function goBack() {
+  router.back()
+}
+
 /* ====== Chat state ====== */
 const messages = ref<ChatMessage[]>([])
 const userInput = ref('')
@@ -403,24 +407,36 @@ watch(
 
   <main class="contenido">
     <header class="page-head">
-      <div class="head-main">
-        <h2 class="page-title">{{ title }}</h2>
-        <p class="chat-subtitle">
-          Disponible 24/7 para acompañarte. Recordá que NuraBot no reemplaza la ayuda de un profesional de la salud.
-        </p>
-      </div>
+  <div class="top">
+    <button
+      class="back-link"
+      type="button"
+      @click="goBack"
+      aria-label="Volver"
+    >
+      <span class="arrow">←</span>
+    </button>
 
-      <div class="head-actions">
-        <button
-          type="button"
-          class="ghost-btn"
-          @click="showClearModal = true"
-          :disabled="clearing"
-        >
-          Borrar historial
-        </button>
-      </div>
-    </header>
+    <div class="top-text">
+      <h2 class="page-title">{{ title }}</h2>
+
+      <p class="chat-subtitle">
+        Disponible 24/7 para acompañarte. Recordá que NuraBot no reemplaza la ayuda de un profesional.
+      </p>
+    </div>
+  </div>
+
+ <div class="head-actions">
+    <button
+      type="button"
+      class="ghost-btn"
+      @click="showClearModal = true"
+      :disabled="clearing"
+    >
+      Borrar historial
+    </button>
+  </div> 
+</header>
 
     <section v-if="showPremiumCta" class="premium-cta" aria-labelledby="premium-cta-title">
       <div class="premium-cta__left">
@@ -553,10 +569,57 @@ watch(
 
 .page-head {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 14px;
   margin-bottom: 14px;
+}
+
+.top{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+}
+
+.top-text{
+  flex:1;
+  min-width:0;
+
+  display:grid;
+  gap:4px;
+}
+
+.back-link{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+
+  border:none;
+  border-radius:999px;
+
+  background:#e8fbf8;
+  color:#50bdbd;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  cursor:pointer;
+
+  transition:
+    background-color .2s,
+    transform .18s,
+    box-shadow .2s;
+}
+
+.back-link:hover{
+  background:#d8f6f1;
+  transform:translateY(-1px);
+  box-shadow:0 8px 16px rgba(80,189,189,.14);
+}
+
+.arrow{
+  font-size:1.35rem;
+  line-height:1;
 }
 
 .head-main {
@@ -565,8 +628,9 @@ watch(
 }
 
 .head-actions {
+  width: 100%;
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
 }
 
 .page-title {
@@ -1013,12 +1077,20 @@ watch(
     align-items: stretch;
   }
 
-  .head-actions {
-    justify-content: flex-start;
-  }
+  .top{
+  gap:10px;
+}
 
-  .page-title {
-    font-size: 1.45rem;
+.page-title{
+  font-size:1.35rem;
+}
+
+.chat-subtitle{
+  font-size:.88rem;
+}
+
+  .head-actions {
+    justify-content: flex-end;
   }
 
   .premium-cta {
@@ -1074,6 +1146,24 @@ watch(
 
   .modal-actions .modal-btn {
     width: 100%;
+  }
+}
+
+@media (max-width:420px){
+
+  .back-link{
+    width:38px;
+    height:38px;
+    flex-basis:38px;
+  }
+
+  .page-title{
+    font-size:1.2rem;
+  }
+
+  .chat-subtitle{
+    font-size:.82rem;
+    line-height:1.35;
   }
 }
 </style>
