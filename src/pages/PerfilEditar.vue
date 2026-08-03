@@ -269,8 +269,8 @@ onMounted(() => {
 
   <main class="perfil-edit">
     <header class="page-head">
-      <button class="back-btn" type="button" @click="goBack" aria-label="Volver">
-        ←
+      <button class="back-link" type="button" @click="goBack">
+        <i class="fa-solid fa-arrow-left arrow"></i>
       </button>
       <h2 class="page-title">Editar perfil</h2>
     </header>
@@ -409,30 +409,33 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.back-btn {
-  width: 42px;
-  height: 42px;
-  border: none;
-  border-radius: 999px;
-  background: #e8fbf8;
-  color: #50bdbd;
-  font-size: 1.35rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.back-link{
+  width:40px;
+  height:40px;
+  flex:0 0 44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  border-radius:50%;
+  background:#e8fbf8;
+  color:#50bdbd;
+  cursor:pointer;
   transition:
-    background-color 0.2s ease,
-    transform 0.18s ease,
-    box-shadow 0.2s ease;
+    background .2s,
+    transform .2s,
+    box-shadow .2s;
 }
 
-@media (hover: hover) {
-  .back-btn:hover {
-    background: #d8f6f1;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 16px rgba(80, 189, 189, 0.14);
-  }
+.back-link:hover{
+  background:#d8f6f1;
+  transform:translateY(-2px);
+  box-shadow:0 8px 16px rgba(80,189,189,.16);
+}
+
+.arrow{
+  font-size:1.2rem;
+  font-weight:900;
 }
 
 .grid {

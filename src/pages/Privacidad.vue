@@ -14,7 +14,7 @@ function goBack() {
       <main class="page">
     <header class="top">
       <button class="back-link" type="button" @click="goBack">
-        <span class="arrow">←</span>
+        <i class="fa-solid fa-arrow-left arrow"></i>
       </button>
       <div class="top-text">
         <h2 class="title">{{ title }}</h2>

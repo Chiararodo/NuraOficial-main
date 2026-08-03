@@ -303,9 +303,9 @@ onBeforeUnmount(() => {
       aria-hidden="true"
     />
 
-    <span class="install-bubble__badge" aria-hidden="true">
-      +
-    </span>
+    <span class="install-bubble__tooltip">
+  Instalar Nura
+</span>
   </button>
 </Transition>
 
@@ -765,42 +765,34 @@ onBeforeUnmount(() => {
   left: 12px;
   bottom: calc(78px + env(safe-area-inset-bottom));
   z-index: 55;
-
-  width: 52px;
-  height: 52px;
-
+  width: 55px;
+  height: 55px;
   display: grid;
   place-items: center;
-
-  padding: 0;
-
-  border: 1px solid rgba(80, 189, 189, 0.32);
+  padding: 4px;
+  border: 2px solid rgba(80, 189, 189, 0.4);
   border-radius: 50%;
-
-  background: rgba(255, 255, 255, 0.76);
-
+  background: rgba(255, 255, 255, 0.92);
+  overflow: visible;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-
   box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.15),
-    0 3px 8px rgba(15, 23, 42, 0.08);
-
+    0 12px 28px rgba(15, 23, 42, 0.16),
+    0 4px 10px rgba(15, 23, 42, 0.08);
   cursor: pointer;
-
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
-    background-color 0.2s ease;
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .install-bubble img {
-  width: 44px;
-  height: 44px;
-
+  width: 49px;
+  height: 49px;
   display: block;
   object-fit: contain;
-
+  border-radius: 50%;
   animation: nuri-bubble-float 2.8s ease-in-out infinite;
 }
 
@@ -808,33 +800,56 @@ onBeforeUnmount(() => {
   position: absolute;
   top: -2px;
   right: -2px;
-
   width: 19px;
   height: 19px;
-
   display: grid;
   place-items: center;
-
   border: 2px solid #ffffff;
   border-radius: 50%;
-
   background: #50bdbd;
   color: #ffffff;
-
   font-size: 0.8rem;
   font-weight: 800;
   line-height: 1;
 }
 
+.install-bubble__tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.22);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+}
+
 @media (hover: hover) {
   .install-bubble:hover {
-    transform: translateY(-3px) scale(1.04);
-
-    background: rgba(255, 255, 255, 0.92);
-
+    transform: translateY(-4px) scale(1.06);
+    background: #ffffff;
+    border-color: #50bdbd;
     box-shadow:
-      0 15px 30px rgba(80, 189, 189, 0.22),
-      0 4px 10px rgba(15, 23, 42, 0.08);
+      0 16px 34px rgba(80, 189, 189, 0.26),
+      0 5px 12px rgba(15, 23, 42, 0.1);
+  }
+
+  .install-bubble:hover .install-bubble__tooltip {
+    opacity: 1;
+    visibility: visible;
+
+    transform: translateY(-50%) translateX(0);
   }
 }
 
@@ -870,14 +885,13 @@ onBeforeUnmount(() => {
   .install-bubble {
     left: 9px;
     bottom: calc(73px + env(safe-area-inset-bottom));
-
-    width: 46px;
-    height: 46px;
+    width: 50px;
+    height: 50px;
   }
 
   .install-bubble img {
-    width: 39px;
-    height: 39px;
+    width: 43px;
+    height: 43px;
   }
 
   .install-bubble__badge {
@@ -885,17 +899,23 @@ onBeforeUnmount(() => {
     height: 18px;
     font-size: 0.72rem;
   }
+
+  .install-bubble__tooltip {
+    display: none;
+  }
 }
 
 @media (max-width: 360px) {
   .install-bubble {
-    width: 42px;
-    height: 42px;
+    width: 48px;
+    height: 48px;
   }
 
   .install-bubble img {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
   }
 }
+
+
 </style>

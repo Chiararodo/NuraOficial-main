@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
     <section class="wrap">
       <header class="top">
         <button class="back" type="button" @click="goBack" aria-label="Volver">
-          <span class="arrow">←</span>
+          <i class="fa-solid fa-arrow-left arrow"></i>
         </button>
 
         <div class="top-txt">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch,
+  nextTick } from 'vue'
 import { supabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/store/auth'
 import { useRoute, useRouter } from 'vue-router'
@@ -416,6 +417,7 @@ const bookingHasSingleMode = ref(false)
 const bookingEmail = ref('')
 const bookingSaving = ref(false)
 const bookingError = ref('')
+const bookingModalBody = ref<HTMLElement | null>(null)
 const turnoConfirmado = ref(false)
 
 const showAppointmentsModal = ref(false)
@@ -832,8 +834,11 @@ async function openBookingModal(p: Profesional) {
 
   inferBookingModeFromProfessional(p)
 
-  bookingEmail.value = auth.user?.email ?? ''
+ bookingEmail.value = auth.user?.email ?? ''
+
   bookingError.value = ''
+  mpError.value = ''
+
   showBookingModal.value = true
   editingAppointmentId.value = null
   weekOffset.value = 0
@@ -845,7 +850,10 @@ async function openBookingModal(p: Profesional) {
 
 function closeBookingModal() {
   showBookingModal.value = false
+
   bookingError.value = ''
+  mpError.value = ''
+
   selectedPro.value = null
   editingAppointmentId.value = null
   occupiedSlots.value = []
@@ -859,33 +867,78 @@ function closeBookingModal() {
 const mpLoading = ref(false)
 const mpError = ref('')
 
-async function payDepositWithMercadoPago() {
+async function scrollBookingModalToTop() {
+  await nextTick()
+
+  bookingModalBody.value?.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+
+async function showBookingError(message: string) {
+  bookingError.value = message
   mpError.value = ''
 
+  await scrollBookingModalToTop()
+}
+
+async function showPaymentError(message: string) {
+  mpError.value = message
+  bookingError.value = ''
+
+  await scrollBookingModalToTop()
+}
+
+async function payDepositWithMercadoPago() {
+  mpError.value = ''
+  bookingError.value = ''
+
   if (!selectedPro.value) {
-    mpError.value = 'Seleccioná un profesional primero.'
+    await showPaymentError(
+      'Seleccioná un profesional primero.'
+    )
     return
   }
+
   if (!bookingDate.value || !bookingTime.value) {
-    mpError.value = 'Elegí fecha y horario antes de pagar.'
+    await showPaymentError(
+      'Elegí fecha y horario antes de pagar.'
+    )
     return
   }
+
   if (!validateTimeRangeHHMM(bookingTime.value)) {
-    mpError.value = 'Elegí un horario disponible del profesional para ese día.'
+    await showPaymentError(
+      'Elegí un horario disponible del profesional para ese día.'
+    )
     return
   }
-  if (!bookingEmail.value || !bookingEmail.value.includes('@')) {
-    mpError.value = 'Ingresá un email válido.'
+
+  if (
+    !bookingEmail.value ||
+    !bookingEmail.value.includes('@')
+  ) {
+    await showPaymentError(
+      'Ingresá un email válido.'
+    )
     return
   }
 
   mpLoading.value = true
 
   try {
-    window.open(MP_DEPOSIT_URL, '_blank', 'noopener,noreferrer')
-  } catch (e) {
-    console.error(e)
-    mpError.value = 'No se pudo iniciar el pago. Probá de nuevo.'
+    window.open(
+      MP_DEPOSIT_URL,
+      '_blank',
+      'noopener,noreferrer'
+    )
+  } catch (error) {
+    console.error(error)
+
+    await showPaymentError(
+      'No se pudo iniciar el pago. Probá de nuevo.'
+    )
   } finally {
     mpLoading.value = false
   }
@@ -985,43 +1038,78 @@ function showClash(msg: string) {
 /* ================= GUARDAR / EDITAR TURNO ================= */
 async function saveAppointment() {
   bookingError.value = ''
+  mpError.value = ''
 
   if (!auth.user) {
-    bookingError.value = 'Tenés que iniciar sesión.'
+    await showBookingError(
+      'Tenés que iniciar sesión.'
+    )
     return
   }
+
   if (!selectedPro.value) {
-    bookingError.value = 'Seleccioná un profesional.'
+    await showBookingError(
+      'Seleccioná un profesional.'
+    )
     return
   }
+
   if (!bookingDate.value || !bookingTime.value) {
-    bookingError.value = 'Elegí fecha y horario.'
+    await showBookingError(
+      'Elegí fecha y horario.'
+    )
     return
   }
+
   if (!validateTimeRangeHHMM(bookingTime.value)) {
-    bookingError.value = 'Elegí un horario disponible del profesional para ese día.'
-    return
-  }
-  if (!bookingEmail.value || !bookingEmail.value.includes('@')) {
-    bookingError.value = 'Ingresá un email válido.'
+    await showBookingError(
+      'Elegí un horario disponible del profesional para ese día.'
+    )
     return
   }
 
-  const professionalId = String(selectedPro.value._id || selectedPro.value.id || '')
+  if (
+    !bookingEmail.value ||
+    !bookingEmail.value.includes('@')
+  ) {
+    await showBookingError(
+      'Ingresá un email válido.'
+    )
+    return
+  }
+
+  const professionalId = String(
+    selectedPro.value._id ||
+    selectedPro.value.id ||
+    ''
+  )
+
   if (!professionalId) {
-    bookingError.value = 'No se pudo identificar al profesional.'
+    await showBookingError(
+      'No se pudo identificar al profesional.'
+    )
     return
   }
 
-  const duration = getSessionDuration(selectedPro.value)
-  const start = new Date(`${bookingDate.value}T${bookingTime.value}:00-03:00`)
-  const end = new Date(start.getTime() + duration * 60000)
+  const duration = getSessionDuration(
+    selectedPro.value
+  )
+
+  const start = new Date(
+    `${bookingDate.value}T${bookingTime.value}:00-03:00`
+  )
+
+  const end = new Date(
+    start.getTime() + duration * 60000
+  )
 
   bookingSaving.value = true
+
   try {
     const payload = {
       especialistaId: professionalId,
-      pacienteNombre: auth.user?.email || 'Paciente',
+      pacienteNombre:
+        auth.user?.email || 'Paciente',
       pacienteEmail: bookingEmail.value,
       start: start.toISOString(),
       end: end.toISOString(),
@@ -1029,15 +1117,18 @@ async function saveAppointment() {
     }
 
     if (editingAppointmentId.value) {
-      await editarTurno(editingAppointmentId.value, payload)
+      await editarTurno(
+        editingAppointmentId.value,
+        payload
+      )
     } else {
       await crearTurno(payload)
     }
 
-await Promise.all([
-  loadAppointments(),
-  loadWeeklyAvailability()
-])
+    await Promise.all([
+      loadAppointments(),
+      loadWeeklyAvailability()
+    ])
 
     showBookingModal.value = false
     turnoConfirmado.value = true
@@ -1045,12 +1136,19 @@ await Promise.all([
 
     await createNotification({
       title: 'Turno confirmado',
-      body: `Tu turno con ${selectedPro.value.name ?? 'el profesional'} fue guardado correctamente.`,
+      body: `Tu turno con ${
+        selectedPro.value.name ??
+        'el profesional'
+      } fue guardado correctamente.`,
       type: 'appointment'
     })
-  } catch (e: any) {
-    console.error(e)
-    bookingError.value = e?.message || 'No se pudo guardar el turno. Probá de nuevo.'
+  } catch (error: any) {
+    console.error(error)
+
+    await showBookingError(
+      error?.message ||
+      'No se pudo guardar el turno. Probá de nuevo.'
+    )
   } finally {
     bookingSaving.value = false
   }
@@ -1375,8 +1473,8 @@ onMounted(async () => {
           <button type="button" class="modal-close" @click="closeBookingModal">×</button>
         </header>
 
-        <section class="modal-body modal-body-scroll">
-          <div class="booking-topbar">
+        <section ref="bookingModalBody" class="modal-body modal-body-scroll">
+         <div class="booking-topbar">
   <div class="prof-summary">
     <img
       v-if="selectedPro && getAvatarUrl(selectedPro)"
@@ -1384,13 +1482,32 @@ onMounted(async () => {
       class="prof-summary-avatar"
       alt=""
     />
+
     <div>
-      <p class="prof-summary-name">{{ selectedPro?.name }}</p>
+      <p class="prof-summary-name">
+        {{ selectedPro?.name }}
+      </p>
+
       <p class="prof-summary-type">
         {{ selectedPro?.specialty || selectedPro?.type }}
       </p>
     </div>
   </div>
+</div>
+
+<div
+  v-if="bookingError || mpError"
+  class="booking-alert"
+  role="alert"
+  aria-live="assertive"
+>
+  <span class="booking-alert__icon" aria-hidden="true">
+    !
+  </span>
+
+  <p>
+    {{ bookingError || mpError }}
+  </p>
 </div>
 
           <div class="booking-layout">
@@ -1548,11 +1665,7 @@ onMounted(async () => {
                 >
                   {{ mpLoading ? 'Redirigiendo a Mercado Pago…' : 'Pagar seña con Mercado Pago' }}
                 </button>
-
-                <p v-if="mpError" class="modal-error">{{ mpError }}</p>
               </div>
-
-              <p v-if="bookingError" class="modal-error">{{ bookingError }}</p>
             </section>
           </div>
         </section>
@@ -2294,6 +2407,56 @@ font-family: var(--font-main);
   align-items: start;
 }
 
+/* ================= ALERTA SUPERIOR DEL TURNO ================= */
+
+.booking-alert {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+
+  background: #fef2f2;
+  color: #b91c1c;
+
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.08);
+}
+
+.booking-alert__icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #fee2e2;
+  color: #b91c1c;
+
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.booking-alert p {
+  margin: 0;
+
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 /* ===== panel izquierdo ===== */
 
 .calendar-panel {
@@ -2968,6 +3131,15 @@ font-family: var(--font-main);
     margin-bottom: 10px;
   }
 
+  .booking-alert {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.booking-alert p {
+  font-size: 0.82rem;
+}
   .prof-summary {
     flex: 1 1 100%;
   }

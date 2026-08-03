@@ -414,7 +414,7 @@ watch(
       @click="goBack"
       aria-label="Volver"
     >
-      <span class="arrow">←</span>
+      <i class="fa-solid fa-arrow-left arrow"></i>
     </button>
 
     <div class="top-text">
@@ -589,37 +589,32 @@ watch(
 }
 
 .back-link{
-  width:42px;
-  height:42px;
-  flex:0 0 42px;
-
-  border:none;
-  border-radius:999px;
-
-  background:#e8fbf8;
-  color:#50bdbd;
-
+  width:40px;
+  height:40px;
+  flex:0 0 44px;
   display:flex;
   align-items:center;
   justify-content:center;
-
+  border:none;
+  border-radius:50%;
+  background:#e8fbf8;
+  color:#50bdbd;
   cursor:pointer;
-
   transition:
-    background-color .2s,
-    transform .18s,
+    background .2s,
+    transform .2s,
     box-shadow .2s;
 }
 
 .back-link:hover{
   background:#d8f6f1;
-  transform:translateY(-1px);
-  box-shadow:0 8px 16px rgba(80,189,189,.14);
+  transform:translateY(-2px);
+  box-shadow:0 8px 16px rgba(80,189,189,.16);
 }
 
 .arrow{
-  font-size:1.35rem;
-  line-height:1;
+  font-size:1.2rem;
+  font-weight:900;
 }
 
 .head-main {

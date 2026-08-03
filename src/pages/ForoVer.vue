@@ -493,7 +493,7 @@ onBeforeUnmount(() => {
   <main class="contenido ver-foro">
     <header class="page-head">
       <button class="back-link" type="button" @click="goBack" aria-label="Volver">
-        <span class="arrow">←</span>
+        <i class="fa-solid fa-arrow-left arrow"></i>
       </button>
 
       <div class="page-copy">

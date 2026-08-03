@@ -244,7 +244,7 @@ onMounted(async () => {
     <section class="container">
       <header class="page-head">
   <button class="back-link" type="button" @click="goBack">
-    <span class="arrow">←</span>
+    <i class="fa-solid fa-arrow-left arrow"></i>
   </button>
 
   <div class="head-left">
