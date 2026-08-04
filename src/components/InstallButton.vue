@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed'
-    platform: string
-  }>
-}
+import {
+  appWasInstalled,
+  clearInstallPrompt,
+  deferredInstallPrompt,
+} from '@/services/installPrompt'
 
-const deferredPrompt = ref<BeforeInstallPromptEvent | null>(null)
+const deferredPrompt =
+  deferredInstallPrompt
 
 const isIOS = ref(false)
 const isInstalled = ref(false)
@@ -18,27 +23,54 @@ const showHelpModal = ref(false)
 const installing = ref(false)
 
 const collapsed = ref(
-  sessionStorage.getItem('nura-install-collapsed') === 'true'
+  sessionStorage.getItem(
+    'nura-install-collapsed'
+  ) === 'true'
 )
 
+let displayModeMediaQuery:
+  MediaQueryList | null = null
 
-let displayModeMediaQuery: MediaQueryList | null = null
-
+/*
+ * El aviso aparece únicamente cuando:
+ *
+ * 1. La app todavía no está instalada.
+ * 2. Estamos en iOS, donde se instala manualmente.
+ * 3. O el navegador entregó beforeinstallprompt.
+ */
 const showInstallUI = computed(() => {
-  return !isInstalled.value
+  return (
+    !isInstalled.value &&
+    (
+      isIOS.value ||
+      deferredPrompt.value !== null
+    )
+  )
 })
 
 const showInstallBanner = computed(() => {
-  return showInstallUI.value && !collapsed.value
+  return (
+    showInstallUI.value &&
+    !collapsed.value
+  )
 })
 
 const showInstallBubble = computed(() => {
-  return showInstallUI.value && collapsed.value
+  return (
+    showInstallUI.value &&
+    collapsed.value
+  )
 })
 
 const installButtonText = computed(() => {
-  if (installing.value) return 'Abriendo…'
-  if (isIOS.value) return 'Agregar a inicio'
+  if (installing.value) {
+    return 'Abriendo…'
+  }
+
+  if (isIOS.value) {
+    return 'Agregar a inicio'
+  }
+
   return 'Instalar'
 })
 
@@ -55,18 +87,28 @@ const installDescription = computed(() => {
 })
 
 function detectInstalledMode() {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as Navigator & {
+  const navigatorWithStandalone =
+    window.navigator as Navigator & {
       standalone?: boolean
-    }).standalone === true
+    }
+
+  return (
+    window
+      .matchMedia(
+        '(display-mode: standalone)'
+      )
+      .matches ||
+    navigatorWithStandalone
+      .standalone === true
   )
 }
 
 function detectIOS() {
-  const userAgent = navigator.userAgent.toLowerCase()
+  const userAgent =
+    navigator.userAgent.toLowerCase()
 
-  const regularIOS = /iphone|ipad|ipod/.test(userAgent)
+  const regularIOS =
+    /iphone|ipad|ipod/.test(userAgent)
 
   const iPadOS =
     navigator.platform === 'MacIntel' &&
@@ -77,92 +119,96 @@ function detectIOS() {
 
 function refreshState() {
   isIOS.value = detectIOS()
-  isInstalled.value = detectInstalledMode()
+
+  isInstalled.value =
+    detectInstalledMode() ||
+    appWasInstalled.value
 
   if (isInstalled.value) {
-    deferredPrompt.value = null
+    clearInstallPrompt()
+
     showHelpModal.value = false
     collapsed.value = false
 
-    sessionStorage.removeItem('nura-install-collapsed')
+    sessionStorage.removeItem(
+      'nura-install-collapsed'
+    )
   }
 }
 
-function handleBeforeInstallPrompt(event: Event) {
-  event.preventDefault()
-
-  deferredPrompt.value =
-    event as BeforeInstallPromptEvent
-
-  refreshState()
-}
-
-function handleAppInstalled() {
-  deferredPrompt.value = null
-  installing.value = false
-  isInstalled.value = true
-  showHelpModal.value = false
-  collapsed.value = false
-
-  sessionStorage.removeItem('nura-install-collapsed')
-}
-
-
 async function handleInstallClick() {
-  if (installing.value) return
+  if (installing.value) {
+    return
+  }
 
   /*
-   * iOS no ofrece el prompt automático.
-   * Mostramos instrucciones.
+   * En iPhone y iPad no existe
+   * beforeinstallprompt.
    */
   if (isIOS.value) {
     showHelpModal.value = true
     return
   }
 
+  const promptEvent =
+    deferredPrompt.value
+
   /*
-   * Chrome, Edge, Samsung Internet, etc.
-   * Si el navegador emitió beforeinstallprompt,
-   * abrimos el instalador directamente.
+   * Si no existe el evento, mostramos
+   * las instrucciones manuales.
    */
-  if (deferredPrompt.value) {
-    installing.value = true
-
-    try {
-      await deferredPrompt.value.prompt()
-
-      const choice =
-        await deferredPrompt.value.userChoice
-
-      if (choice.outcome === 'accepted') {
-  deferredPrompt.value = null
-  collapsed.value = false
-}
-    } catch (error) {
-      console.error(
-        'No se pudo abrir el instalador:',
-        error
-      )
-
-      showHelpModal.value = true
-    } finally {
-      installing.value = false
-      refreshState()
-    }
-
+  if (!promptEvent) {
+    showHelpModal.value = true
     return
   }
 
-  /*
-   * Si todavía no llegó el evento o el navegador
-   * no lo soporta, mostramos ayuda.
-   */
-  showHelpModal.value = true
+  installing.value = true
+
+  try {
+    /*
+     * Abre el diálogo nativo de Chrome,
+     * Edge o el navegador compatible.
+     */
+    await promptEvent.prompt()
+
+    const choice =
+      await promptEvent.userChoice
+
+    /*
+     * El evento no puede reutilizarse,
+     * independientemente del resultado.
+     */
+    clearInstallPrompt()
+
+    if (
+      choice.outcome === 'accepted'
+    ) {
+      collapsed.value = false
+
+      sessionStorage.removeItem(
+        'nura-install-collapsed'
+      )
+    }
+  } catch (error) {
+    console.error(
+      'No se pudo abrir el instalador:',
+      error
+    )
+
+    showHelpModal.value = true
+  } finally {
+    installing.value = false
+    refreshState()
+  }
 }
 
 function collapseBanner() {
   collapsed.value = true
-  sessionStorage.setItem('nura-install-collapsed', 'true')
+
+  sessionStorage.setItem(
+    'nura-install-collapsed',
+    'true'
+  )
 }
 
 function openInstallHelp() {
@@ -177,23 +223,34 @@ function handleDisplayModeChange() {
   refreshState()
 }
 
+/*
+ * Si la instalación se completa, el archivo global
+ * modifica appWasInstalled y este watch actualiza
+ * inmediatamente el componente.
+ */
+watch(
+  appWasInstalled,
+  (installed) => {
+    if (installed) {
+      refreshState()
+    }
+  }
+)
+
 onMounted(() => {
   refreshState()
 
-  window.addEventListener(
-    'beforeinstallprompt',
-    handleBeforeInstallPrompt
-  )
-
-  window.addEventListener(
-    'appinstalled',
-    handleAppInstalled
-  )
-
-
-  displayModeMediaQuery = window.matchMedia(
-    '(display-mode: standalone)'
-  )
+  /*
+   * Solamente dejamos dentro de onMounted
+   * el listener de display-mode.
+   *
+   * beforeinstallprompt y appinstalled
+   * ya se escuchan globalmente desde main.ts.
+   */
+  displayModeMediaQuery =
+    window.matchMedia(
+      '(display-mode: standalone)'
+    )
 
   displayModeMediaQuery.addEventListener(
     'change',
@@ -202,21 +259,11 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener(
-    'beforeinstallprompt',
-    handleBeforeInstallPrompt
-  )
-
-  window.removeEventListener(
-    'appinstalled',
-    handleAppInstalled
-  )
-
-
-  displayModeMediaQuery?.removeEventListener(
-    'change',
-    handleDisplayModeChange
-  )
+  displayModeMediaQuery
+    ?.removeEventListener(
+      'change',
+      handleDisplayModeChange
+    )
 })
 </script>
 
@@ -396,13 +443,6 @@ onBeforeUnmount(() => {
   {{ installing ? 'Abriendo…' : 'Instalar ahora' }}
 </button>
 
-          <button
-            class="install-modal__ok"
-            type="button"
-            @click="closeModal"
-          >
-            Entendido
-          </button>
         </section>
       </div>
     </Transition>
@@ -542,7 +582,7 @@ onBeforeUnmount(() => {
 
 .install-modal {
   position: relative;
-  width: 55%;
+  width: 70%;
   padding: 20px;
   border: 1px solid #e2edf7;
   border-radius: 18px;
