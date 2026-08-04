@@ -13,7 +13,6 @@ const deferredPrompt = ref<BeforeInstallPromptEvent | null>(null)
 
 const isIOS = ref(false)
 const isInstalled = ref(false)
-const isSmallScreen = ref(false)
 
 const showHelpModal = ref(false)
 const installing = ref(false)
@@ -21,13 +20,12 @@ const installing = ref(false)
 const collapsed = ref(
   sessionStorage.getItem('nura-install-collapsed') === 'true'
 )
-const MAX_WIDTH = 1024
 
-let screenMediaQuery: MediaQueryList | null = null
+
 let displayModeMediaQuery: MediaQueryList | null = null
 
 const showInstallUI = computed(() => {
-  return !isInstalled.value && isSmallScreen.value
+  return !isInstalled.value
 })
 
 const showInstallBanner = computed(() => {
@@ -80,20 +78,13 @@ function detectIOS() {
 function refreshState() {
   isIOS.value = detectIOS()
   isInstalled.value = detectInstalledMode()
-  isSmallScreen.value = window.matchMedia(
-    `(max-width: ${MAX_WIDTH}px)`
-  ).matches
 
- if (isInstalled.value) {
-  deferredPrompt.value = null
-  showHelpModal.value = false
-  collapsed.value = false
-
-  sessionStorage.removeItem('nura-install-collapsed')
-}
-
-  if (!isSmallScreen.value) {
+  if (isInstalled.value) {
+    deferredPrompt.value = null
     showHelpModal.value = false
+    collapsed.value = false
+
+    sessionStorage.removeItem('nura-install-collapsed')
   }
 }
 
@@ -174,20 +165,12 @@ function collapseBanner() {
   sessionStorage.setItem('nura-install-collapsed', 'true')
 }
 
-async function openInstallHelp() {
-  if (deferredPrompt.value && !isIOS.value) {
-    await handleInstallClick()
-    return
-  }
-
+function openInstallHelp() {
   showHelpModal.value = true
 }
+
 function closeModal() {
   showHelpModal.value = false
-}
-
-function handleScreenChange() {
-  refreshState()
 }
 
 function handleDisplayModeChange() {
@@ -207,17 +190,9 @@ onMounted(() => {
     handleAppInstalled
   )
 
-  screenMediaQuery = window.matchMedia(
-    `(max-width: ${MAX_WIDTH}px)`
-  )
 
   displayModeMediaQuery = window.matchMedia(
     '(display-mode: standalone)'
-  )
-
-  screenMediaQuery.addEventListener(
-    'change',
-    handleScreenChange
   )
 
   displayModeMediaQuery.addEventListener(
@@ -237,10 +212,6 @@ onBeforeUnmount(() => {
     handleAppInstalled
   )
 
-  screenMediaQuery?.removeEventListener(
-    'change',
-    handleScreenChange
-  )
 
   displayModeMediaQuery?.removeEventListener(
     'change',
@@ -383,30 +354,47 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-            v-else
-            class="install-modal__body"
-          >
-            <p>
-              El instalador automático todavía no está
-              disponible en este navegador.
-            </p>
+  v-else
+  class="install-modal__body"
+>
+  <p>
+    Podés instalar Nura en tu computadora y usarla como una aplicación.
+  </p>
 
-            <ol>
-              <li>
-                Abrí el menú del navegador
-                <strong>⋮</strong>.
-              </li>
+  <ol>
+    <li>
+      Tocá el botón
+      <strong>Instalar ahora</strong>.
+    </li>
 
-              <li>
-                Elegí
-                <strong>Instalar aplicación</strong>
-                o
-                <strong>
-                  Agregar a pantalla de inicio
-                </strong>.
-              </li>
-            </ol>
-          </div>
+    <li>
+      Confirmá la instalación en la ventana del navegador.
+    </li>
+
+    <li>
+      Nura quedará disponible desde el escritorio o el menú de aplicaciones.
+    </li>
+  </ol>
+
+  <p v-if="!deferredPrompt">
+    Si no aparece el instalador, abrí el menú del navegador
+    <strong>⋮</strong>
+    y elegí
+    <strong>Instalar Nura</strong>
+    o
+    <strong>Instalar aplicación</strong>.
+  </p>
+</div>
+
+<button
+  v-if="!isIOS && deferredPrompt"
+  class="install-modal__install"
+  type="button"
+  :disabled="installing"
+  @click="handleInstallClick"
+>
+  {{ installing ? 'Abriendo…' : 'Instalar ahora' }}
+</button>
 
           <button
             class="install-modal__ok"
@@ -431,13 +419,13 @@ onBeforeUnmount(() => {
   left: 10px;
   bottom: calc(74px + env(safe-area-inset-bottom));
   z-index: 55;
-  width: min(230px, calc(100vw - 20px));
-  min-height: 52px;
+  width:320px;
+  min-height:64px;
+  padding:10px 42px 10px 12px;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 7px 32px 7px 8px;
   border: 1px solid rgba(26, 23, 228, 0.2);
   border-radius: 16px;
   backdrop-filter: blur(14px);
@@ -448,8 +436,8 @@ onBeforeUnmount(() => {
 }
 
 .install-banner__icon {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   flex: 0 0 34px;
   display: grid;
   place-items: center;
@@ -458,8 +446,8 @@ onBeforeUnmount(() => {
 }
 
 .install-banner__icon img {
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
   max-width: none;
   display: block;
   object-fit: contain;
@@ -475,56 +463,53 @@ onBeforeUnmount(() => {
 
 .install-banner__copy strong {
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 1rem;
+  font-weight: 800;
   line-height: 1.15;
 }
 
 .install-banner__copy span {
   overflow: hidden;
-
   color: #475569;
-  font-size: 0.58rem;
-  line-height: 1.25;
-
+  font-size: 0.8rem;
+  line-height: 1.35;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .install-banner__action {
-  min-height: 28px;
-  padding: 5px 10px;
-
+  min-height: 34px;
+  padding: 0px 18px;
   border: none;
   border-radius: 999px;
-
   background: #50bdbd;
   color: #fff;
-
-  font-size: 0.64rem;
+  font-size: 0.82rem;
   font-weight: 700;
   line-height: 1;
-
   cursor: pointer;
+  transition:.25s;
+}
+
+.install-banner__action:hover{
+    background:#3ea9a9;
+    transform:translateY(-2px);
+    box-shadow:0 10px 20px rgba(80,189,189,.35);
 }
 
 .install-banner__close {
   position: absolute;
   top: 3px;
   right: 4px;
-
   width: 22px;
   height: 22px;
-
   display: grid;
   place-items: center;
-
   padding: 0;
   border: none;
   border-radius: 50%;
-
   background: transparent;
   color: #64748b;
-
   font-size: 1rem;
   cursor: pointer;
 }
@@ -557,12 +542,41 @@ onBeforeUnmount(() => {
 
 .install-modal {
   position: relative;
-  width: 75%;
+  width: 55%;
   padding: 20px;
   border: 1px solid #e2edf7;
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+}
+
+.install-modal__install {
+  min-height: 40px;
+  margin-top: 20px;
+  margin-right: 8px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #50bdbd;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.install-modal__install:hover:not(:disabled) {
+  background: #3ea9a9;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(80, 189, 189, 0.3);
+}
+
+.install-modal__install:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .install-modal__close {
@@ -629,20 +643,24 @@ onBeforeUnmount(() => {
 }
 
 .install-modal__ok {
-  min-height: 36px;
+  min-height: 28px;
   margin-top: 20px;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border: none;
   border-radius: 999px;
   background: #50bdbd;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+   display: flex;
+  justify-content: flex-end;
+  gap: 1px;
+  flex-wrap: wrap;
 }
 
 .install-modal__ok:hover {
-  background: #50bdbda8;
+  background: #419b9b;
 }
 
 /* =====================================================

@@ -153,25 +153,76 @@ function getCoverageLabel(value?: string): string {
   return value || ''
 }
 
-function formatHorariosResumen(horarios?: Horarios): string {
+type HorarioAgrupado = {
+  dias: string
+  horario: string
+}
+
+function formatHorariosResumen(horarios?: Horarios): HorarioAgrupado[] {
   if (!horarios || typeof horarios !== 'object') {
-    return 'Lunes a viernes de 09:00 a 17:00'
+    return []
   }
 
-  const activos = DIAS.filter((d) => horarios[d.key]?.active)
+  const activos = DIAS
+    .map((dia) => {
+      const horario = horarios[dia.key]
+
+      if (!horario?.active || !horario.from || !horario.to) {
+        return null
+      }
+
+      return {
+        key: dia.key,
+        label: dia.label,
+        horario: `${horario.from} a ${horario.to}`
+      }
+    })
+    .filter(Boolean) as {
+      key: keyof Horarios
+      label: string
+      horario: string
+    }[]
 
   if (!activos.length) {
-    return 'Sin horarios cargados'
+    return []
   }
 
-  return activos
-    .map((d) => {
-      const item = horarios[d.key]
-      const from = item?.from || ''
-      const to = item?.to || ''
-      return `${d.label}: ${from} a ${to}`
-    })
-    .join(' · ')
+  const grupos: {
+    dias: typeof activos
+    horario: string
+  }[] = []
+
+  for (const dia of activos) {
+    const ultimoGrupo = grupos[grupos.length - 1]
+
+    if (ultimoGrupo && ultimoGrupo.horario === dia.horario) {
+      ultimoGrupo.dias.push(dia)
+    } else {
+      grupos.push({
+        dias: [dia],
+        horario: dia.horario
+      })
+    }
+  }
+
+  return grupos.map((grupo) => {
+    const nombres = grupo.dias.map((dia) => dia.label)
+
+    let diasTexto = nombres[0]
+
+    if (nombres.length === 2) {
+      diasTexto = `${nombres[0]} y ${nombres[1]}`
+    }
+
+    if (nombres.length >= 3) {
+      diasTexto = `${nombres[0]} a ${nombres[nombres.length - 1]}`
+    }
+
+    return {
+      dias: diasTexto,
+      horario: grupo.horario
+    }
+  })
 }
 
 function pad2(n: number) {
@@ -1355,7 +1406,17 @@ onMounted(async () => {
       </div>
     </section>
 
-    <p v-if="loading" class="state">Cargando cartilla…</p>
+    <div v-if="loading" class="loading-cartilla">
+  <img
+    src="/icons/nuri-bien.png"
+    alt="Nura"
+    class="loading-logo"
+  />
+
+  <p class="loading-text">
+    Cargando especialistas...
+  </p>
+</div>
 
     <p v-else-if="errorMsg" class="state state--error">
       {{ errorMsg }}
@@ -1407,9 +1468,22 @@ onMounted(async () => {
             </span>
           </div>
 
-          <p class="prof-schedule">
-            <strong>Horarios:</strong> {{ formatHorariosResumen(p.horarios) }}
-          </p>
+<div class="schedule-chips">
+  <strong class="schedule-chips-title">
+    <i class="fa-regular fa-clock"></i>
+    Horarios
+  </strong>
+
+  <div class="schedule-chips-list">
+    <span
+      v-for="grupo in formatHorariosResumen(p.horarios)"
+      :key="`${grupo.dias}-${grupo.horario}`"
+      class="schedule-chip"
+    >
+      {{ grupo.dias }} · {{ grupo.horario }}
+    </span>
+  </div>
+</div>        
 
           <p v-if="p.bio" class="prof-bio">{{ p.bio }}</p>
         </div>
@@ -2065,7 +2139,56 @@ font-family: var(--font-main);
 }
 
 /* ================= STATES ================= */
+.loading-cartilla{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:18px;
 
+  padding:70px 20px;
+}
+
+.loading-logo{
+  width:72px;
+  height:72px;
+  object-fit:contain;
+
+  animation:nuraSpin 1.2s linear infinite;
+}
+
+.loading-text{
+  margin:0;
+  font-size:1rem;
+  font-weight:600;
+  color:#50bdbd;
+}
+
+@keyframes nuraSpin{
+  from{
+    transform:rotate(0deg);
+  }
+
+  to{
+    transform:rotate(360deg);
+  }
+}
+
+.loading-cartilla{
+  animation:fadeLoading .25s ease;
+}
+
+@keyframes fadeLoading{
+  from{
+    opacity:0;
+    transform:translateY(8px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
 .state {
   font-size: 0.92rem;
   color: #6b7280;
@@ -2174,11 +2297,36 @@ font-family: var(--font-main);
   border: 1px solid rgba(22, 163, 74, 0.18);
 }
 
-.prof-schedule {
-  margin: 10px 0 0;
-  font-size: 0.93rem;
-  color: #374151;
-  line-height: 1.45;
+ .schedule-chips {
+  margin-top: 12px;
+  font-size:.74rem;
+  padding:4px 8px;
+  font-weight:500;
+}
+
+.schedule-chips-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  font-size: 0.84rem;
+  color: #0f766e;
+}
+
+.schedule-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.schedule-chip {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eefafa;
+  border: 1px solid #cdeaea;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
 .prof-bio {
@@ -3285,7 +3433,12 @@ font-family: var(--font-main);
     font-size: 0.92rem;
   }
 
-  .prof-schedule,
+  .schedule-row {
+    grid-template-columns: 82px 1fr;
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+  
   .prof-bio {
     font-size: 0.88rem;
   }
