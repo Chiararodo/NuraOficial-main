@@ -391,23 +391,24 @@ onBeforeUnmount(() => {
   class="install-modal__body"
 >
   <p>
-    Podés instalar Nura en tu computadora y usarla como una aplicación.
+    Podés instalar Nura en tu diapositivo y usarla como una aplicación.
   </p>
 
-  <ol>
-    <li>
-      Tocá el botón
-      <strong>Instalar ahora</strong>.
-    </li>
+  
+   <ol>
+  <li>
+    Tocá <strong>Instalar ahora</strong>.
+  </li>
 
-    <li>
-      Confirmá la instalación en la ventana del navegador.
-    </li>
+  <li>
+    Confirmá la instalación cuando el navegador lo solicite.
+  </li>
 
-    <li>
-      Nura quedará disponible desde el escritorio o el menú de aplicaciones.
-    </li>
-  </ol>
+  <li>
+    Nura se agregará como una aplicación a tu
+    <strong>diapositivo</strong>, para acceder con un solo clic desde el escritorio, el menú de aplicaciones o la pantalla de inicio.
+  </li>
+</ol>
 
   <p v-if="!deferredPrompt">
     Si no aparece el instalador, abrí el menú del navegador
