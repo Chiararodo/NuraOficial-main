@@ -811,7 +811,7 @@ onBeforeUnmount(() => {
     width: min(130px, calc(100vw - 16px));
     left: 8px;
     grid-template-columns: 32px minmax(0, 1fr);
-    gap: 6px;
+    gap: 12px;
   }
 
   .install-banner__icon {
@@ -998,15 +998,13 @@ onBeforeUnmount(() => {
 @media (max-width: 390px) {
 
   .install-banner {
-    width: 155px;
+    width: 135px;
     min-height: 52px;
-
     padding: 7px 28px 7px 7px;
-
     grid-template-columns:
       34px
       1fr;
-    gap: 8px;
+    gap: 15px;
   }
 
   .install-banner__icon {
