@@ -447,7 +447,6 @@ onBeforeUnmount(() => {
     74px + env(safe-area-inset-bottom)
   );
   z-index: 55;
-  width: auto;
   width: 160px;
   min-height: 52px;
   padding: 8px 38px 8px 10px;
@@ -759,11 +758,11 @@ onBeforeUnmount(() => {
     right: auto;
     left: 8px;
     bottom: calc(72px + env(safe-area-inset-bottom));
-    width: min(220px, calc(100vw - 16px));
+    width: 135px;
     min-height: 50px;
     padding: 7px 30px 7px 7px;
     grid-template-columns: 34px minmax(0, 1fr) auto;
-    gap: 6px;
+    gap: 20px;
     border-radius: 14px;
   }
 
@@ -788,9 +787,11 @@ onBeforeUnmount(() => {
   }
 
   .install-banner__action {
-    min-height: 27px;
-    padding: 5px 8px;
-    font-size: 0.61rem;
+    width:78px;
+    min-height:30px;
+    padding:0 10px;
+    font-size:12px;
+    font-weight:700;
   }
 }
 
@@ -811,7 +812,6 @@ onBeforeUnmount(() => {
     left: 8px;
     grid-template-columns: 32px minmax(0, 1fr);
     gap: 6px;
-  
   }
 
   .install-banner__icon {
@@ -827,7 +827,6 @@ onBeforeUnmount(() => {
   .install-banner__action {
     grid-column: 2;
     justify-self: start;
-
     min-height: 26px;
     padding: 5px 9px;
   }
@@ -993,6 +992,45 @@ onBeforeUnmount(() => {
 
   .install-bubble__tooltip {
     display: none;
+  }
+}
+
+@media (max-width: 390px) {
+
+  .install-banner {
+    width: 155px;
+    min-height: 52px;
+
+    padding: 7px 28px 7px 7px;
+
+    grid-template-columns:
+      34px
+      1fr;
+    gap: 8px;
+  }
+
+  .install-banner__icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .install-banner__icon img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .install-banner__action {
+    width: 82px;
+    min-height: 30px;
+
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .install-banner__close{
+    width:20px;
+    height:20px;
+    font-size:.9rem;
   }
 }
 
