@@ -2145,7 +2145,6 @@ font-family: var(--font-main);
   align-items:center;
   justify-content:center;
   gap:18px;
-
   padding:70px 20px;
 }
 
@@ -2153,8 +2152,8 @@ font-family: var(--font-main);
   width:72px;
   height:72px;
   object-fit:contain;
-
-  animation:nuraSpin 1.2s linear infinite;
+  animation:nuraSpin 2.8s linear infinite;
+  transform-origin: center;
 }
 
 .loading-text{

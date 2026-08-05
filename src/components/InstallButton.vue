@@ -38,12 +38,16 @@ let displayModeMediaQuery:
  * 2. Estamos en iOS, donde se instala manualmente.
  * 3. O el navegador entregó beforeinstallprompt.
  */
+const canInstallAutomatically = computed(() => {
+  return deferredPrompt.value !== null
+})
+
 const showInstallUI = computed(() => {
   return (
     !isInstalled.value &&
     (
       isIOS.value ||
-      deferredPrompt.value !== null
+      canInstallAutomatically.value
     )
   )
 })
@@ -64,7 +68,7 @@ const showInstallBubble = computed(() => {
 
 const installButtonText = computed(() => {
   if (installing.value) {
-    return 'Abriendo…'
+    return 'Abriendo'
   }
 
   if (isIOS.value) {
@@ -74,17 +78,6 @@ const installButtonText = computed(() => {
   return 'Instalar'
 })
 
-const installDescription = computed(() => {
-  if (isIOS.value) {
-    return 'Agregá Nura a tu pantalla de inicio.'
-  }
-
-  if (deferredPrompt.value) {
-    return 'Instalá Nura para abrirla más rápido.'
-  }
-
-  return 'Guardá Nura como una app.'
-})
 
 function detectInstalledMode() {
   const navigatorWithStandalone =
@@ -142,8 +135,8 @@ async function handleInstallClick() {
   }
 
   /*
-   * En iPhone y iPad no existe
-   * beforeinstallprompt.
+   * iOS no tiene un instalador automático.
+   * Se muestran las instrucciones manuales.
    */
   if (isIOS.value) {
     showHelpModal.value = true
@@ -154,35 +147,29 @@ async function handleInstallClick() {
     deferredPrompt.value
 
   /*
-   * Si no existe el evento, mostramos
-   * las instrucciones manuales.
+   * Si el navegador no entregó el evento,
+   * no intentamos instalar ni abrimos un
+   * modal que no puede resolverlo.
    */
   if (!promptEvent) {
-    showHelpModal.value = true
     return
   }
 
   installing.value = true
 
   try {
-    /*
-     * Abre el diálogo nativo de Chrome,
-     * Edge o el navegador compatible.
-     */
     await promptEvent.prompt()
 
     const choice =
       await promptEvent.userChoice
 
     /*
-     * El evento no puede reutilizarse,
-     * independientemente del resultado.
+     * beforeinstallprompt solamente puede
+     * utilizarse una vez.
      */
     clearInstallPrompt()
 
-    if (
-      choice.outcome === 'accepted'
-    ) {
+    if (choice.outcome === 'accepted') {
       collapsed.value = false
 
       sessionStorage.removeItem(
@@ -195,7 +182,11 @@ async function handleInstallClick() {
       error
     )
 
-    showHelpModal.value = true
+    /*
+     * No mostramos instrucciones incorrectas
+     * si el instalador automático falló.
+     */
+    clearInstallPrompt()
   } finally {
     installing.value = false
     refreshState()
@@ -280,11 +271,6 @@ onBeforeUnmount(() => {
     alt=""
   />
 </div>
-
-      <div class="install-banner__copy">
-        <strong>Instalá Nura</strong>
-        <span>{{ installDescription }}</span>
-      </div>
 
       <button
         class="install-banner__action"
@@ -453,47 +439,79 @@ onBeforeUnmount(() => {
 /* =====================================================
    BANNER DE INSTALACIÓN
 ===================================================== */
-
 .install-banner {
   position: fixed;
   left: 10px;
-  bottom: calc(74px + env(safe-area-inset-bottom));
+  bottom: calc(
+    74px + env(safe-area-inset-bottom)
+  );
   z-index: 55;
-  width:320px;
-  min-height:64px;
-  padding:10px 42px 10px 12px;
+  width: auto;
+  width: 160px;
+  min-height: 52px;
+  padding: 8px 38px 8px 10px;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns:
+    46px
+    minmax(0, 1fr)
+    auto;
   align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(26, 23, 228, 0.2);
-  border-radius: 16px;
+  gap: 10px;
+  border: 1px solid
+    rgba(80, 189, 189, 0.28);
+  border-radius: 20px;
+  background: rgba(248, 246, 246, 0.96);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow:
-    0 10px 26px rgba(15, 23, 42, 0.12),
-    0 2px 8px rgba(15, 23, 42, 0.06);
+    0 12px 30px
+      rgba(15, 23, 42, 0.13),
+    0 3px 9px
+      rgba(15, 23, 42, 0.06);
 }
 
 .install-banner__icon {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 34px;
+  left: 12px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  z-index: 55;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  padding: 4px;
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  overflow: visible;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.16),
+    0 4px 10px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .install-banner__icon img {
-  width: 58px;
-  height: 58px;
-  max-width: none;
+  width: 45px;
+  height: 45px;
   display: block;
   object-fit: contain;
-  transform: scale(1.45);
-  animation: nuri-install-float 2.8s ease-in-out infinite;
+  border-radius: 50%;
+  animation: nuri-bubble-float 2.8s ease-in-out infinite;
 }
+
+.install-banner__title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 
 .install-banner__copy {
   min-width: 0;
@@ -519,12 +537,13 @@ onBeforeUnmount(() => {
 
 .install-banner__action {
   min-height: 34px;
+  width: 105px;
   padding: 0px 18px;
   border: none;
   border-radius: 999px;
   background: #50bdbd;
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -557,11 +576,11 @@ onBeforeUnmount(() => {
 @keyframes nuri-install-float {
   0%,
   100% {
-    transform: scale(1.45) translateY(0) rotate(0deg);
+    transform: scale(1.08) translateY(0);
   }
 
   50% {
-    transform: scale(1.45) translateY(-3px) rotate(-2deg);
+    transform: scale(1.08) translateY(-1px);
   }
 }
 
@@ -645,7 +664,7 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
   overflow: hidden;
   border-radius: 18px;
-  border: 1px solid rgba(80, 189, 189, 0.2);
+  border: 1px solid rgba(2, 255, 255, 0.2);
 }
 
 .install-modal__icon img {
@@ -747,14 +766,16 @@ onBeforeUnmount(() => {
     border-radius: 14px;
   }
 
-  .install-banner__icon {
-    width: 34px;
-    height: 34px;
+   .install-banner__icon {
+    width: 36px;
+    height: 36px;
   }
 
   .install-banner__icon img {
-    width: 31px;
-    height: 31px;
+    width: 36px;
+    height: 36px;
+    transform: scale(1.06);
+    animation: nuri-install-float-mobile 4s ease-in-out infinite;
   }
 
   .install-banner__copy strong {
@@ -769,6 +790,17 @@ onBeforeUnmount(() => {
     min-height: 27px;
     padding: 5px 8px;
     font-size: 0.61rem;
+  }
+}
+
+@keyframes nuri-install-float-mobile {
+  0%,
+  100% {
+    transform: scale(1.06) translateY(0);
+  }
+
+  50% {
+    transform: scale(1.06) translateY(-1px);
   }
 }
 
@@ -823,8 +855,8 @@ onBeforeUnmount(() => {
   left: 12px;
   bottom: calc(78px + env(safe-area-inset-bottom));
   z-index: 55;
-  width: 55px;
-  height: 55px;
+  width: 70px;
+  height: 70px;
   display: grid;
   place-items: center;
   padding: 4px;
@@ -846,8 +878,8 @@ onBeforeUnmount(() => {
 }
 
 .install-bubble img {
-  width: 49px;
-  height: 49px;
+  width: 59px;
+  height: 59px;
   display: block;
   object-fit: contain;
   border-radius: 50%;
@@ -876,11 +908,11 @@ onBeforeUnmount(() => {
   left: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%) translateX(-4px);
-  padding: 5px 9px;
+  padding: 8px 9px;
   border-radius: 999px;
   background: #50bdbd;
   color: #ffffff;
-  font-size: 0.62rem;
+  font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
   opacity: 0;
