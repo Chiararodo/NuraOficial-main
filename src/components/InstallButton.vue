@@ -391,7 +391,7 @@ onBeforeUnmount(() => {
   class="install-modal__body"
 >
   <p>
-    Podés instalar Nura en tu diapositivo y usarla como una aplicación.
+    Podés instalar Nura en tu dispositivo y usarla como una aplicación.
   </p>
 
   
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
 
   <li>
     Nura se agregará como una aplicación a tu
-    <strong>diapositivo</strong>, para acceder con un solo clic desde el escritorio, el menú de aplicaciones o la pantalla de inicio.
+    <strong>dispositivo</strong>, para acceder con un solo click desde el escritorio, el menú de aplicaciones o la pantalla de inicio.
   </li>
 </ol>
 

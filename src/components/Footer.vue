@@ -25,11 +25,7 @@
 
 @media (max-width: 768px) {
   .site-footer {
-    padding: 12px 14px;
-  }
-
-  .site-footer p {
-    font-size: 0.85rem;
+    display: none;
   }
 }
 </style>
