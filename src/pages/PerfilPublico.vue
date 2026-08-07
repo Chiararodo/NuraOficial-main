@@ -13,6 +13,13 @@ const auth = useAuthStore()
 
 const uid = route.params.uid as string
 
+const isOwnProfile = computed(() => {
+  return Boolean(
+    auth.user?.id &&
+    auth.user.id === uid
+  )
+})
+
 const user = ref<any | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
@@ -39,6 +46,27 @@ type ForumPreview = {
 
 const recentComments = ref<CommentPreview[]>([])
 const recentForums = ref<ForumPreview[]>([])
+
+type DeleteTarget =
+  | {
+      type: 'forum'
+      id: string
+      title: string
+    }
+  | {
+      type: 'comment'
+      id: string
+      title: string
+    }
+
+const deleteTarget =
+  ref<DeleteTarget | null>(null)
+
+const showDeleteActivityModal =
+  ref(false)
+
+const deletingActivity =
+  ref(false)
 
 const canViewProfile = ref(false)
 const isAdmin = ref(false)
@@ -86,6 +114,14 @@ function goBack() {
   router.back()
 }
 
+function goToEditProfile() {
+  if (!isOwnProfile.value) {
+    return
+  }
+
+  router.push('/app/perfil/editar')
+}
+
 function goToAdminPanel() {
   router.push('/app/admin/usuarios')
 }
@@ -106,6 +142,29 @@ function formatDate(iso?: string | null) {
 const displayName = computed(() => {
   if (!user.value) return 'Usuario Nura'
   return user.value.name || user.value.full_name || user.value.username || 'Usuario Nura'
+})
+
+const isViewedUserPremium = computed(() => {
+  if (!user.value) {
+    return false
+  }
+
+  const planIsPremium =
+    user.value.plan === 'premium'
+
+  const planIsActive =
+    !user.value.plan_expires_at ||
+    new Date(
+      user.value.plan_expires_at
+    ) > new Date()
+
+  return (
+    user.value.premium === true ||
+    (
+      planIsPremium &&
+      planIsActive
+    )
+  )
 })
 
 const hasAvatar = computed(() => !!publicAvatar.value)
@@ -129,6 +188,130 @@ function goToComment(forumId: string, commentId: string) {
     path: `/app/foro/${forumId}`,
     query: { highlight: commentId },
   })
+}
+
+function askDeleteForumFromProfile(
+  forum: ForumPreview
+) {
+  if (!isOwnProfile.value) {
+    return
+  }
+
+  deleteTarget.value = {
+    type: 'forum',
+    id: forum.id,
+    title: forum.title || 'este foro'
+  }
+
+  showDeleteActivityModal.value = true
+}
+
+function askDeleteCommentFromProfile(
+  comment: CommentPreview
+) {
+  if (!isOwnProfile.value) {
+    return
+  }
+
+  deleteTarget.value = {
+    type: 'comment',
+    id: comment.id,
+    title: 'este comentario'
+  }
+
+  showDeleteActivityModal.value = true
+}
+
+function closeDeleteActivityModal() {
+  if (deletingActivity.value) {
+    return
+  }
+
+  showDeleteActivityModal.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDeleteActivity() {
+  if (
+    !auth.user ||
+    !isOwnProfile.value ||
+    !deleteTarget.value
+  ) {
+    return
+  }
+
+  deletingActivity.value = true
+
+  try {
+    const target = deleteTarget.value
+
+    if (target.type === 'comment') {
+      const { data, error } = await supabase
+        .from('forum_comments')
+        .delete()
+        .eq('id', target.id)
+        .eq('user_id', auth.user.id)
+        .select('id')
+
+      if (error) {
+        throw error
+      }
+
+      if (!data?.length) {
+        throw new Error(
+          'El comentario no existe o no pertenece al usuario.'
+        )
+      }
+
+      showToast(
+        'Comentario eliminado correctamente.'
+      )
+    }
+
+    if (target.type === 'forum') {
+      const { data, error } = await supabase
+        .from('forums')
+        .delete()
+        .eq('id', target.id)
+        .eq('user_id', auth.user.id)
+        .select('id')
+
+      if (error) {
+        throw error
+      }
+
+      if (!data?.length) {
+        throw new Error(
+          'El foro no existe o no pertenece al usuario.'
+        )
+      }
+
+      showToast(
+        'Foro eliminado correctamente.'
+      )
+    }
+
+    showDeleteActivityModal.value = false
+    deleteTarget.value = null
+
+    /*
+     * Recarga los totales y las listas
+     * después de eliminar.
+     */
+    await loadStatsAndActivity()
+  } catch (error) {
+    console.error(
+      'No se pudo eliminar la actividad:',
+      error
+    )
+
+    showToast(
+      'No se pudo eliminar. Probá nuevamente.',
+      'error'
+    )
+  } finally {
+    deletingActivity.value = false
+  }
 }
 
 function publicUrl(bucket: string, path: string) {
@@ -361,15 +544,30 @@ onMounted(async () => {
     !myProfile.plan_expires_at || new Date(myProfile.plan_expires_at) > new Date()
   const premiumFromPlan = myProfile.premium === true || (planIsPremium && planIsActive)
 
-  canViewProfile.value = adminFromProfile || premiumFromPlan
+/*
+ * Todos pueden ver su propio perfil.
+ *
+ * Para ver el perfil de otra persona se necesita:
+ * - ser administradora; o
+ * - tener Premium activo.
+ */
+canViewProfile.value =
+  isOwnProfile.value ||
+  adminFromProfile ||
+  premiumFromPlan
 
-  if (!canViewProfile.value) {
-    loading.value = false
-    premiumTitle.value = 'Función Premium'
-    premiumText.value = 'Para ver el perfil completo de otros usuarios necesitás el Plan Premium.'
-    openPremiumModal()
-    return
-  }
+if (!canViewProfile.value) {
+  loading.value = false
+
+  premiumTitle.value =
+    'Función Premium'
+
+  premiumText.value =
+    'Podés ver tu propio perfil. Para consultar el perfil completo de otros usuarios necesitás el Plan Premium.'
+
+  openPremiumModal()
+  return
+}
 
   await loadProfile()
   await loadStatsAndActivity()
@@ -383,9 +581,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <h1 class="visually-hidden">Perfil público</h1>
+  <h1 class="visually-hidden">
+  {{ isOwnProfile ? 'Mi perfil público' : 'Perfil público' }}
+</h1>
 
   <main class="perfil-publico">
+    <header class="public-profile-head">
+  <button
+    class="back-link"
+    type="button"
+    aria-label="Volver"
+    @click="goBack"
+  >
+    <i
+      class="fa-solid fa-arrow-left arrow"
+      aria-hidden="true"
+    ></i>
+  </button>
+
+  <h2 class="public-profile-title">
+    {{
+      isOwnProfile
+        ? 'Mi perfil'
+        : 'Perfil de usuario'
+    }}
+  </h2>
+</header>
     <div v-if="loading" class="state-card">
       <p class="estado">Cargando perfil...</p>
     </div>
@@ -395,9 +616,6 @@ onBeforeUnmount(() => {
     </div>
 
     <section v-else-if="user" class="perfil-card" aria-labelledby="public-profile-name">
-      <button class="back-btn" type="button" @click="goBack" aria-label="Volver">
-        ←
-      </button>
 
       <div class="avatar-wrapper">
         <img
@@ -412,65 +630,246 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <h2 id="public-profile-name" class="nombre">{{ displayName }}</h2>
-
-      <p class="miembro" v-if="user.created_at">
-        Miembro desde {{ formatDate(user.created_at) }}
-      </p>
-      <p class="miembro" v-else>
-        Miembro de la comunidad Nura
-      </p>
-      <p v-if="user.email" class="email-line">{{ user.email }}</p>
-
       <div class="badges">
-        <span class="badge">Comunidad Nura</span>
-        <span class="badge badge-soft">Foro de bienestar</span>
-        <span v-if="user.blocked" class="badge badge-danger">Cuenta bloqueada</span>
-        <span v-if="user.is_admin" class="badge badge-admin">Admin</span>
-      </div>
+  <span
+    v-if="user.blocked"
+    class="badge badge-danger"
+  >
+    Cuenta bloqueada
+  </span>
 
-      <div v-if="canManageThisUser" class="admin-tools">
-        <button class="admin-pill admin-pill-soft" type="button" @click="goToAdminPanel">
-          Panel admin
-        </button>
+  <span
+    v-if="user.is_admin"
+    class="badge badge-admin"
+  >
+    Admin
+  </span>
+</div>
 
-        <button class="admin-pill admin-pill-dark" type="button" @click="askToggleBlocked">
-          {{ user.blocked ? 'Desbloquear usuario' : 'Bloquear usuario' }}
-        </button>
+     <h2
+  id="public-profile-name"
+  class="nombre"
+>
+  {{ displayName }}
+</h2>
+<button
+  class="plan-badge"
+  :class="{
+    'plan-badge--free':
+      !isViewedUserPremium
+  }"
+  type="button"
+  @click="goPremium"
+>
+  <span
+    class="plan-badge__dot"
+    :class="{
+      'plan-badge__dot--free':
+        !isViewedUserPremium
+    }"
+    aria-hidden="true"
+  ></span>
 
-        <button class="admin-pill admin-pill-danger" type="button" @click="askDeleteUser">
-          Eliminar usuario
-        </button>
-      </div>
+  {{
+    isViewedUserPremium
+      ? 'Plan Premium'
+      : 'Plan gratuito'
+  }}
+</button>
 
-      <div class="stats">
-        <div class="stat-item">
-          <span class="stat-number">{{ commentCount ?? '—' }}</span>
-          <span class="stat-label">Comentarios</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-number">{{ forumCount ?? '—' }}</span>
-          <span class="stat-label">Foros creados</span>
-        </div>
-      </div>
+<p
+  v-if="user.created_at"
+  class="miembro"
+>
+  Miembro desde {{ formatDate(user.created_at) }}
+</p>
 
-      <section v-if="recentForums.length" class="section-list" aria-labelledby="recent-forums-title">
-        <h3 id="recent-forums-title" class="section-title">Foros recientes</h3>
-        <ul>
-          <li v-for="f in recentForums" :key="f.id" class="clickable" @click="goToForum(f.id)">
-            <span class="item-title">{{ f.title || 'Foro sin título' }}</span>
-            <span class="item-date">{{ formatDate(f.created_at) }}</span>
-          </li>
-        </ul>
-      </section>
+<p
+  v-else
+  class="miembro"
+>
+  Miembro de la comunidad Nura
+</p>
+
+<p
+  v-if="user.email && (isOwnProfile || isAdmin)"
+  class="email-line"
+>
+  {{ user.email }}
+</p>
+
+<div class="badges">
+  <span class="badge">
+    Comunidad Nura
+  </span>
+
+  <span
+    v-if="user.blocked"
+    class="badge badge-danger"
+  >
+    Cuenta bloqueada
+  </span>
+
+  <span
+    v-if="user.is_admin"
+    class="badge badge-admin"
+  >
+    Admin
+  </span>
+</div>
+
+<div
+  v-if="isOwnProfile"
+  class="own-profile-actions"
+>
+  <button
+    class="edit-profile-btn"
+    type="button"
+    @click="goToEditProfile"
+  >
+    Editar nombre y foto
+  </button>
+</div>
+
+<div
+  v-if="canManageThisUser"
+  class="admin-tools"
+>
+  <button
+    class="admin-pill admin-pill-soft"
+    type="button"
+    @click="goToAdminPanel"
+  >
+    Panel admin
+  </button>
+
+  <button
+    class="admin-pill admin-pill-dark"
+    type="button"
+    @click="askToggleBlocked"
+  >
+    {{
+      user.blocked
+        ? 'Desbloquear usuario'
+        : 'Bloquear usuario'
+    }}
+  </button>
+
+  <button
+    class="admin-pill admin-pill-danger"
+    type="button"
+    @click="askDeleteUser"
+  >
+    Eliminar usuario
+  </button>
+</div>
+
+<div class="stats">
+  <div class="stat-item">
+    <span class="stat-number">
+      {{ commentCount ?? '—' }}
+    </span>
+
+    <span class="stat-label">
+      Comentarios
+    </span>
+  </div>
+
+  <div class="stat-item">
+    <span class="stat-number">
+      {{ forumCount ?? '—' }}
+    </span>
+
+    <span class="stat-label">
+      Foros creados
+    </span>
+  </div>
+</div>
+
+<section
+  v-if="recentForums.length"
+  class="section-list"
+  aria-labelledby="recent-forums-title"
+>
+  <h3
+    id="recent-forums-title"
+    class="section-title"
+  >
+    Foros recientes
+  </h3>
+
+  <ul>
+    <li
+      v-for="f in recentForums"
+      :key="f.id"
+      class="activity-item"
+    >
+      <button
+        class="activity-content"
+        type="button"
+        @click="goToForum(f.id)"
+      >
+        <span class="item-title">
+          {{ f.title || 'Foro sin título' }}
+        </span>
+
+        <span class="item-date">
+          {{ formatDate(f.created_at) }}
+        </span>
+      </button>
+
+      <button
+        v-if="isOwnProfile"
+        class="activity-delete-btn"
+        type="button"
+        :aria-label="`Eliminar foro ${f.title || 'sin título'}`"
+        @click.stop="askDeleteForumFromProfile(f)"
+      >
+        Borrar
+      </button>
+    </li>
+  </ul>
+</section>
 
       <section v-if="recentComments.length" class="section-list" aria-labelledby="recent-comments-title">
         <h3 id="recent-comments-title" class="section-title">Comentarios recientes</h3>
         <ul>
-          <li v-for="c in recentComments" :key="c.id" class="clickable" @click="goToComment(c.forum_id, c.id)">
-            <span class="item-body">{{ c.body }}</span>
-            <span class="item-date">{{ formatDate(c.created_at) }}</span>
-          </li>
+          <li
+  v-for="c in recentComments"
+  :key="c.id"
+  class="activity-item"
+>
+  <button
+    class="activity-content"
+    type="button"
+    @click="
+      goToComment(
+        c.forum_id,
+        c.id
+      )
+    "
+  >
+    <span class="item-body">
+      {{ c.body }}
+    </span>
+
+    <span class="item-date">
+      {{ formatDate(c.created_at) }}
+    </span>
+  </button>
+
+  <button
+    v-if="isOwnProfile"
+    class="activity-delete-btn"
+    type="button"
+    aria-label="Eliminar comentario"
+    @click="
+      askDeleteCommentFromProfile(c)
+    "
+  >
+    Borrar
+  </button>
+</li>
         </ul>
       </section>
     </section>
@@ -545,6 +944,62 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+      <div
+  v-if="showDeleteActivityModal"
+  class="modal"
+  @click.self="closeDeleteActivityModal"
+>
+  <div
+    class="modal-box"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="delete-activity-title"
+  >
+    <h2
+      id="delete-activity-title"
+      class="modal-title modal-title-danger"
+    >
+      {{
+        deleteTarget?.type === 'forum'
+          ? '¿Eliminar foro?'
+          : '¿Eliminar comentario?'
+      }}
+    </h2>
+
+    <p class="modal-text">
+      {{
+        deleteTarget?.type === 'forum'
+          ? 'También se eliminarán los comentarios asociados. Esta acción no se puede deshacer.'
+          : 'Esta acción no se puede deshacer.'
+      }}
+    </p>
+
+    <div class="modal-actions">
+      <button
+        class="btn btn-ghost"
+        type="button"
+        :disabled="deletingActivity"
+        @click="closeDeleteActivityModal"
+      >
+        Cancelar
+      </button>
+
+      <button
+        class="btn btn-danger"
+        type="button"
+        :disabled="deletingActivity"
+        @click="confirmDeleteActivity"
+      >
+        {{
+          deletingActivity
+            ? 'Eliminando…'
+            : 'Eliminar'
+        }}
+      </button>
+    </div>
+  </div>
+</div>
+
     <div
       v-if="toastVisible"
       class="toast"
@@ -561,9 +1016,9 @@ onBeforeUnmount(() => {
 .perfil-publico {
   min-height: calc(100vh - 64px);
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 72px 16px 40px;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 16px 40px;
   background: #ffffff;
   box-sizing: border-box;
 }
@@ -887,7 +1342,7 @@ onBeforeUnmount(() => {
 }
 
 .modal-title-danger {
-  color: #dc2626;
+  color: #50bdbd;
 }
 
 .modal-text {
@@ -987,9 +1442,15 @@ onBeforeUnmount(() => {
   background: #ef4444;
 }
 
+.badge-own {
+  background: #d8f8f4;
+  color: #0f766e;
+  border: 1px solid #9de2dc;
+}
+
 @media (max-width: 768px) {
-  .perfil-publico {
-    padding: 64px 12px 96px;
+   .perfil-publico {
+    padding: 14px 12px 96px;
   }
 
   .perfil-card {
@@ -1022,6 +1483,274 @@ onBeforeUnmount(() => {
 
   .admin-tools {
     flex-direction: column;
+  }
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  margin-bottom: 8px;
+
+  border: 1px solid #edf2f2;
+  border-radius: 12px;
+
+  background: #ffffff;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+
+  display: block;
+  padding: 0;
+
+  border: none;
+  background: transparent;
+
+  text-align: left;
+  font-family: inherit;
+
+  cursor: pointer;
+}
+
+.activity-delete-btn {
+  flex: 0 0 auto;
+
+  min-height: 32px;
+  padding: 6px 12px;
+
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: #dc2626;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.18s ease;
+}
+
+@media (hover: hover) {
+  .activity-item:hover {
+    background: #eefafa;
+    border-color: #d7f1ef;
+  }
+
+  .activity-delete-btn:hover {
+    background: #ef4444;
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 520px) {
+  .activity-item {
+    align-items: flex-start;
+  }
+
+  .activity-delete-btn {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
+
+  .modal-actions {
+    flex-direction: row;
+  }
+
+  .modal-actions .btn {
+    flex: 1;
+  }
+}
+
+.own-profile-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.edit-profile-btn {
+  min-height: 38px;
+  padding: 8px 16px;
+
+  border: 1.5px solid #50bdbd;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: #50bdbd;
+
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 6px 16px
+    rgba(80, 189, 189, 0.14);
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .edit-profile-btn:hover {
+    background: #50bdbd;
+    color: #ffffff;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+      0 10px 22px
+      rgba(80, 189, 189, 0.24);
+  }
+}
+
+@media (max-width: 520px) {
+  .edit-profile-btn {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+  }
+}
+
+.public-profile-head {
+  width: 100%;
+  max-width: 560px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 54px;
+}
+
+.public-profile-title {
+  margin: 0;
+
+  color: #50bdbd;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.back-link {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: #e8fbf8;
+  color: #50bdbd;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.arrow {
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+
+@media (hover: hover) {
+  .back-link:hover {
+    background: #d8f6f1;
+    transform: translateY(-2px);
+    box-shadow:
+      0 8px 16px
+      rgba(80, 189, 189, 0.16);
+  }
+}
+
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  margin: 0 auto 8px;
+  padding: 5px 10px;
+  border: 1px solid #50bdbd;
+  border-radius: 999px;
+  background: #e0faf7;
+  color: #0f766e;
+
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .plan-badge:hover {
+    background: #c9f3ef;
+    transform: translateY(-1px);
+    box-shadow:
+      0 8px 18px
+      rgba(80, 189, 189, 0.18);
+  }
+}
+
+.plan-badge--free {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.plan-badge__dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+  background: #22c55e;
+
+  box-shadow:
+    0 0 0 2px
+    #bbf7d0;
+}
+
+.plan-badge__dot--free {
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+@media (max-width: 520px) {
+  .public-profile-head {
+    margin-bottom: 50px;
+  }
+
+  .public-profile-title {
+    font-size: 1.25rem;
+  }
+
+  .plan-badge {
+    min-height: 27px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
   }
 }
 </style>

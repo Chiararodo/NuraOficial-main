@@ -242,6 +242,9 @@ const messages = {
   video: {
     newTitle: 'Nuevo video',
     filePath: 'Ruta del archivo de video',
+    filePlaceholder:
+      'Pegá la ruta del archivo',
+    
     duration: 'Duración en segundos',
     create: 'Crear video',
     fileLabelSuffix: 'de video'

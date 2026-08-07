@@ -560,109 +560,357 @@ function mmss(total: number) {
           </div>
         </div>
 
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.video.newTitle') }}</h3>
+        
+                <!-- =====================================
+             NUEVO VIDEO
+        ====================================== -->
+
+        <section
+          class="abm card abm-box"
+          aria-labelledby="new-video-title"
+        >
+          <h3
+            id="new-video-title"
+            class="abm-title"
+          >
+            {{ $t('content.video.newTitle') }}
+          </h3>
 
           <div class="abm-grid">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="videoCreateForm.title" type="text" />
-            </div>
+
+            <!-- TÍTULO -->
 
             <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="videoCreateForm.cover_path" type="text" />
+              <label for="video-title">
+                {{ $t('content.fields.title') }}
+              </label>
+
+              <input
+                id="video-title"
+                v-model="videoCreateForm.title"
+                type="text"
+                autocomplete="off"
+                required
+                aria-required="true"
+                :aria-invalid="
+                  videoCreateForm.title.trim()
+                    ? 'false'
+                    : 'true'
+                "
+                aria-describedby="video-title-help"
+              />
+
+              <small
+                id="video-title-help"
+                class="field-help"
+              >
+                Ingresá el título del video.
+              </small>
             </div>
 
-            <div class="field">
-              <label>{{ $t('content.video.filePath') }}</label>
-              <input v-model="videoCreateForm.file_path" type="text" />
-            </div>
+            <!-- PORTADA -->
 
             <div class="field">
-              <label>{{ $t('content.video.duration') }}</label>
-              <input v-model.number="videoCreateForm.duration_seconds" type="number" min="0" />
+              <label for="video-cover">
+                {{ $t('content.fields.coverPath') }}
+              </label>
+
+              <input
+                id="video-cover"
+                v-model="videoCreateForm.cover_path"
+                type="text"
+                placeholder="Ingresá la ruta de la portada"
+                aria-describedby="video-cover-help"
+              />
+
+              <small
+                id="video-cover-help"
+                class="field-help"
+              >
+                Ingresá la ubicación de la imagen de portada.
+              </small>
             </div>
 
+            <!-- ARCHIVO -->
+
             <div class="field">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="2" v-model="videoCreateForm.description" />
+              <label for="video-file">
+                {{ $t('content.video.filePath') }}
+              </label>
+
+              <input
+                id="video-file"
+                v-model="videoCreateForm.file_path"
+                type="text"
+                required
+                aria-required="true"
+                :aria-invalid="
+                  videoCreateForm.file_path.trim()
+                    ? 'false'
+                    : 'true'
+                "
+                aria-describedby="video-file-help"
+              />
+
+              <small
+                id="video-file-help"
+                class="field-help"
+              >
+                Ingresá la ruta del archivo de video.
+              </small>
+            </div>
+
+            <!-- DURACIÓN -->
+
+            <div class="field">
+              <label for="video-duration">
+                {{ $t('content.video.duration') }}
+              </label>
+
+              <input
+                id="video-duration"
+                v-model.number="videoCreateForm.duration_seconds"
+                type="number"
+                min="0"
+                aria-describedby="video-duration-help"
+              />
+
+              <small
+                id="video-duration-help"
+                class="field-help"
+              >
+                Duración total del video expresada en segundos.
+              </small>
+            </div>
+
+            <!-- DESCRIPCIÓN -->
+
+            <div class="field">
+              <label for="video-description">
+                {{ $t('content.fields.description') }}
+              </label>
+
+              <textarea
+                id="video-description"
+                v-model="videoCreateForm.description"
+                rows="3"
+                aria-describedby="video-description-help"
+              ></textarea>
+
+              <small
+                id="video-description-help"
+                class="field-help"
+              >
+                Agregá una breve descripción del contenido.
+              </small>
             </div>
           </div>
 
           <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createVideo">
+            <button
+              type="button"
+              class="pill pill--primary"
+              @click="createVideo"
+            >
               {{ $t('content.video.create') }}
             </button>
-            <button type="button" class="pill pill--soft" @click="resetVideoCreateForm">
+
+            <button
+              type="button"
+              class="pill pill--soft"
+              @click="resetVideoCreateForm"
+            >
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <div v-else class="content-main">
-        <div v-if="loading.videos" class="loading">{{ $t('content.loadingVideos') }}</div>
-        <p v-else-if="!videos.length" class="empty">{{ $t('content.emptyVideos') }}</p>
+      <!-- =====================================
+           VIDEOS - USUARIO NORMAL
+      ====================================== -->
 
-        <div v-else class="grid">
+      <div
+        v-else
+        class="content-main"
+      >
+        <div
+          v-if="loading.videos"
+          class="loading"
+          role="status"
+          aria-live="polite"
+        >
+          {{ $t('content.loadingVideos') }}
+        </div>
+
+        <p
+          v-else-if="!videos.length"
+          class="empty"
+        >
+          {{ $t('content.emptyVideos') }}
+        </p>
+
+        <div
+          v-else
+          class="grid"
+        >
           <article
             v-for="v in videos"
             :key="v.id"
             class="card media-card"
+            role="button"
+            tabindex="0"
+            :aria-label="`Abrir video ${v.title}`"
             @click="openVideo(v)"
+            @keydown.enter="openVideo(v)"
+            @keydown.space.prevent="openVideo(v)"
           >
             <div class="thumb thumb-video">
-              <img :src="publicUrl(v.cover_path)" :alt="v.title" />
-              <span class="duration" v-if="v.duration_seconds">{{ mmss(v.duration_seconds) }}</span>
+              <img
+                :src="publicUrl(v.cover_path)"
+                :alt="`Portada del video ${v.title}`"
+              />
+
+              <span
+                v-if="v.duration_seconds"
+                class="duration"
+              >
+                {{ mmss(v.duration_seconds) }}
+              </span>
             </div>
-            <h3 class="card-title">{{ v.title }}</h3>
+
+            <h3 class="card-title">
+              {{ v.title }}
+            </h3>
           </article>
         </div>
       </div>
     </section>
 
-    <section v-else-if="tab === 'biblioteca'" class="section">
-      <div v-if="isAdmin" class="content-row">
-        <div class="content-main">
-          <div v-if="loading.books" class="loading">{{ $t('content.loadingLibrary') }}</div>
-          <p v-else-if="!books.length" class="empty">{{ $t('content.emptyBooks') }}</p>
+    <!-- =====================================
+         BIBLIOTECA
+    ====================================== -->
 
-          <div v-else class="grid">
+    <section
+      v-else-if="tab === 'biblioteca'"
+      class="section"
+    >
+      <div
+        v-if="isAdmin"
+        class="content-row"
+      >
+        <div class="content-main">
+
+          <div
+            v-if="loading.books"
+            class="loading"
+            role="status"
+            aria-live="polite"
+          >
+            {{ $t('content.loadingLibrary') }}
+          </div>
+
+          <p
+            v-else-if="!books.length"
+            class="empty"
+          >
+            {{ $t('content.emptyBooks') }}
+          </p>
+
+          <div
+            v-else
+            class="grid"
+          >
             <article
               v-for="b in books"
               :key="b.id"
               class="card media-card"
+              role="button"
+              tabindex="0"
+              :aria-label="`Abrir libro ${b.title}`"
               @click="openBook(b)"
+              @keydown.enter="openBook(b)"
+              @keydown.space.prevent="openBook(b)"
             >
               <div class="thumb thumb-book">
-                <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+                <img
+                  :src="publicUrl(b.cover_path)"
+                  :alt="`Portada del libro ${b.title}`"
+                />
               </div>
 
-              <h3 class="card-title">{{ b.title }}</h3>
+              <h3 class="card-title">
+                {{ b.title }}
+              </h3>
 
-              <div v-if="isAdmin" class="small-actions" @click.stop>
-                <button class="abm-btn abm-btn--edit" type="button" @click="startEditBook(b)">
+              <div
+                class="small-actions"
+                @click.stop
+                @keydown.stop
+              >
+                <button
+                  class="abm-btn abm-btn--edit"
+                  type="button"
+                  :aria-label="`Editar libro ${b.title}`"
+                  @click="startEditBook(b)"
+                >
                   {{ $t('content.actions.edit') }}
                 </button>
-                <button class="abm-btn abm-btn--delete" type="button" @click="askDelete('book', b.id, b.title)">
+
+                <button
+                  class="abm-btn abm-btn--delete"
+                  type="button"
+                  :aria-label="`Eliminar libro ${b.title}`"
+                  @click="askDelete('book', b.id, b.title)"
+                >
                   {{ $t('content.actions.delete') }}
                 </button>
               </div>
             </article>
           </div>
 
-          <section v-if="articles.length" class="articles-section">
-            <h3 class="subhead">{{ $t('content.articles.title') }}</h3>
+          <!-- ARTÍCULOS -->
+
+          <section
+            v-if="articles.length"
+            class="articles-section"
+            aria-labelledby="articles-title"
+          >
+            <h3
+              id="articles-title"
+              class="subhead"
+            >
+              {{ $t('content.articles.title') }}
+            </h3>
 
             <div class="articles">
-              <article v-for="a in articles" :key="a.id" class="article-card">
-                <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+              <article
+                v-for="a in articles"
+                :key="a.id"
+                class="article-card"
+              >
+                <img
+                  class="art-cover"
+                  :src="publicUrl(a.cover_path)"
+                  :alt="`Portada del artículo ${a.title}`"
+                />
+
                 <div class="art-body">
-                  <h4 class="art-title">{{ a.title }}</h4>
-                  <p class="art-summary">{{ a.summary }}</p>
+                  <h4 class="art-title">
+                    {{ a.title }}
+                  </h4>
+
+                  <p class="art-summary">
+                    {{ a.summary }}
+                  </p>
+
                   <small v-if="a.read_minutes">
-                    {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                    {{
+                      $t(
+                        'content.articles.reading',
+                        { m: a.read_minutes }
+                      )
+                    }}
                   </small>
                 </div>
               </article>
@@ -670,87 +918,250 @@ function mmss(total: number) {
           </section>
         </div>
 
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.book.newTitle') }}</h3>
+        <!-- =================================
+             NUEVO LIBRO
+        ================================== -->
+
+        <section
+          class="abm card abm-box"
+          aria-labelledby="new-book-title"
+        >
+          <h3
+            id="new-book-title"
+            class="abm-title"
+          >
+            {{ $t('content.book.newTitle') }}
+          </h3>
 
           <div class="abm-grid">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="bookCreateForm.title" type="text" />
-            </div>
+
+            <!-- TÍTULO -->
 
             <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="bookCreateForm.cover_path" type="text" />
-            </div>
+              <label for="book-title">
+                {{ $t('content.fields.title') }}
+              </label>
 
-            <div class="field">
-              <label>{{ $t('content.book.filePath') }}</label>
               <input
+                id="book-title"
+                v-model="bookCreateForm.title"
+                type="text"
+                autocomplete="off"
+                required
+                aria-required="true"
+                :aria-invalid="
+                  bookCreateForm.title.trim()
+                    ? 'false'
+                    : 'true'
+                "
+                aria-describedby="book-title-help"
+              />
+
+              <small
+                id="book-title-help"
+                class="field-help"
+              >
+                Ingresá el título del libro.
+              </small>
+            </div>
+
+            <!-- PORTADA -->
+
+            <div class="field">
+              <label for="book-cover">
+                {{ $t('content.fields.coverPath') }}
+              </label>
+
+              <input
+                id="book-cover"
+                v-model="bookCreateForm.cover_path"
+                type="text"
+                placeholder="Ingresá la ruta de la portada"
+                aria-describedby="book-cover-help"
+              />
+
+              <small
+                id="book-cover-help"
+                class="field-help"
+              >
+                Ingresá la ubicación de la imagen de portada.
+              </small>
+            </div>
+
+            <!-- PDF PATH -->
+
+            <div class="field">
+              <label for="book-file">
+                {{ $t('content.book.filePath') }}
+              </label>
+
+              <input
+                id="book-file"
                 v-model="bookCreateForm.file_path"
                 type="text"
                 :placeholder="$t('content.book.filePlaceholder')"
+                aria-describedby="book-file-help"
               />
+
+              <small
+                id="book-file-help"
+                class="field-help"
+              >
+                Podés ingresar una ruta o seleccionar un PDF debajo.
+              </small>
             </div>
 
+            <!-- SUBIR PDF -->
+
             <div class="field">
-              <label>{{ $t('content.pdf.orUpload') }}</label>
+              <span
+                id="book-pdf-label"
+                class="field-label"
+              >
+                {{ $t('content.pdf.orUpload') }}
+              </span>
+
               <div class="upload-row">
                 <input
                   ref="bookPdfInput"
                   type="file"
                   accept="application/pdf"
                   class="file-input"
+                  aria-labelledby="book-pdf-label"
                   @change="onBookPdfSelected"
                 />
-                <button type="button" class="upload-btn" @click="bookPdfInput?.click()">
+
+                <button
+                  type="button"
+                  class="upload-btn"
+                  aria-label="Seleccionar archivo PDF del libro"
+                  @click="bookPdfInput?.click()"
+                >
                   {{ $t('content.pdf.select') }}
                 </button>
-                <span v-if="bookPdfName" class="file-name">{{ bookPdfName }}</span>
+
+                <span
+                  v-if="bookPdfName"
+                  class="file-name"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {{ bookPdfName }}
+                </span>
               </div>
             </div>
           </div>
 
           <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createBook">
+            <button
+              type="button"
+              class="pill pill--primary"
+              @click="createBook"
+            >
               {{ $t('content.book.create') }}
             </button>
-            <button type="button" class="pill pill--soft" @click="resetBookCreateForm">
+
+            <button
+              type="button"
+              class="pill pill--soft"
+              @click="resetBookCreateForm"
+            >
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <div v-else class="content-main">
-        <div v-if="loading.books" class="loading">{{ $t('content.loadingLibrary') }}</div>
-        <p v-else-if="!books.length" class="empty">{{ $t('content.emptyBooks') }}</p>
+      <!-- BIBLIOTECA USUARIO NORMAL -->
 
-        <div v-else class="grid">
+      <div
+        v-else
+        class="content-main"
+      >
+        <div
+          v-if="loading.books"
+          class="loading"
+          role="status"
+          aria-live="polite"
+        >
+          {{ $t('content.loadingLibrary') }}
+        </div>
+
+        <p
+          v-else-if="!books.length"
+          class="empty"
+        >
+          {{ $t('content.emptyBooks') }}
+        </p>
+
+        <div
+          v-else
+          class="grid"
+        >
           <article
             v-for="b in books"
             :key="b.id"
             class="card media-card"
+            role="button"
+            tabindex="0"
+            :aria-label="`Abrir libro ${b.title}`"
             @click="openBook(b)"
+            @keydown.enter="openBook(b)"
+            @keydown.space.prevent="openBook(b)"
           >
             <div class="thumb thumb-book">
-              <img :src="publicUrl(b.cover_path)" :alt="b.title" />
+              <img
+                :src="publicUrl(b.cover_path)"
+                :alt="`Portada del libro ${b.title}`"
+              />
             </div>
-            <h3 class="card-title">{{ b.title }}</h3>
+
+            <h3 class="card-title">
+              {{ b.title }}
+            </h3>
           </article>
         </div>
 
-        <section v-if="articles.length" class="articles-section">
-          <h3 class="subhead">{{ $t('content.articles.title') }}</h3>
+        <section
+          v-if="articles.length"
+          class="articles-section"
+          aria-labelledby="public-articles-title"
+        >
+          <h3
+            id="public-articles-title"
+            class="subhead"
+          >
+            {{ $t('content.articles.title') }}
+          </h3>
 
           <div class="articles">
-            <article v-for="a in articles" :key="a.id" class="article-card">
-              <img class="art-cover" :src="publicUrl(a.cover_path)" :alt="a.title" />
+            <article
+              v-for="a in articles"
+              :key="a.id"
+              class="article-card"
+            >
+              <img
+                class="art-cover"
+                :src="publicUrl(a.cover_path)"
+                :alt="`Portada del artículo ${a.title}`"
+              />
+
               <div class="art-body">
-                <h4 class="art-title">{{ a.title }}</h4>
-                <p class="art-summary">{{ a.summary }}</p>
+                <h4 class="art-title">
+                  {{ a.title }}
+                </h4>
+
+                <p class="art-summary">
+                  {{ a.summary }}
+                </p>
+
                 <small v-if="a.read_minutes">
-                  {{ $t('content.articles.reading', { m: a.read_minutes }) }}
+                  {{
+                    $t(
+                      'content.articles.reading',
+                      { m: a.read_minutes }
+                    )
+                  }}
                 </small>
               </div>
             </article>
@@ -759,45 +1170,125 @@ function mmss(total: number) {
       </div>
     </section>
 
-    <section v-else-if="tab === 'guias'" class="section">
-      <div v-if="isAdmin" class="content-row">
-        <div class="content-main">
-          <div v-if="loading.guides" class="loading">{{ $t('content.loadingGuides') }}</div>
-          <p v-else-if="!guides.length" class="empty">{{ $t('content.emptyGuides') }}</p>
+    <!-- =====================================
+         GUÍAS
+    ====================================== -->
 
-          <div v-else class="grid">
+    <section
+      v-else-if="tab === 'guias'"
+      class="section"
+    >
+      <div
+        v-if="isAdmin"
+        class="content-row"
+      >
+        <div class="content-main">
+
+          <div
+            v-if="loading.guides"
+            class="loading"
+            role="status"
+            aria-live="polite"
+          >
+            {{ $t('content.loadingGuides') }}
+          </div>
+
+          <p
+            v-else-if="!guides.length"
+            class="empty"
+          >
+            {{ $t('content.emptyGuides') }}
+          </p>
+
+          <div
+            v-else
+            class="grid"
+          >
             <article
               v-for="g in guides"
               :key="g.id"
               class="card media-card"
+              role="button"
+              tabindex="0"
+              :aria-label="`Abrir guía ${g.title}`"
               @click="openGuide(g)"
+              @keydown.enter="openGuide(g)"
+              @keydown.space.prevent="openGuide(g)"
             >
               <div class="thumb thumb-guide">
-                <img :src="publicUrl(g.cover_path)" :alt="g.title" />
+                <img
+                  :src="publicUrl(g.cover_path)"
+                  :alt="`Portada de la guía ${g.title}`"
+                />
               </div>
 
               <div class="guide-body">
-                <h3 class="card-title">{{ g.title }}</h3>
-                <p class="guide-summary">{{ g.description }}</p>
+                <h3 class="card-title">
+                  {{ g.title }}
+                </h3>
+
+                <p class="guide-summary">
+                  {{ g.description }}
+                </p>
 
                 <div class="guide-actions">
-                  <button class="btn" type="button" @click.stop="openGuide(g)">
+                  <button
+                    class="btn"
+                    type="button"
+                    :aria-label="`Abrir guía ${g.title}`"
+                    @click.stop="openGuide(g)"
+                  >
                     {{ $t('content.actions.continue') }}
                   </button>
 
-                  <div class="progress-wrap" v-if="progressMap.get(g.id) !== undefined">
-                    <div class="progress">
-                      <div class="bar" :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }" />
+                  <div
+                    v-if="progressMap.get(g.id) !== undefined"
+                    class="progress-wrap"
+                  >
+                    <div
+                      class="progress"
+                      role="progressbar"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      :aria-valuenow="progressMap.get(g.id) ?? 0"
+                      :aria-label="`Progreso de ${g.title}`"
+                    >
+                      <div
+                        class="bar"
+                        :style="{
+                          width:
+                            (progressMap.get(g.id) ?? 0) +
+                            '%'
+                        }"
+                      ></div>
                     </div>
-                    <small class="pct">{{ progressMap.get(g.id) }}%</small>
+
+                    <small class="pct">
+                      {{ progressMap.get(g.id) }}%
+                    </small>
                   </div>
                 </div>
 
-                <div v-if="isAdmin" class="small-actions" @click.stop>
-                  <button class="abm-btn abm-btn--edit" type="button" @click="startEditGuide(g)">
+                <div
+                  class="small-actions"
+                  @click.stop
+                  @keydown.stop
+                >
+                  <button
+                    class="abm-btn abm-btn--edit"
+                    type="button"
+                    :aria-label="`Editar guía ${g.title}`"
+                    @click="startEditGuide(g)"
+                  >
                     {{ $t('content.actions.edit') }}
                   </button>
-                  <button class="abm-btn abm-btn--delete" type="button" @click="askDelete('guide', g.id, g.title)">
+
+                  <button
+                    class="abm-btn abm-btn--delete"
+                    type="button"
+                    :aria-label="`Eliminar guía ${g.title}`"
+                    @click="askDelete('guide', g.id, g.title)"
+                  >
                     {{ $t('content.actions.delete') }}
                   </button>
                 </div>
@@ -806,92 +1297,260 @@ function mmss(total: number) {
           </div>
         </div>
 
-        <section class="abm card abm-box">
-          <h3 class="abm-title">{{ $t('content.guide.newTitle') }}</h3>
+        <!-- =================================
+             NUEVA GUÍA
+        ================================== -->
+
+        <section
+          class="abm card abm-box"
+          aria-labelledby="new-guide-title"
+        >
+          <h3
+            id="new-guide-title"
+            class="abm-title"
+          >
+            {{ $t('content.guide.newTitle') }}
+          </h3>
 
           <div class="abm-grid">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="guideCreateForm.title" type="text" />
-            </div>
 
             <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="guideCreateForm.cover_path" type="text" />
-            </div>
+              <label for="guide-title">
+                {{ $t('content.fields.title') }}
+              </label>
 
-            <div class="field">
-              <label>{{ $t('content.guide.filePath') }}</label>
               <input
+                id="guide-title"
+                v-model="guideCreateForm.title"
+                type="text"
+                autocomplete="off"
+                required
+                aria-required="true"
+                :aria-invalid="
+                  guideCreateForm.title.trim()
+                    ? 'false'
+                    : 'true'
+                "
+                aria-describedby="guide-title-help"
+              />
+
+              <small
+                id="guide-title-help"
+                class="field-help"
+              >
+                Ingresá el título de la guía.
+              </small>
+            </div>
+
+            <div class="field">
+              <label for="guide-cover">
+                {{ $t('content.fields.coverPath') }}
+              </label>
+
+              <input
+                id="guide-cover"
+                v-model="guideCreateForm.cover_path"
+                type="text"
+                placeholder="Ingresá la ruta de la portada"
+                aria-describedby="guide-cover-help"
+              />
+
+              <small
+                id="guide-cover-help"
+                class="field-help"
+              >
+                Ingresá la ubicación de la imagen de portada.
+              </small>
+            </div>
+
+            <div class="field">
+              <label for="guide-file">
+                {{ $t('content.guide.filePath') }}
+              </label>
+
+              <input
+                id="guide-file"
                 v-model="guideCreateForm.file_path"
                 type="text"
                 :placeholder="$t('content.guide.filePlaceholder')"
+                aria-describedby="guide-file-help"
               />
+
+              <small
+                id="guide-file-help"
+                class="field-help"
+              >
+                Podés ingresar una ruta o seleccionar un PDF debajo.
+              </small>
             </div>
 
+            <!-- PDF -->
+
             <div class="field">
-              <label>{{ $t('content.pdf.orUpload') }}</label>
+              <span
+                id="guide-pdf-label"
+                class="field-label"
+              >
+                {{ $t('content.pdf.orUpload') }}
+              </span>
+
               <div class="upload-row">
                 <input
                   ref="guidePdfInput"
                   type="file"
                   accept="application/pdf"
                   class="file-input"
+                  aria-labelledby="guide-pdf-label"
                   @change="onGuidePdfSelected"
                 />
-                <button type="button" class="upload-btn" @click="guidePdfInput?.click()">
+
+                <button
+                  type="button"
+                  class="upload-btn"
+                  aria-label="Seleccionar archivo PDF de la guía"
+                  @click="guidePdfInput?.click()"
+                >
                   {{ $t('content.pdf.select') }}
                 </button>
-                <span v-if="guidePdfName" class="file-name">{{ guidePdfName }}</span>
+
+                <span
+                  v-if="guidePdfName"
+                  class="file-name"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {{ guidePdfName }}
+                </span>
               </div>
             </div>
 
             <div class="field">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="2" v-model="guideCreateForm.description" />
+              <label for="guide-description">
+                {{ $t('content.fields.description') }}
+              </label>
+
+              <textarea
+                id="guide-description"
+                v-model="guideCreateForm.description"
+                rows="3"
+                aria-describedby="guide-description-help"
+              ></textarea>
+
+              <small
+                id="guide-description-help"
+                class="field-help"
+              >
+                Contá brevemente de qué se trata la guía.
+              </small>
             </div>
           </div>
 
           <div class="abm-actions">
-            <button type="button" class="pill pill--primary" @click="createGuide">
+            <button
+              type="button"
+              class="pill pill--primary"
+              @click="createGuide"
+            >
               {{ $t('content.guide.create') }}
             </button>
-            <button type="button" class="pill pill--soft" @click="resetGuideCreateForm">
+
+            <button
+              type="button"
+              class="pill pill--soft"
+              @click="resetGuideCreateForm"
+            >
               {{ $t('content.actions.clear') }}
             </button>
           </div>
         </section>
       </div>
 
-      <div v-else class="content-main">
-        <div v-if="loading.guides" class="loading">{{ $t('content.loadingGuides') }}</div>
-        <p v-else-if="!guides.length" class="empty">{{ $t('content.emptyGuides') }}</p>
+      <!-- GUÍAS USUARIO -->
 
-        <div v-else class="grid">
+      <div
+        v-else
+        class="content-main"
+      >
+        <div
+          v-if="loading.guides"
+          class="loading"
+          role="status"
+          aria-live="polite"
+        >
+          {{ $t('content.loadingGuides') }}
+        </div>
+
+        <p
+          v-else-if="!guides.length"
+          class="empty"
+        >
+          {{ $t('content.emptyGuides') }}
+        </p>
+
+        <div
+          v-else
+          class="grid"
+        >
           <article
             v-for="g in guides"
             :key="g.id"
             class="card media-card"
+            role="button"
+            tabindex="0"
+            :aria-label="`Abrir guía ${g.title}`"
             @click="openGuide(g)"
+            @keydown.enter="openGuide(g)"
+            @keydown.space.prevent="openGuide(g)"
           >
             <div class="thumb thumb-guide">
-              <img :src="publicUrl(g.cover_path)" :alt="g.title" />
+              <img
+                :src="publicUrl(g.cover_path)"
+                :alt="`Portada de la guía ${g.title}`"
+              />
             </div>
 
             <div class="guide-body">
-              <h3 class="card-title">{{ g.title }}</h3>
-              <p class="guide-summary">{{ g.description }}</p>
+              <h3 class="card-title">
+                {{ g.title }}
+              </h3>
+
+              <p class="guide-summary">
+                {{ g.description }}
+              </p>
 
               <div class="guide-actions">
-                <button class="btn" type="button" @click.stop="openGuide(g)">
+                <button
+                  class="btn"
+                  type="button"
+                  @click.stop="openGuide(g)"
+                >
                   {{ $t('content.actions.continue') }}
                 </button>
 
-                <div class="progress-wrap" v-if="progressMap.get(g.id) !== undefined">
-                  <div class="progress">
-                    <div class="bar" :style="{ width: (progressMap.get(g.id) ?? 0) + '%' }" />
+                <div
+                  v-if="progressMap.get(g.id) !== undefined"
+                  class="progress-wrap"
+                >
+                  <div
+                    class="progress"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    :aria-valuenow="progressMap.get(g.id) ?? 0"
+                  >
+                    <div
+                      class="bar"
+                      :style="{
+                        width:
+                          (progressMap.get(g.id) ?? 0) +
+                          '%'
+                      }"
+                    ></div>
                   </div>
-                  <small class="pct">{{ progressMap.get(g.id) }}%</small>
+
+                  <small class="pct">
+                    {{ progressMap.get(g.id) }}%
+                  </small>
                 </div>
               </div>
             </div>
@@ -900,114 +1559,337 @@ function mmss(total: number) {
       </div>
     </section>
 
-    <div v-if="currentVideo" class="overlay" @click.self="closeVideo">
-      <div class="modal-card media-modal">
-        <button type="button" class="close" @click="closeVideo">×</button>
+    <!-- =====================================
+         MODAL VIDEO
+    ====================================== -->
+
+    <div
+      v-if="currentVideo"
+      class="overlay"
+      @click.self="closeVideo"
+    >
+      <div
+        class="modal-card media-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="video-modal-title"
+      >
+        <button
+          type="button"
+          class="close"
+          aria-label="Cerrar video"
+          @click="closeVideo"
+        >
+          ×
+        </button>
+
         <div class="player">
-          <video v-if="videoSrc" :src="videoSrc" controls playsinline />
+          <video
+            v-if="videoSrc"
+            :src="videoSrc"
+            controls
+            playsinline
+          ></video>
         </div>
-        <div class="modal-copy">
-          <h2 class="modal-title">{{ currentVideo?.title }}</h2>
-          <p class="modal-desc" v-if="currentVideo?.description">{{ currentVideo?.description }}</p>
-        </div>
-      </div>
-    </div>
 
-    <div v-if="currentPdf" class="overlay" @click.self="closePdf">
-      <div class="modal-card media-modal">
-        <button type="button" class="close" @click="closePdf">×</button>
         <div class="modal-copy">
-          <h2 class="modal-title">{{ currentPdf?.title }}</h2>
-          <p class="modal-desc" v-if="currentPdf?.description">{{ currentPdf?.description }}</p>
-        </div>
-        <div class="pdf">
-          <iframe v-if="pdfSrc" :src="pdfSrc" :title="$t('content.pdf.iframeTitle')" />
-        </div>
-      </div>
-    </div>
-
-    <div v-if="editModal" class="overlay" @click.self="closeEditModal">
-      <div class="modal-card edit-card">
-        <header class="edit-header">
-          <h2 class="edit-title">
-            <span v-if="editModal.type === 'video'">{{ $t('content.edit.video') }}</span>
-            <span v-else-if="editModal.type === 'book'">{{ $t('content.edit.book') }}</span>
-            <span v-else>{{ $t('content.edit.guide') }}</span>
+          <h2
+            id="video-modal-title"
+            class="modal-title"
+          >
+            {{ currentVideo.title }}
           </h2>
-          <button class="edit-close" type="button" @click="closeEditModal">×</button>
+
+          <p
+            v-if="currentVideo.description"
+            class="modal-desc"
+          >
+            {{ currentVideo.description }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================
+         MODAL PDF
+    ====================================== -->
+
+    <div
+      v-if="currentPdf"
+      class="overlay"
+      @click.self="closePdf"
+    >
+      <div
+        class="modal-card media-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pdf-modal-title"
+      >
+        <button
+          type="button"
+          class="close"
+          aria-label="Cerrar documento PDF"
+          @click="closePdf"
+        >
+          ×
+        </button>
+
+        <div class="modal-copy">
+          <h2
+            id="pdf-modal-title"
+            class="modal-title"
+          >
+            {{ currentPdf.title }}
+          </h2>
+
+          <p
+            v-if="currentPdf.description"
+            class="modal-desc"
+          >
+            {{ currentPdf.description }}
+          </p>
+        </div>
+
+        <div class="pdf">
+          <iframe
+            v-if="pdfSrc"
+            :src="pdfSrc"
+            :title="$t('content.pdf.iframeTitle')"
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================
+         MODAL EDITAR
+    ====================================== -->
+
+    <div
+      v-if="editModal"
+      class="overlay"
+      @click.self="closeEditModal"
+    >
+      <div
+        class="modal-card edit-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="content-edit-title"
+      >
+        <header class="edit-header">
+          <h2
+            id="content-edit-title"
+            class="edit-title"
+          >
+            <span v-if="editModal.type === 'video'">
+              {{ $t('content.edit.video') }}
+            </span>
+
+            <span v-else-if="editModal.type === 'book'">
+              {{ $t('content.edit.book') }}
+            </span>
+
+            <span v-else>
+              {{ $t('content.edit.guide') }}
+            </span>
+          </h2>
+
+          <button
+            class="edit-close"
+            type="button"
+            aria-label="Cerrar ventana de edición"
+            @click="closeEditModal"
+          >
+            ×
+          </button>
         </header>
 
         <section class="edit-body">
           <div class="abm-grid">
-            <div class="field">
-              <label>{{ $t('content.fields.title') }}</label>
-              <input v-model="editModal.title" type="text" />
-            </div>
 
             <div class="field">
-              <label>{{ $t('content.fields.coverPath') }}</label>
-              <input v-model="editModal.cover_path" type="text" />
+              <label for="edit-content-title">
+                {{ $t('content.fields.title') }}
+              </label>
+
+              <input
+                id="edit-content-title"
+                v-model="editModal.title"
+                type="text"
+                required
+                aria-required="true"
+              />
             </div>
 
             <div class="field">
-              <label>
-  {{ $t('content.fields.file') }}
-  <span v-if="editModal.type === 'video'">
-    {{ $t('content.video.fileLabelSuffix') }}
-  </span>
-  <span v-else>
-    {{ $t('content.pdf.fileLabelSuffix') }}
-  </span>
-</label>
-              <input v-model="editModal.file_path" type="text" />
+              <label for="edit-content-cover">
+                {{ $t('content.fields.coverPath') }}
+              </label>
+
+              <input
+                id="edit-content-cover"
+                v-model="editModal.cover_path"
+                type="text"
+              />
             </div>
 
-            <div v-if="editModal.type === 'video'" class="field">
-              <label>{{ $t('content.video.duration') }}</label>
-              <input v-model.number="editModal.duration_seconds" type="number" min="0" />
+            <div class="field">
+              <label for="edit-content-file">
+                {{ $t('content.fields.file') }}
+
+                <span v-if="editModal.type === 'video'">
+                  {{ $t('content.video.fileLabelSuffix') }}
+                </span>
+
+                <span v-else>
+                  {{ $t('content.pdf.fileLabelSuffix') }}
+                </span>
+              </label>
+
+              <input
+                id="edit-content-file"
+                v-model="editModal.file_path"
+                type="text"
+                required
+                aria-required="true"
+              />
             </div>
 
-            <div v-if="editModal.type !== 'book'" class="field">
-              <label>{{ $t('content.fields.description') }}</label>
-              <textarea rows="3" v-model="editModal.description" />
+            <div
+              v-if="editModal.type === 'video'"
+              class="field"
+            >
+              <label for="edit-video-duration">
+                {{ $t('content.video.duration') }}
+              </label>
+
+              <input
+                id="edit-video-duration"
+                v-model.number="editModal.duration_seconds"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div
+              v-if="editModal.type !== 'book'"
+              class="field"
+            >
+              <label for="edit-content-description">
+                {{ $t('content.fields.description') }}
+              </label>
+
+              <textarea
+                id="edit-content-description"
+                v-model="editModal.description"
+                rows="3"
+              ></textarea>
             </div>
           </div>
         </section>
 
         <footer class="edit-footer">
-          <button class="pill pill--soft" type="button" @click="closeEditModal">
+          <button
+            class="pill pill--soft"
+            type="button"
+            @click="closeEditModal"
+          >
             {{ $t('content.actions.cancel') }}
           </button>
-          <button class="pill pill--primary" type="button" @click="saveEdit">
+
+          <button
+            class="pill pill--primary"
+            type="button"
+            @click="saveEdit"
+          >
             {{ $t('content.actions.save') }}
           </button>
         </footer>
       </div>
     </div>
 
-    <div v-if="confirmDelete" class="overlay" @click.self="cancelDelete">
-      <div class="modal-card confirm-card">
-        <h2 class="confirm-title">
-          {{ $t('content.delete.title', { item: $t(`content.delete.labels.${confirmDelete.type}`) }) }}
+    <!-- =====================================
+         MODAL ELIMINAR
+    ====================================== -->
+
+    <div
+      v-if="confirmDelete"
+      class="overlay"
+      @click.self="cancelDelete"
+    >
+      <div
+        class="modal-card confirm-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="content-delete-title"
+      >
+        <h2
+          id="content-delete-title"
+          class="confirm-title"
+        >
+          {{
+            $t(
+              'content.delete.title',
+              {
+                item:
+                  $t(
+                    `content.delete.labels.${confirmDelete.type}`
+                  )
+              }
+            )
+          }}
         </h2>
+
         <p class="confirm-text">
           {{ $t('content.delete.text') }}
-          <strong>«{{ confirmDelete.title }}»</strong>?
+
+          <strong>
+            «{{ confirmDelete.title }}»
+          </strong>?
         </p>
+
         <div class="confirm-actions">
-          <button class="pill pill--soft" type="button" @click="cancelDelete">
+          <button
+            class="pill pill--soft"
+            type="button"
+            @click="cancelDelete"
+          >
             {{ $t('content.actions.cancel') }}
           </button>
-          <button class="pill pill--danger" type="button" @click="performDelete">
+
+          <button
+            class="pill pill--danger"
+            type="button"
+            @click="performDelete"
+          >
             {{ $t('content.actions.delete') }}
           </button>
         </div>
       </div>
     </div>
 
-    <div v-if="toast" class="toast" :class="toast.kind">
+    <!-- =====================================
+         TOAST
+    ====================================== -->
+
+    <div
+      v-if="toast"
+      class="toast"
+      :class="toast.kind"
+      :role="
+        toast.kind === 'error'
+          ? 'alert'
+          : 'status'
+      "
+      :aria-live="
+        toast.kind === 'error'
+          ? 'assertive'
+          : 'polite'
+      "
+      aria-atomic="true"
+    >
       {{ toast.message }}
     </div>
+
   </main>
 </template>
 
@@ -1652,30 +2534,48 @@ function mmss(total: number) {
 .toast {
   position: fixed;
   right: 18px;
-  bottom: 20px;
-  padding: 10px 16px;
+  z-index: 5000;
+  max-width: min(420px, calc(100vw - 36px));
+  padding: 11px 16px;
   border-radius: 12px;
   color: #ffffff;
   font-size: 0.85rem;
-  z-index: 3000;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  font-weight: 700;
+  line-height: 1.35;
+  box-sizing: border-box;
+  box-shadow:
+    0 10px 28px
+    rgba(15, 23, 42, 0.24);
 }
 
 .toast.success {
+  bottom: 20px;
   background: #50bdbd;
 }
 
 .toast.error {
+  top: 18px;
+  bottom: auto;
   background: #ef4444;
 }
 
 .visually-hidden {
-  position: absolute;
-  left: -9999px;
-  top: auto;
+  position: absolute !important;
+
   width: 1px;
   height: 1px;
+
+  padding: 0;
+  margin: -1px;
+
   overflow: hidden;
+
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+
+  white-space: nowrap;
+
+  border: 0;
 }
 
 /* ===== RESPONSIVE CONTENIDO ===== */
@@ -1947,11 +2847,22 @@ function mmss(total: number) {
     height: 65vh;
   }
 
-  .toast {
+ .toast {
     left: 12px;
     right: 12px;
-    bottom: 82px;
+    width: auto;
+    max-width: none;
     text-align: center;
+  }
+
+  .toast.success {
+    top: auto;
+    bottom: 82px;
+  }
+
+  .toast.error {
+    top: 12px;
+    bottom: auto;
   }
 }
 
@@ -2042,5 +2953,67 @@ function mmss(total: number) {
     padding: 6px 9px;
     font-size: 0.72rem;
   }
+}
+
+.field-help {
+  display: block;
+  margin-top: 1px;
+
+  color: #64748b;
+
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: #ef4444;
+}
+
+.tab:focus-visible,
+.btn:focus-visible,
+.abm-btn:focus-visible,
+.upload-btn:focus-visible,
+.pill:focus-visible,
+.edit-close:focus-visible,
+.close:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 3px solid rgba(80, 189, 189, 0.35);
+  outline-offset: 2px;
+}
+
+.field-label,
+.field label {
+  color: #50bdbd;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.field-help {
+  display: block;
+  margin-top: 1px;
+
+  color: #64748b;
+
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: #ef4444;
+}
+
+.media-card:focus-visible,
+.tab:focus-visible,
+.btn:focus-visible,
+.abm-btn:focus-visible,
+.upload-btn:focus-visible,
+.pill:focus-visible,
+.edit-close:focus-visible,
+.close:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 3px solid rgba(80, 189, 189, 0.35);
+  outline-offset: 2px;
 }
 </style>

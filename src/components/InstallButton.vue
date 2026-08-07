@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
     74px + env(safe-area-inset-bottom)
   );
   z-index: 55;
-  width: 160px;
+  width: 185px;
   min-height: 52px;
   padding: 8px 38px 8px 10px;
   display: grid;
@@ -537,13 +537,13 @@ onBeforeUnmount(() => {
 
 .install-banner__action {
   min-height: 34px;
-  width: 105px;
+  width: 145px;
   padding: 0px 18px;
   border: none;
   border-radius: 999px;
   background: #50bdbd;
   color: #fff;
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -758,7 +758,7 @@ onBeforeUnmount(() => {
     right: auto;
     left: 8px;
     bottom: calc(72px + env(safe-area-inset-bottom));
-    width: 135px;
+    width: 165px;
     min-height: 50px;
     padding: 7px 30px 7px 7px;
     grid-template-columns: 34px minmax(0, 1fr) auto;
@@ -787,7 +787,7 @@ onBeforeUnmount(() => {
   }
 
   .install-banner__action {
-    width:78px;
+    width:118px;
     min-height:30px;
     padding:0 10px;
     font-size:12px;
@@ -808,7 +808,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 360px) {
   .install-banner {
-    width: min(130px, calc(100vw - 16px));
+    width: 160px;
     left: 8px;
     grid-template-columns: 32px minmax(0, 1fr);
     gap: 12px;
@@ -828,6 +828,7 @@ onBeforeUnmount(() => {
     grid-column: 2;
     justify-self: start;
     min-height: 26px;
+    width:118px;
     padding: 5px 9px;
   }
 
@@ -998,7 +999,7 @@ onBeforeUnmount(() => {
 @media (max-width: 390px) {
 
   .install-banner {
-    width: 135px;
+    width: 160px;
     min-height: 52px;
     padding: 7px 28px 7px 7px;
     grid-template-columns:
@@ -1018,9 +1019,8 @@ onBeforeUnmount(() => {
   }
 
   .install-banner__action {
-    width: 82px;
+    width:118px;
     min-height: 30px;
-
     font-size: 12px;
     font-weight: 700;
   }

@@ -1135,17 +1135,21 @@ onBeforeUnmount(() => {
 
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .modal-btn {
   border-radius: 999px;
   border: none;
   padding: 9px 14px;
+  flex: 1;
+  max-width: 150px;
   min-height: 42px;
-  font-weight: 700;
+  font-weight: 750;
   cursor: pointer;
   background: #50bdbd;
   color: #fff;
@@ -1209,8 +1213,12 @@ onBeforeUnmount(() => {
     align-items: flex-start;
   }
 
+   .delete-comment-btn {
+    width: 20%;
+  }
+
   .delete-forum-btn {
-    width: 100%;
+    width: 30%;
   }
 
   .comment-header {
@@ -1227,17 +1235,26 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 520px) {
+
   .modal-actions {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
   }
 
   .modal-actions .modal-btn {
-    width: 100%;
+    flex: 1;
+    max-width: 140px;
+    width: auto;
+  }
+
+  .delete-forum-btn {
+    width: 35%;
   }
 
   .delete-comment-btn {
-    width: 100%;
+    width: 25%;
   }
 }
 </style>

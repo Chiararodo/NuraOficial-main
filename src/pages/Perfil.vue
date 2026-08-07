@@ -265,6 +265,21 @@ function goDiaryList() {
   router.push('/app/diario/entradas')
 }
 
+function goToMyPublicProfile() {
+  const uid = auth.user?.id
+
+  if (!uid) {
+    return
+  }
+
+  router.push({
+    name: 'perfil-publico',
+    params: {
+      uid
+    }
+  })
+}
+
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
 
@@ -353,13 +368,23 @@ const avatarInitial = computed(() => fallbackInitial())
               {{ $t('profile.memberSince', { year: memberSinceYear }) }}
             </p>
 
-            <button
-              class="btn btn-full"
-              type="button"
-              @click="router.push('/app/perfil/editar')"
-            >
-              {{ $t('profile.edit') }}
-            </button>
+            <div class="profile-actions">
+          <button
+            class="btn btn-full"
+            type="button"
+            @click="router.push('/app/perfil/editar')"
+          >
+            {{ $t('profile.edit') }}
+          </button>
+
+          <button
+            class="btn btn-full btn-public-profile"
+            type="button"
+            @click="goToMyPublicProfile"
+          >
+            Ver mi perfil
+          </button>
+        </div>
           </div>
         </div>
 
@@ -1134,6 +1159,62 @@ const avatarInitial = computed(() => fallbackInitial())
     width: auto;
     flex: 1;
     max-width: none;
+  }
+}
+
+.profile-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.profile-actions .btn {
+  margin-top: 0;
+}
+
+.btn-public-profile {
+  background: #ffffff;
+  color: #50bdbd;
+  border: 1.5px solid #50bdbd;
+  box-shadow: 0 5px 14px rgba(80, 189, 189, 0.14);
+}
+
+@media (hover: hover) {
+  .btn-public-profile:hover {
+    background: #e8fbf8;
+    color: #0f766e;
+    border-color: #0f766e;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(80, 189, 189, 0.22);
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-actions {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .profile-actions .btn {
+    flex: 1;
+    width: auto;
+    min-width: 135px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .profile-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-actions .btn {
+    width: 100%;
+    max-width: 190px;
   }
 }
 </style>

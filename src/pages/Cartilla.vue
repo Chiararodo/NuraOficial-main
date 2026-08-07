@@ -1840,7 +1840,6 @@ onMounted(async () => {
         </section>
 
         <footer class="modal-footer">
-          <button class="pill pill--ghost" @click="closeTooLateCancelModal">Cerrar</button>
           <button v-if="lateCancelProfessionalName" class="pill pill--primary" @click="goToProfessionalForRebook">
             Reprogramar turno
           </button>
@@ -2092,7 +2091,7 @@ font-family: var(--font-main);
 .pill--ghost-limpiar {
   background: var(--nura-green);
   box-shadow: 0 4px 12px rgba(80, 189, 189, 0.3);
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .pill--ghost-limpiar {
@@ -2103,7 +2102,7 @@ font-family: var(--font-main);
   background: var(--nura-danger);
   box-shadow: 0 8px 18px rgba(239, 68, 68, 0.35);
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 800;
 }
 
 .pill--danger:hover:not(:disabled) {
@@ -3218,7 +3217,7 @@ font-family: var(--font-main);
   }
 
   .modal-card {
-    width: 100%;
+    width: 90%;
     max-width: 100%;
     max-height: 92dvh;
     border-radius: 18px;

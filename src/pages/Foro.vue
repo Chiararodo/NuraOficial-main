@@ -271,6 +271,14 @@ function goBack() {
       </button>
     </div>
 
+
+    <div class="cta">
+      <button class="btn-primary" type="button" @click="goNewForum">
+        Nuevo foro
+      </button>
+    </div>
+
+
     <div v-if="loading" class="state">Cargando foros…</div>
     <p v-else-if="!filtered.length" class="state empty">
       No hay foros para mostrar con esos filtros.
@@ -283,12 +291,6 @@ function goBack() {
         <small class="count">({{ countFor(f.id) }})</small>
       </li>
     </ul>
-
-    <div class="cta">
-      <button class="btn-primary" type="button" @click="goNewForum">
-        Nuevo foro
-      </button>
-    </div>
 
     <div v-if="showUpsell" class="modal-overlay" @click.self="showUpsell = false">
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="upsell-title">
@@ -653,9 +655,9 @@ function goBack() {
   padding: 12px 20px;
   min-height: 44px;
   border-radius: 999px;
-  border: none;
-  background: #50bdbd;
-  color: #fff;
+  border: 2px solid #50bdbd;
+  background: #fff;
+  color: #50bdbd;
   font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;
@@ -888,7 +890,7 @@ function goBack() {
   }
 
   .cta .btn-primary {
-    width: 100%;
+    width: 35%;
     max-width: none;
   }
 

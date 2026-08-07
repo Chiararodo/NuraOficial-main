@@ -705,7 +705,7 @@ onMounted(async () => {
   font-weight: 900;
 }
 
-.card-actions,
+
 .plan-actions {
   display: flex;
   gap: 10px;
@@ -857,18 +857,28 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-/* 3 botones de estado */
+/* ===== BOTONES DEL ESTADO DE SUSCRIPCIÓN ===== */
+
 .card-actions{
-  display:flex;
-  flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:1fr 1fr;
   gap:12px;
   margin-top:18px;
 }
 
-.card-actions .btn{
-  flex:1;
-  min-width:170px;
-  max-width:220px;
+/* Botón principal */
+.card-actions .btn-primary{
+  grid-column:1 / -1;
+  justify-self:center;
+  width:100%;
+  min-height:36px;
+}
+
+/* Botones inferiores */
+.card-actions .btn-soft,
+.card-actions .btn-danger{
+  width:100%;
+  min-height:36px;
 }
 
 /* otros botones */
@@ -1064,7 +1074,27 @@ onMounted(async () => {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .card-actions .btn-primary,
+  .card-actions .btn-soft,
+  .card-actions .btn-danger{
+    font-size:.78rem;
+    min-height:34px;
+  }
 }
 
+/* Para celulares muy angostos */
+@media (max-width: 390px) {
+  .card-actions{
+    gap:10px;
+  }
+
+  .card-actions .btn-primary,
+  .card-actions .btn-soft,
+  .card-actions .btn-danger{
+    padding:7px 10px;
+    font-size:.75rem;
+  }
+}
 
 </style>
