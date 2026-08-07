@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted
+} from 'vue'
+
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
@@ -9,12 +14,17 @@ const auth = useAuthStore()
 
 const wantsReminder = ref(true)
 
-/** email de la cuenta (Auth) */
-const authEmail = computed(() => auth.user?.email ?? '')
+/* Email de la cuenta Auth */
+const authEmail = computed(
+  () => auth.user?.email ?? ''
+)
 
-/** Email editable guardado en profiles.email */
+/* Email editable guardado en profiles.email */
 const editableEmail = ref('')
-const emailMode = ref<'view' | 'edit'>('view')
+
+const emailMode =
+  ref<'view' | 'edit'>('view')
+
 const emailSaving = ref(false)
 const emailError = ref('')
 const emailSavedOk = ref(false)
@@ -33,88 +43,186 @@ function openEditEmail() {
 
 function cancelEditEmail() {
   clearEmailMessages()
+
   emailMode.value = 'view'
-  editableEmail.value = currentConfirmEmail.value
+
+  editableEmail.value =
+    currentConfirmEmail.value
 }
 
 function isValidEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    v.trim()
+  )
 }
 
 async function loadConfirmEmail() {
-  currentConfirmEmail.value = authEmail.value
-  editableEmail.value = authEmail.value
+  currentConfirmEmail.value =
+    authEmail.value
 
-  if (!auth.user) return
+  editableEmail.value =
+    authEmail.value
 
-  const { data } = await supabase
+  if (!auth.user) {
+    return
+  }
+
+  const { data, error } = await supabase
     .from('profiles')
     .select('email')
     .eq('id', auth.user.id)
     .maybeSingle()
 
+  if (error) {
+    console.error(
+      'Error cargando email:',
+      error
+    )
+
+    return
+  }
+
   if (data?.email) {
-    currentConfirmEmail.value = data.email
-    editableEmail.value = data.email
+    currentConfirmEmail.value =
+      data.email
+
+    editableEmail.value =
+      data.email
   }
 }
 
 async function saveEmail() {
   clearEmailMessages()
 
-  const next = editableEmail.value.trim()
+  const next =
+    editableEmail.value.trim()
 
   if (!next) {
-    emailError.value = 'Ingresá un email.'
+    emailError.value =
+      'Ingresá un email.'
+
     return
   }
 
   if (!isValidEmail(next)) {
-    emailError.value = 'El formato del email no es válido.'
+    emailError.value =
+      'El formato del email no es válido.'
+
     return
   }
 
-  if (!auth.user) return
+  if (!auth.user) {
+    return
+  }
 
   emailSaving.value = true
 
   try {
     const { error } = await supabase
       .from('profiles')
-      .update({ email: next })
+      .update({
+        email: next
+      })
       .eq('id', auth.user.id)
 
-    if (error) throw error
+    if (error) {
+      throw error
+    }
 
-    currentConfirmEmail.value = next
-    emailSavedOk.value = true
-    emailMode.value = 'view'
+    currentConfirmEmail.value =
+      next
+
+    emailSavedOk.value =
+      true
+
+    emailMode.value =
+      'view'
   } catch (e: any) {
     emailError.value =
-      e?.message ?? 'No se pudo guardar el email. Probá nuevamente.'
+      e?.message ??
+      'No se pudo guardar el email. Probá nuevamente.'
   } finally {
     emailSaving.value = false
   }
 }
 
+/*
+ * Avisa a Navbar, Perfil, Home,
+ * FeatureGate, etc. que Premium cambió.
+ */
+function notifyPremiumChanged() {
+  window.dispatchEvent(
+    new Event(
+      'nura-premium-changed'
+    )
+  )
+}
+
+/* =========================================
+   ACTIVAR PREMIUM
+========================================= */
+
 onMounted(async () => {
   const now = new Date()
-  const next = new Date(now)
-  next.setMonth(next.getMonth() + 1)
 
-  localStorage.setItem('nura_is_premium', 'true')
-  localStorage.setItem('nura_premium_subscribed_at', now.toISOString())
-  localStorage.setItem('nura_premium_next_payment', next.toISOString())
+  const nextPayment =
+    new Date(now)
 
+  nextPayment.setMonth(
+    nextPayment.getMonth() + 1
+  )
+
+  /*
+   * Estado local.
+   */
+  localStorage.setItem(
+    'nura_is_premium',
+    'true'
+  )
+
+  localStorage.setItem(
+    'nura_premium_subscribed_at',
+    now.toISOString()
+  )
+
+  localStorage.setItem(
+    'nura_premium_next_payment',
+    nextPayment.toISOString()
+  )
+
+  /*
+   * Estado persistente en Supabase.
+   */
   if (auth.user) {
-    await supabase.from('profiles').update({ premium: true }).eq('id', auth.user.id)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        premium: true,
+        plan: 'premium'
+      })
+      .eq('id', auth.user.id)
+
+    if (error) {
+      console.error(
+        'Error activando Premium:',
+        error
+      )
+    }
   }
+
+  /*
+   * MUY IMPORTANTE:
+   * actualiza la UI sin F5.
+   */
+  notifyPremiumChanged()
 
   await loadConfirmEmail()
 })
 
 function goPremiumArea() {
-  router.push({ name: 'premium-area' })
+  router.push({
+    name: 'premium-area'
+  })
 }
 </script>
 
