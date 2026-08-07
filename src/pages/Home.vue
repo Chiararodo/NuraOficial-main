@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/composables/useSupabase'
+import { useNuraApi } from '@/composables/useNuraApi'
 import MoodSuccessModal from '@/components/MoodSuccessModal.vue'
 import { useI18n } from 'vue-i18n'
 import { useFeatureGate } from '@/composables/useFeatureGate'
@@ -26,9 +27,33 @@ type Appt = {
   modality: string | null
 }
 
+type ApiTurno = {
+  _id: string
+  especialistaId:
+    | string
+    | {
+        name?: string
+        type?: string
+      }
+
+  pacienteNombre?: string
+  pacienteEmail?: string
+
+  start: string
+  end: string
+
+  status?: string
+  notes?: string
+  source?: string
+}
+
 const router = useRouter()
 const auth = useAuthStore()
 const { locale, t, tm } = useI18n()
+
+const {
+  fetchTurnosByPaciente
+} = useNuraApi()
 
 /* ========= Premium Popup (1 vez por día) ========= */
 const gate = useFeatureGate('diary')
@@ -225,8 +250,111 @@ const mondayBased = (first.getDay() + 6) % 7
 const leadingBlanks = mondayBased
 const daysInMonth = last.getDate()
 
-/* ========= Actividades (turnos de hoy) ========= */
-const activities = ref<Appt[]>([])
+/* ========= Actividades / turnos ========= */
+
+/*
+ * Todos los turnos del mes.
+ * Se usan para marcar el calendario.
+ */
+const monthAppointments = ref<Appt[]>([])
+
+/*
+ * Solamente los turnos de hoy que tdv no pasaron.
+ * Se muestran en "Actividades de hoy".
+ */
+const activities = computed(() => {
+  return monthAppointments.value.filter(
+    (appt) =>
+      appt.on_date === todayLocalISO() &&
+      isFutureAppointment(appt)
+  )
+})
+
+/*
+ * Importante:
+ * usamos fecha LOCAL y no toISOString(),
+ * para evitar problemas de zona horaria.
+ */
+function todayLocalISO() {
+  const now = new Date()
+
+  const year = now.getFullYear()
+
+  const month = String(
+    now.getMonth() + 1
+  ).padStart(2, '0')
+
+  const day = String(
+    now.getDate()
+  ).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+/*
+ * Devuelve YYYY-MM-DD para un día
+ * del mes que estamos mostrando.
+ */
+function calendarDayISO(day: number) {
+  const year = today.getFullYear()
+
+  const month = String(
+    today.getMonth() + 1
+  ).padStart(2, '0')
+
+  const dayText = String(day).padStart(
+    2,
+    '0'
+  )
+
+  return `${year}-${month}-${dayText}`
+}
+
+function isFutureAppointment(appt: Appt) {
+  const time =
+    (appt.at_time || '23:59:59')
+      .slice(0, 8)
+
+  const appointmentDate =
+    new Date(
+      `${appt.on_date}T${time}`
+    )
+
+  return (
+    appointmentDate.getTime() >=
+    new Date().getTime()
+  )
+}
+
+function hasAppointment(day: number) {
+  const date =
+    calendarDayISO(day)
+
+  return monthAppointments.value.some(
+    (appt) =>
+      appt.on_date === date &&
+      isFutureAppointment(appt)
+  )
+}
+
+function appointmentCount(day: number) {
+  const date =
+    calendarDayISO(day)
+
+  return monthAppointments.value.filter(
+    (appt) =>
+      appt.on_date === date &&
+      isFutureAppointment(appt)
+  ).length
+}
+
+function openCalendarDay(day: number) {
+  if (!hasAppointment(day)) {
+    return
+  }
+
+  goToMyAppointments()
+}
 
 function formatTime(ti: string) {
   return ti?.slice(0, 5) ?? ''
@@ -256,19 +384,170 @@ function exportApptToGoogle(a: Appt) {
 onMounted(async () => {
   await cargarForosActivos()
 
-  if (!auth.user) return
+  if (!auth.user?.email) {
+    return
+  }
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .select('id,user_id,on_date,at_time,title,details,professional,modality')
-    .eq('user_id', auth.user.id)
-    .eq('on_date', hoyYYYYMMDD)
-    .order('on_date', { ascending: true })
-    .order('at_time', { ascending: true })
+  try {
+    /*
+     * Usamos la MISMA API que Cartilla.
+     */
+    const turnos =
+      await fetchTurnosByPaciente(
+        auth.user.email
+      )
 
-  if (!error && data) activities.value = data as Appt[]
+    const month =
+      today.getMonth()
+
+    const year =
+      today.getFullYear()
+
+    monthAppointments.value =
+      (turnos as ApiTurno[])
+        /*
+         * No mostramos turnos cancelados.
+         */
+        .filter(
+          (turno) =>
+            turno.status !== 'cancelled'
+        )
+
+        /*
+         * Transformamos el formato de la API
+         * al formato que usa Home.
+         */
+        .map((turno: any) => {
+          const start =
+            new Date(turno.start)
+
+          const professional =
+            turno.especialistaId || {}
+
+          const notes =
+            String(turno.notes || '')
+
+          const modality =
+            notes.includes('Virtual')
+              ? 'Virtual'
+              : 'Presencial'
+
+          /*
+           * Importante:
+           * convertimos usando horario LOCAL.
+           */
+          const yyyy =
+            start.getFullYear()
+
+          const mm =
+            String(
+              start.getMonth() + 1
+            ).padStart(2, '0')
+
+          const dd =
+            String(
+              start.getDate()
+            ).padStart(2, '0')
+
+          const hh =
+            String(
+              start.getHours()
+            ).padStart(2, '0')
+
+          const min =
+            String(
+              start.getMinutes()
+            ).padStart(2, '0')
+
+          return {
+            id:
+              String(turno._id),
+
+            user_id:
+              auth.user!.id,
+
+            on_date:
+              `${yyyy}-${mm}-${dd}`,
+
+            at_time:
+              `${hh}:${min}:00`,
+
+            title:
+              `Turno – ${
+                professional.name ??
+                'Profesional'
+              }`,
+
+            details:
+              notes || null,
+
+            professional:
+              `${
+                professional.name ?? ''
+              }${
+                professional.type
+                  ? ` – ${professional.type}`
+                  : ''
+              }`.trim(),
+
+            modality
+          } satisfies Appt
+        })
+
+        /*
+         * El calendario de Home muestra
+         * solamente el mes actual.
+         */
+        .filter((appt) => {
+          const [
+            apptYear,
+            apptMonth
+          ] =
+            appt.on_date
+              .split('-')
+              .map(Number)
+
+          return (
+            apptYear === year &&
+            apptMonth === month + 1
+          )
+        })
+
+        /*
+         * Ordenamos por fecha + hora.
+         */
+        .sort((a, b) => {
+          const aDate =
+            `${a.on_date}T${
+              a.at_time || '00:00:00'
+            }`
+
+          const bDate =
+            `${b.on_date}T${
+              b.at_time || '00:00:00'
+            }`
+
+          return (
+            new Date(aDate).getTime() -
+            new Date(bDate).getTime()
+          )
+        })
+
+    console.log(
+      'Turnos cargados en Home:',
+      monthAppointments.value
+    )
+  } catch (error) {
+    console.error(
+      'Error cargando turnos en Home:',
+      error
+    )
+
+    monthAppointments.value = []
+  }
 
   await gate.refresh()
+
   openPremiumPopupOncePerDay()
 })
 </script>
@@ -427,14 +706,34 @@ onMounted(async () => {
               <span v-for="i in leadingBlanks" :key="'b' + i" class="blank" />
 
               <button
-                v-for="d in daysInMonth"
-                :key="'d' + d"
-                class="cal-day"
-                :class="{ today: d === today.getDate() }"
-                type="button"
-              >
-                {{ d }}
-              </button>
+  v-for="d in daysInMonth"
+  :key="'d' + d"
+  class="cal-day"
+  :class="{
+    today:
+      d === today.getDate(),
+
+    'has-appointment':
+      hasAppointment(d)
+  }"
+  type="button"
+  :aria-label="
+    hasAppointment(d)
+      ? `${d} de ${monthName}, ${appointmentCount(d)} turno${appointmentCount(d) > 1 ? 's' : ''}`
+      : `${d} de ${monthName}`
+  "
+  @click="openCalendarDay(d)"
+>
+  <span>
+    {{ d }}
+  </span>
+
+  <span
+    v-if="hasAppointment(d)"
+    class="appointment-dot"
+    aria-hidden="true"
+  ></span>
+</button>
             </div>
           </div>
 
@@ -840,6 +1139,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   font-weight: 600;
   font-size: 0.9rem;
   color: #1f2937;
@@ -855,6 +1155,51 @@ h2 {
   color: white;
   border-color: #50bdbd;
   box-shadow: 0 0 0 3px rgba(80, 189, 189, 0.25);
+}
+
+.cal-day.has-appointment {
+  cursor: pointer;
+  border-color: #50bdbd;
+  background: #effcfa;
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.cal-day.today.has-appointment {
+  background: #50bdbd;
+  color: #ffffff;
+  border-color: #50bdbd;
+}
+
+.cal-day.today .appointment-dot {
+  background: #ffffff;
+}
+
+@media (hover: hover) {
+  .cal-day.has-appointment:hover {
+    background: #d8f6f1;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+      0 7px 14px
+      rgba(80, 189, 189, 0.18);
+  }
+
+  .cal-day.today.has-appointment:hover {
+    background: #3eaaaa;
+  }
+}
+
+.appointment-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #50bdbd;
+  transform: translateX(-50%);
 }
 
 .cal-actions {
