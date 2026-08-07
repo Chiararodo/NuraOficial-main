@@ -262,7 +262,7 @@ function setMood(mood: Mood) {
 }
 
 function goDiaryList() {
-  router.push('/app/diario/entradas')
+  router.push('/app/diario')
 }
 
 function goToMyPublicProfile() {

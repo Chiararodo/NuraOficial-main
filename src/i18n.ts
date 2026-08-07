@@ -168,7 +168,7 @@ const messages = {
       diary: {
         title: 'Mi Diario',
         emptyPreview: '',
-        viewAll: 'Entradas',
+        viewAll: 'Diario',
         writeToday: 'Escribir hoy'
       },
 
