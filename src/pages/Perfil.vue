@@ -425,19 +425,20 @@ const avatarInitial = computed(() => fallbackInitial())
             </p>
 
             <RouterLink
-  :to="
-        isPremium
-          ? '/app/premium'
-          : '/app/planes'
-      "
-      class="btn btn-full"
-    >
-      {{
-        isPremium
-          ? $t('profile.plan.seeDetails')
-          : $t('profile.plan.seePlans')
-      }}
-    </RouterLink>
+  v-if="!isPremium"
+  to="/app/planes"
+  class="btn btn-full"
+>
+  Ver planes
+</RouterLink>
+
+<RouterLink
+  v-else
+  to="/app/premium"
+  class="btn btn-full"
+>
+  Ver Premium
+</RouterLink>
           </template>
 
           <template v-else>

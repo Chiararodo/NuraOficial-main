@@ -254,7 +254,6 @@ function goCheckout() {
 
   font-size: 1.7rem;
   font-weight: 850;
-
   color: #50bdbd;
 }
 
@@ -294,22 +293,16 @@ function goCheckout() {
     20px
     20px
     18px;
-
   border:
     1px solid #e2edf7;
-
   background: #ffffff;
-
   box-shadow:
     0 12px 28px
     rgba(15, 23, 42, 0.08);
-
   display: flex;
   flex-direction: column;
-
   gap: 14px;
-
-  min-height: 390px;
+  min-height: 200px;
 
   transition:
     transform 0.22s ease,
