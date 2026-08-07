@@ -76,7 +76,7 @@ onMounted(async () => {
 })
 
 function goPlans() {
-  router.push('/app/premium')
+  router.push('/app/planes')
 }
 function goAgenda() {
   router.push('/app/agendar/eventos')

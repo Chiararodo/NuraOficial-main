@@ -23,6 +23,7 @@ function setAdminToggle(value: boolean) {
   localStorage.setItem('nura_admin_premium_enabled', value ? 'true' : 'false')
 }
 
+
 function syncPremiumCache(value: boolean) {
   if (value) localStorage.setItem('nura_is_premium', 'true')
   else localStorage.removeItem('nura_is_premium')
@@ -31,16 +32,20 @@ function syncPremiumCache(value: boolean) {
 }
 
 const isPremium = computed(() => {
-  if (isAdmin.value) return adminPremiumEnabled.value
-  return premiumDb.value || localStorage.getItem('nura_is_premium') === 'true'
+  if (isAdmin.value) {
+    return adminPremiumEnabled.value
+  }
+
+  return premiumDb.value
 })
 
 async function loadStatus() {
   if (!auth.user) {
     premiumDb.value = false
     isAdmin.value = false
-    syncPremiumCache(false)
     loading.value = false
+
+    router.replace('/app/planes')
     return
   }
 
@@ -52,13 +57,57 @@ async function loadStatus() {
     .eq('id', auth.user.id)
     .maybeSingle()
 
-  if (!error && data) {
-    isAdmin.value = !!data.is_admin
-    premiumDb.value = !!data.premium
-    syncPremiumCache(isAdmin.value ? adminPremiumEnabled.value : premiumDb.value)
+  if (error) {
+    console.error(
+      'Error cargando estado Premium:',
+      error
+    )
+
+    /*
+     * Si Supabase falla momentáneamente,
+     * NO mandamos al usuario a Home ni a Planes.
+     * Conservamos el estado local.
+     */
+    premiumDb.value =
+      localStorage.getItem('nura_is_premium') === 'true'
+
+    loading.value = false
+    return
   }
 
+  if (!data) {
+    premiumDb.value = false
+    isAdmin.value = false
+    syncPremiumCache(false)
+    loading.value = false
+
+    router.replace('/app/planes')
+    return
+  }
+
+  isAdmin.value = Boolean(data.is_admin)
+  premiumDb.value = Boolean(data.premium)
+
+  /*
+   * Admin conserva el comportamiento especial
+   * que ya tenías.
+   */
+  const premiumActive =
+    isAdmin.value
+      ? adminPremiumEnabled.value
+      : premiumDb.value
+
+  syncPremiumCache(premiumActive)
+
   loading.value = false
+
+  /*
+   * Solamente después de tener respuesta real
+   * decidimos si corresponde ir a Planes.
+   */
+  if (!premiumActive) {
+    router.replace('/app/planes')
+  }
 }
 
 function goCheckout() {
@@ -71,10 +120,13 @@ function goPerfil() {
 
 function goPremiumArea() {
   if (!isPremium.value) {
-    router.push({ name: 'premium' })
+    router.push('/app/planes')
     return
   }
-  router.push({ name: 'premium-area' })
+
+  router.push({
+    name: 'premium-area'
+  })
 }
 
 const showAdminChoicePopup = ref(false)
@@ -172,28 +224,53 @@ async function confirmCancelPremium() {
   cancelLoading.value = true
 
   syncPremiumCache(false)
-  localStorage.removeItem('nura_premium_subscribed_at')
-  localStorage.removeItem('nura_premium_next_payment')
+
+  localStorage.removeItem(
+    'nura_premium_subscribed_at'
+  )
+
+  localStorage.removeItem(
+    'nura_premium_next_payment'
+  )
 
   if (auth.user) {
-    await supabase
+    const { error } = await supabase
       .from('profiles')
-      .update({ premium: false, plan: 'free', plan_expires_at: null })
+      .update({
+        premium: false,
+        plan: 'free',
+        plan_expires_at: null
+      })
       .eq('id', auth.user.id)
+
+    if (error) {
+      console.error(
+        'Error cancelando Premium:',
+        error
+      )
+
+      cancelLoading.value = false
+      return
+    }
   }
 
-  if (isAdmin.value) setAdminToggle(false)
+  if (isAdmin.value) {
+    setAdminToggle(false)
+  }
+
+  premiumDb.value = false
 
   cancelLoading.value = false
   showConfirmCancel.value = false
   showSuccessModal.value = true
-
-  await loadStatus()
 }
 
 function closeSuccessModal() {
   showSuccessModal.value = false
-  router.push({ name: 'perfil' })
+
+  router.push({
+    name: 'perfil'
+  })
 }
 
 type Shortcut = { title: string; desc: string; to: string }
@@ -233,7 +310,6 @@ function goBack() {
 onMounted(async () => {
   loadAdminToggle()
   await loadStatus()
-  syncPremiumCache(isPremium.value)
 })
 </script>
 
@@ -269,129 +345,162 @@ onMounted(async () => {
   </div>
 </header>
 
-      <p v-if="loading" class="page-sub loading-text">Cargando…</p>
+      <!-- =====================================
+           CARGANDO
+      ====================================== -->
 
-      <section v-else-if="!isPremium" class="plans-grid" aria-label="Planes disponibles">
-        <article class="plan-card">
-          <header class="plan-head">
-            <div>
-              <h2 class="plan-title">Plan Gratuito</h2>
-              <p class="plan-desc">
-                Ideal para empezar a usar Nura y conocer las funciones principales.
-              </p>
-            </div>
-            <p class="plan-price">$0 <span>/mes</span></p>
-          </header>
+      <p
+        v-if="loading"
+        class="page-sub loading-text"
+        role="status"
+        aria-live="polite"
+      >
+        Cargando…
+      </p>
 
-          <ul class="benefits">
-            <li><strong>Foro:</strong> Podés comentar, pero no crear publicaciones.</li>
-            <li><strong>Diario:</strong> Hasta <strong>10 entradas por mes</strong>.</li>
-            <li><strong>Chatbot:</strong> Hasta 10 mensajes por día.</li>
-            <li><strong>Contenido:</strong> Acceso a materiales generales.</li>
-          </ul>
-        </article>
+      <!-- =====================================
+           PREMIUM ACTIVO
+      ====================================== -->
 
-        <article class="plan-card plan-card--premium">
-          <header class="plan-head">
-            <div>
-              <h2 class="plan-title">Plan Premium</h2>
-              <p class="plan-desc">
-                Acceso completo e ilimitado a herramientas y experiencias en vivo.
-              </p>
-            </div>
-            <p class="plan-price">$10.000 <span>/mes</span></p>
-          </header>
-
-          <ul class="benefits">
-            <li><strong>Foro:</strong> Crear + comentar sin límites.</li>
-            <li><strong>Diario:</strong> Entradas ilimitadas.</li>
-            <li><strong>Chatbot:</strong> Usos ilimitados.</li>
-            <li>Videollamadas grupales semanales.</li>
-            <li>Talleres exclusivos en vivo.</li>
-            <li>Merch exclusivo.</li>
-          </ul>
-
-          <div class="plan-actions">
-            <button class="btn btn-primary" type="button" @click="goCheckout">
-              Elegir Premium
-            </button>
-
-            <button
-              v-if="isAdmin"
-              class="btn btn-soft"
-              type="button"
-              @click="openAdminChoicePopup"
-            >
-              Premium Admin
-            </button>
-          </div>
-        </article>
-
-        <div class="bottom-action">
-          <button class="btn btn-soft" type="button" @click="goPerfil">
-            Volver al perfil
-          </button>
-        </div>
-      </section>
-
-      <section v-else class="active-area">
+      <section
+        v-else-if="isPremium"
+        class="active-area"
+      >
         <div class="content-grid">
+
+          <!-- ESTADO DE SUSCRIPCIÓN -->
+
           <section class="card card-stack">
             <div>
-              <h2 class="section-title">Estado de suscripción</h2>
+              <h2 class="section-title">
+                Estado de suscripción
+              </h2>
 
-              <p class="section-sub" v-if="isAdmin">
-                Tu cuenta tiene <strong>Premium incluido</strong> por ser administradora.
+              <p
+                v-if="isAdmin"
+                class="section-sub"
+              >
+                Tu cuenta tiene
+                <strong>Premium incluido</strong>
+                por ser administradora.
               </p>
 
-              <p class="section-sub" v-else>
+              <p
+                v-else
+                class="section-sub"
+              >
                 La renovación es automática todos los meses.
               </p>
 
-              <div class="kv" v-if="!isAdmin">
-                <div class="kv-row" v-if="premiumSinceLabel">
-                  <span class="kv-key">Suscripta desde</span>
-                  <span class="kv-val">{{ premiumSinceLabel }}</span>
+              <div
+                v-if="!isAdmin"
+                class="kv"
+              >
+                <div
+                  v-if="premiumSinceLabel"
+                  class="kv-row"
+                >
+                  <span class="kv-key">
+                    Suscripta desde
+                  </span>
+
+                  <span class="kv-val">
+                    {{ premiumSinceLabel }}
+                  </span>
                 </div>
 
-                <div class="kv-row" v-if="nextPaymentLabel">
-                  <span class="kv-key">Próximo pago estimado</span>
-                  <span class="kv-val">{{ nextPaymentLabel }}</span>
+                <div
+                  v-if="nextPaymentLabel"
+                  class="kv-row"
+                >
+                  <span class="kv-key">
+                    Próximo pago estimado
+                  </span>
+
+                  <span class="kv-val">
+                    {{ nextPaymentLabel }}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div class="card-actions">
-              <button class="btn btn-primary" type="button" @click="goPremiumArea">
+
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="goPremiumArea"
+              >
                 Ir espacio Premium
               </button>
 
-              <button class="btn btn-soft" type="button" @click="goPerfil">
+              <button
+                class="btn btn-soft"
+                type="button"
+                @click="goPerfil"
+              >
                 Volver al perfil
               </button>
 
-              <button class="btn btn-danger" type="button" @click="openCancelModal">
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="openCancelModal"
+              >
                 Darme de baja
               </button>
+
             </div>
           </section>
 
+          <!-- BENEFICIOS -->
+
           <section class="card">
-            <h2 class="section-title">Beneficios incluidos</h2>
-            <p class="section-sub">Acceso completo a herramientas y experiencias premium.</p>
+            <h2 class="section-title">
+              Beneficios incluidos
+            </h2>
+
+            <p class="section-sub">
+              Acceso completo a herramientas y experiencias premium.
+            </p>
 
             <ul class="benefits">
-              <li><strong>Foro:</strong> Crear + comentar sin límites.</li>
-              <li><strong>Diario:</strong> Entradas ilimitadas.</li>
-              <li><strong>Chatbot:</strong> Usos ilimitados.</li>
-              <li>Videollamadas grupales semanales.</li>
-              <li>Talleres exclusivos en vivo.</li>
-              <li>Merch exclusivo.</li>
+              <li>
+                <strong>Foro:</strong>
+                Crear + comentar sin límites.
+              </li>
+
+              <li>
+                <strong>Diario:</strong>
+                Entradas ilimitadas.
+              </li>
+
+              <li>
+                <strong>Chatbot:</strong>
+                Usos ilimitados.
+              </li>
+
+              <li>
+                Videollamadas grupales semanales.
+              </li>
+
+              <li>
+                Talleres exclusivos en vivo.
+              </li>
+
+              <li>
+                Merch exclusivo.
+              </li>
             </ul>
           </section>
 
+          <!-- ACCESOS RÁPIDOS -->
+
           <section class="card card-wide">
-            <h2 class="section-title">Accesos rápidos</h2>
+            <h2 class="section-title">
+              Accesos rápidos
+            </h2>
+
             <p class="section-sub">
               Entradas directas a las secciones principales para aprovechar el plan sin perder tiempo.
             </p>
@@ -405,15 +514,21 @@ onMounted(async () => {
                 @click="goTo(s.to)"
               >
                 <div class="shortcut-top">
-                  <span class="shortcut-title">{{ s.title }}</span>
+                  <span class="shortcut-title">
+                    {{ s.title }}
+                  </span>
                 </div>
-                <p class="shortcut-desc">{{ s.desc }}</p>
+
+                <p class="shortcut-desc">
+                  {{ s.desc }}
+                </p>
               </button>
             </div>
           </section>
+
         </div>
       </section>
-    </section>
+      </section>
 
     <div v-if="showAdminChoicePopup" class="modal-backdrop" @click.self="closeAdminChoicePopup">
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
