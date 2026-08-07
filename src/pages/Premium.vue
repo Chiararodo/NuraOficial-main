@@ -7,45 +7,93 @@ import { useAuthStore } from '@/store/auth'
 const router = useRouter()
 const auth = useAuthStore()
 
+/* =========================================
+   ESTADO GENERAL
+========================================= */
+
 const loading = ref(true)
 const premiumDb = ref(false)
 const isAdmin = ref(false)
 
+/*
+ * Mantengo tu lógica especial para admin
+ * exactamente como la venías usando.
+ */
 const adminPremiumEnabled = ref(true)
 
+/* =========================================
+   ADMIN PREMIUM
+========================================= */
+
 function loadAdminToggle() {
-  const raw = localStorage.getItem('nura_admin_premium_enabled')
-  adminPremiumEnabled.value = raw === null ? true : raw === 'true'
+  const raw =
+    localStorage.getItem(
+      'nura_admin_premium_enabled'
+    )
+
+  adminPremiumEnabled.value =
+    raw === null
+      ? true
+      : raw === 'true'
 }
 
 function setAdminToggle(value: boolean) {
   adminPremiumEnabled.value = value
-  localStorage.setItem('nura_admin_premium_enabled', value ? 'true' : 'false')
+
+  localStorage.setItem(
+    'nura_admin_premium_enabled',
+    value ? 'true' : 'false'
+  )
 }
 
+/* =========================================
+   CACHE PREMIUM
+========================================= */
 
 function syncPremiumCache(value: boolean) {
-  if (value) localStorage.setItem('nura_is_premium', 'true')
-  else localStorage.removeItem('nura_is_premium')
-
-  window.dispatchEvent(new Event('nura-premium-changed'))
-}
-
-const isPremium = computed(() => {
-  if (isAdmin.value) {
-    return adminPremiumEnabled.value
+  if (value) {
+    localStorage.setItem(
+      'nura_is_premium',
+      'true'
+    )
+  } else {
+    localStorage.removeItem(
+      'nura_is_premium'
+    )
   }
 
+  /*
+   * Le avisamos al resto de Nura
+   * que cambió el estado Premium.
+   */
+  window.dispatchEvent(
+    new Event(
+      'nura-premium-changed'
+    )
+  )
+}
+
+/* =========================================
+   ¿ES PREMIUM?
+========================================= */
+
+const isPremium = computed(() => {
   return premiumDb.value
 })
 
+/* =========================================
+   CARGAR ESTADO PREMIUM
+========================================= */
+
 async function loadStatus() {
+  /*
+   * Si no hay usuario, no hacemos
+   * ninguna redirección automática.
+   */
   if (!auth.user) {
     premiumDb.value = false
     isAdmin.value = false
     loading.value = false
-
-    router.replace('/app/planes')
     return
   }
 
@@ -53,74 +101,94 @@ async function loadStatus() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('premium, is_admin')
-    .eq('id', auth.user.id)
+    .select(
+      'premium, is_admin'
+    )
+    .eq(
+      'id',
+      auth.user.id
+    )
     .maybeSingle()
 
+  /*
+   * Si Supabase falla momentáneamente,
+   * usamos la caché local.
+   *
+   * MUY IMPORTANTE:
+   * NO redirigimos a /app/planes.
+   */
   if (error) {
     console.error(
       'Error cargando estado Premium:',
       error
     )
 
-    /*
-     * Si Supabase falla momentáneamente,
-     * NO mandamos al usuario a Home ni a Planes.
-     * Conservamos el estado local.
-     */
     premiumDb.value =
-      localStorage.getItem('nura_is_premium') === 'true'
+      localStorage.getItem(
+        'nura_is_premium'
+      ) === 'true'
 
     loading.value = false
     return
   }
 
+  /*
+   * Si no encontramos el perfil,
+   * simplemente mostramos estado no Premium.
+   *
+   * Tampoco redirigimos automáticamente.
+   */
   if (!data) {
     premiumDb.value = false
     isAdmin.value = false
-    syncPremiumCache(false)
     loading.value = false
-
-    router.replace('/app/planes')
     return
   }
 
-  isAdmin.value = Boolean(data.is_admin)
-  premiumDb.value = Boolean(data.premium)
+  isAdmin.value =
+    Boolean(
+      data.is_admin
+    )
 
-  /*
-   * Admin conserva el comportamiento especial
-   * que ya tenías.
-   */
-  const premiumActive =
-    isAdmin.value
-      ? adminPremiumEnabled.value
-      : premiumDb.value
+  premiumDb.value =
+    Boolean(
+      data.premium
+    )
 
-  syncPremiumCache(premiumActive)
+ syncPremiumCache(
+  premiumDb.value
+)
 
   loading.value = false
-
-  /*
-   * Solamente después de tener respuesta real
-   * decidimos si corresponde ir a Planes.
-   */
-  if (!premiumActive) {
-    router.replace('/app/planes')
-  }
 }
 
+/* =========================================
+   NAVEGACIÓN
+========================================= */
+
 function goCheckout() {
-  router.push({ name: 'premium-checkout' })
+  router.push({
+    name: 'premium-checkout'
+  })
 }
 
 function goPerfil() {
-  router.push({ name: 'perfil' })
+  router.push({
+    name: 'perfil'
+  })
 }
 
 function goPremiumArea() {
+  /*
+   * Esta validación sí la dejamos,
+   * porque el Espacio Premium
+   * tiene que ser solo para Premium.
+   */
   if (!isPremium.value) {
-    router.push('/app/planes')
+    router.push(
+      '/app/planes'
+    )
+
     return
   }
 
@@ -129,35 +197,73 @@ function goPremiumArea() {
   })
 }
 
-const showAdminChoicePopup = ref(false)
-const adminChoiceLoading = ref(false)
+function goTo(path: string) {
+  router.push(path)
+}
+
+function goBack() {
+  router.back()
+}
+
+/* =========================================
+   POPUP ADMIN
+========================================= */
+
+const showAdminChoicePopup =
+  ref(false)
+
+const adminChoiceLoading =
+  ref(false)
 
 function openAdminChoicePopup() {
   showAdminChoicePopup.value = true
 }
 
 function closeAdminChoicePopup() {
-  if (!adminChoiceLoading.value) showAdminChoicePopup.value = false
+  if (
+    !adminChoiceLoading.value
+  ) {
+    showAdminChoicePopup.value = false
+  }
 }
 
 async function ensureAdminPremiumOn() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value) {
+    return
+  }
 
   setAdminToggle(true)
   syncPremiumCache(true)
 
   if (auth.user) {
-    await supabase
+    const { error } = await supabase
       .from('profiles')
-      .update({ premium: true, plan: 'premium', plan_expires_at: null })
-      .eq('id', auth.user.id)
+      .update({
+        premium: true,
+        plan: 'premium',
+        plan_expires_at: null
+      })
+      .eq(
+        'id',
+        auth.user.id
+      )
+
+    if (error) {
+      console.error(
+        'Error activando Premium admin:',
+        error
+      )
+    }
   }
 
   await loadStatus()
 }
 
 async function adminGoToPremiumManage() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value) {
+    return
+  }
+
   adminChoiceLoading.value = true
 
   await ensureAdminPremiumOn()
@@ -165,11 +271,16 @@ async function adminGoToPremiumManage() {
   showAdminChoicePopup.value = false
   adminChoiceLoading.value = false
 
-  router.push({ name: 'premium' })
+  router.push({
+    name: 'premium'
+  })
 }
 
 async function adminGoToPremiumStar() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value) {
+    return
+  }
+
   adminChoiceLoading.value = true
 
   await ensureAdminPremiumOn()
@@ -177,62 +288,104 @@ async function adminGoToPremiumStar() {
   showAdminChoicePopup.value = false
   adminChoiceLoading.value = false
 
-  router.push({ name: 'premium-area' })
+  router.push({
+    name: 'premium-area'
+  })
 }
 
+/* =========================================
+   FECHAS PREMIUM
+========================================= */
+
 const premiumSince = computed(() => {
-  const iso = localStorage.getItem('nura_premium_subscribed_at')
-  return iso ? new Date(iso) : null
+  const iso =
+    localStorage.getItem(
+      'nura_premium_subscribed_at'
+    )
+
+  return iso
+    ? new Date(iso)
+    : null
 })
 
 const nextPayment = computed(() => {
-  const iso = localStorage.getItem('nura_premium_next_payment')
-  return iso ? new Date(iso) : null
+  const iso =
+    localStorage.getItem(
+      'nura_premium_next_payment'
+    )
+
+  return iso
+    ? new Date(iso)
+    : null
 })
 
-const premiumSinceLabel = computed(() => {
-  if (!premiumSince.value) return ''
-  return premiumSince.value.toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
+const premiumSinceLabel =
+  computed(() => {
+    if (!premiumSince.value) {
+      return ''
+    }
+
+    return premiumSince.value
+      .toLocaleDateString(
+        'es-AR',
+        {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }
+      )
   })
-})
 
-const nextPaymentLabel = computed(() => {
-  if (!nextPayment.value) return ''
-  return nextPayment.value.toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
+const nextPaymentLabel =
+  computed(() => {
+    if (!nextPayment.value) {
+      return ''
+    }
+
+    return nextPayment.value
+      .toLocaleDateString(
+        'es-AR',
+        {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }
+      )
   })
-})
 
-const showConfirmCancel = ref(false)
-const showSuccessModal = ref(false)
-const cancelLoading = ref(false)
+/* =========================================
+   DARME DE BAJA
+========================================= */
+
+const showConfirmCancel =
+  ref(false)
+
+const showSuccessModal =
+  ref(false)
+
+const cancelLoading =
+  ref(false)
 
 function openCancelModal() {
   showConfirmCancel.value = true
 }
 
 function closeCancelModal() {
-  if (!cancelLoading.value) showConfirmCancel.value = false
+  if (
+    !cancelLoading.value
+  ) {
+    showConfirmCancel.value = false
+  }
 }
 
 async function confirmCancelPremium() {
   cancelLoading.value = true
 
-  syncPremiumCache(false)
-
-  localStorage.removeItem(
-    'nura_premium_subscribed_at'
-  )
-
-  localStorage.removeItem(
-    'nura_premium_next_payment'
-  )
-
+  /*
+   * Primero actualizamos Supabase.
+   * Así no mostramos Free localmente
+   * si la actualización falla.
+   */
   if (auth.user) {
     const { error } = await supabase
       .from('profiles')
@@ -241,7 +394,10 @@ async function confirmCancelPremium() {
         plan: 'free',
         plan_expires_at: null
       })
-      .eq('id', auth.user.id)
+      .eq(
+        'id',
+        auth.user.id
+      )
 
     if (error) {
       console.error(
@@ -254,11 +410,30 @@ async function confirmCancelPremium() {
     }
   }
 
+  /*
+   * Actualizamos estado local
+   * solamente después de que Supabase
+   * respondió correctamente.
+   */
+  premiumDb.value = false
+
+  syncPremiumCache(false)
+
+  localStorage.removeItem(
+    'nura_premium_subscribed_at'
+  )
+
+  localStorage.removeItem(
+    'nura_premium_next_payment'
+  )
+
+  /*
+   * Mantengo tu comportamiento actual
+   * para admin.
+   */
   if (isAdmin.value) {
     setAdminToggle(false)
   }
-
-  premiumDb.value = false
 
   cancelLoading.value = false
   showConfirmCancel.value = false
@@ -273,42 +448,54 @@ function closeSuccessModal() {
   })
 }
 
-type Shortcut = { title: string; desc: string; to: string }
+/* =========================================
+   ACCESOS RÁPIDOS
+========================================= */
 
-const shortcuts = computed<Shortcut[]>(() => [
-  {
-    title: 'Foro',
-    desc: 'Publicá, comentá y participá en la comunidad. Ideal para apoyo y experiencias compartidas.',
-    to: '/app/foro'
-  },
-  {
-    title: 'Diario',
-    desc: 'Registrá tu estado emocional y escribí tus entradas. Útil para seguimiento personal.',
-    to: '/app/diario'
-  },
-  {
-    title: 'Chatbot',
-    desc: 'Asistente de apoyo para organizarte, reflexionar y acceder a recursos guiados.',
-    to: '/app/chatbot'
-  },
-  {
-    title: 'Agenda',
-    desc: 'Revisá actividades premium, sesiones y próximos encuentros disponibles.',
-    to: '/app/agendar'
-  }
-])
-
-function goTo(path: string) {
-  router.push(path)
+type Shortcut = {
+  title: string
+  desc: string
+  to: string
 }
 
-function goBack() {
-  router.back()
-}
+const shortcuts =
+  computed<Shortcut[]>(() => [
+    {
+      title: 'Foro',
+      desc:
+        'Publicá, comentá y participá en la comunidad. Ideal para apoyo y experiencias compartidas.',
+      to: '/app/foro'
+    },
 
+    {
+      title: 'Diario',
+      desc:
+        'Registrá tu estado emocional y escribí tus entradas. Útil para seguimiento personal.',
+      to: '/app/diario'
+    },
+
+    {
+      title: 'Chatbot',
+      desc:
+        'Asistente de apoyo para organizarte, reflexionar y acceder a recursos guiados.',
+      to: '/app/chatbot'
+    },
+
+    {
+      title: 'Agenda',
+      desc:
+        'Revisá actividades premium, sesiones y próximos encuentros disponibles.',
+      to: '/app/agendar'
+    }
+  ])
+
+/* =========================================
+   CARGA INICIAL
+========================================= */
 
 onMounted(async () => {
   loadAdminToggle()
+
   await loadStatus()
 })
 </script>

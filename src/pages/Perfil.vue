@@ -121,7 +121,7 @@ const premiumDb = ref(false)
 const loadingPremium = ref(true)
 
 const isPremium = computed(() => {
-  return premiumDb.value || localStorage.getItem('nura_is_premium') === 'true'
+  return premiumDb.value
 })
 
 function syncPremiumCache(value: boolean) {
